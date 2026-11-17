@@ -16,7 +16,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import org.json.JSONObject;
 
 import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
@@ -24,7 +27,13 @@ import com.chaquo.python.android.AndroidPlatform;
 /** Hosts the MCUBED gateway (embedded Python) and shows its dashboard full screen. */
 public class MainActivity extends Activity {
     private static final String PREFS = "mcubed";
-    private static final String KEY_OPENROUTER = "openrouter_key";
+    private static final String KEY_CONFIGURED = "keys_configured";
+    /** Provider key slots: environment variable name and label shown in the dialog. */
+    private static final String[][] KEYS = {
+            {"OPENROUTER_API_KEY", "OpenRouter (reaches every model)"},
+            {"OPENAI_API_KEY", "OpenAI (direct)"},
+            {"DEEPSEEK_API_KEY", "DeepSeek (direct)"},
+    };
     private static final int MENU_KEY = 1, MENU_RELOAD = 2;
 
     private WebView web;
@@ -56,7 +65,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (savedInstanceState == null && prefs().getString(KEY_OPENROUTER, null) == null) {
+        if (savedInstanceState == null && !prefs().getBoolean(KEY_CONFIGURED, false)) {
             askForKey(true);
         } else {
             startGateway();
@@ -68,12 +77,12 @@ public class MainActivity extends Activity {
     }
 
     private void startGateway() {
-        final String key = prefs().getString(KEY_OPENROUTER, "");
+        final String keys = keysJson();
         new Thread(() -> {
             try {
                 if (!Python.isStarted()) Python.start(new AndroidPlatform(this));
                 final String url = Python.getInstance().getModule("android_main")
-                        .callAttr("start", getFilesDir().getAbsolutePath() + "/gateway", key).toString();
+                        .callAttr("start", getFilesDir().getAbsolutePath() + "/gateway", keys).toString();
                 runOnUiThread(() -> {
                     setContentView(web);
                     if (web.getUrl() == null) web.loadUrl(url);
@@ -84,35 +93,71 @@ public class MainActivity extends Activity {
         }, "mcubed-start").start();
     }
 
+    private String keysJson() {
+        JSONObject o = new JSONObject();
+        try {
+            for (String[] k : KEYS) o.put(k[0], prefs().getString(k[0], ""));
+        } catch (Exception ignored) {
+        }
+        return o.toString();
+    }
+
     private void askForKey(final boolean firstRun) {
-        final EditText input = new EditText(this);
-        input.setHint("sk-or-…");
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+        final EditText[] fields = new EditText[KEYS.length];
+        for (int i = 0; i < KEYS.length; i++) {
+            TextView label = new TextView(this);
+            label.setText(KEYS[i][1]);
+            box.addView(label);
+            EditText input = new EditText(this);
+            input.setSingleLine(true);
+            input.setHint(prefs().getString(KEYS[i][0], "").isEmpty() ? "not set" : "saved (leave blank to keep)");
+            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            box.addView(input);
+            fields[i] = input;
+        }
         new AlertDialog.Builder(this)
-                .setTitle("OpenRouter API key")
-                .setMessage("One OpenRouter key reaches every model in MCUBED. It is stored only on this "
-                        + "device. Skip to explore in demo mode with simulated replies.")
-                .setView(input)
+                .setTitle("AI provider keys")
+                .setMessage("Add any keys you have. They are stored only on this device. "
+                        + "With no keys, MCUBED runs in demo mode with simulated replies.")
+                .setView(box)
                 .setCancelable(false)
-                .setPositiveButton("Save", (d, w) -> saveKey(input.getText().toString().trim(), firstRun))
-                .setNegativeButton(firstRun ? "Demo mode" : "Cancel", (d, w) -> {
-                    if (firstRun) saveKey("", true);
+                .setPositiveButton("Save", (d, w) -> {
+                    SharedPreferences.Editor e = prefs().edit();
+                    for (int i = 0; i < KEYS.length; i++) {
+                        String v = fields[i].getText().toString().trim();
+                        if (!v.isEmpty()) e.putString(KEYS[i][0], v);
+                    }
+                    e.putBoolean(KEY_CONFIGURED, true).apply();
+                    applyKeys(firstRun);
                 })
-                .setNeutralButton(firstRun ? null : "Remove key", firstRun ? null
-                        : (d, w) -> saveKey("", false))
+                .setNegativeButton(firstRun ? "Demo mode" : "Cancel", (d, w) -> {
+                    if (firstRun) {
+                        prefs().edit().putBoolean(KEY_CONFIGURED, true).apply();
+                        applyKeys(true);
+                    }
+                })
+                .setNeutralButton(firstRun ? null : "Remove all", firstRun ? null : (d, w) -> {
+                    SharedPreferences.Editor e = prefs().edit();
+                    for (String[] k : KEYS) e.remove(k[0]);
+                    e.apply();
+                    applyKeys(false);
+                })
                 .show();
     }
 
-    private void saveKey(String key, boolean firstRun) {
-        prefs().edit().putString(KEY_OPENROUTER, key).apply();
+    private void applyKeys(boolean firstRun) {
         if (firstRun) {
             startGateway();
             return;
         }
+        final String keys = keysJson();
         new Thread(() -> {
             try {
-                if (Python.isStarted()) Python.getInstance().getModule("android_main").callAttr("set_key", key);
+                if (Python.isStarted()) Python.getInstance().getModule("android_main").callAttr("set_keys", keys);
                 runOnUiThread(() -> web.reload());
             } catch (Throwable ignored) {
             }
@@ -121,7 +166,7 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        menu.add(0, MENU_KEY, 0, "API key");
+        menu.add(0, MENU_KEY, 0, "AI keys");
         menu.add(0, MENU_RELOAD, 1, "Reload");
         return true;
     }

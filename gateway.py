@@ -111,17 +111,31 @@ if LITE:
         chars = sum(len(str(m.get("content", ""))) for m in messages or [])
         return chars // 4 + 4 * len(messages or [])
 
+    def _lite_target(model: str) -> Optional[tuple[str, str, str, str]]:
+        """(provider, base_url, env_key, wire_model) for routes LITE mode can call over plain HTTPS."""
+        if model.startswith("openrouter/"):
+            return "openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", model.split("/", 1)[1]
+        if model.startswith("deepseek/"):
+            return "deepseek", "https://api.deepseek.com", "DEEPSEEK_API_KEY", model.split("/", 1)[1]
+        if model.startswith("openai/") or "/" not in model:
+            return "openai", "https://api.openai.com/v1", "OPENAI_API_KEY", model.split("/", 1)[-1]
+        return None
+
     def _completion(model: str, messages: list, timeout: float = 60, **kw: Any) -> Any:
-        if not model.startswith("openrouter/"):
-            raise litellm.AuthenticationError(f"LITE mode only supports OpenRouter routes, got {model}",
+        target = _lite_target(model)
+        if target is None:
+            raise litellm.AuthenticationError(f"LITE mode cannot call {model} directly; use its OpenRouter route",
                                               "lite", model)
-        body = {"model": model.split("/", 1)[1], "messages": messages,
+        provider, base, env_key, wire_model = target
+        body = {"model": wire_model, "messages": messages,
                 **{k: v for k, v in kw.items() if k in ("max_tokens", "temperature", "top_p", "response_format",
                                                         "stop", "seed", "tools", "tool_choice")}}
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions", data=json.dumps(body).encode(),
-            headers={"Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY', '')}",
-                     "Content-Type": "application/json", "X-Title": "MCUBED Gateway"})
+        if provider == "openai" and "max_tokens" in body:  # current OpenAI models use max_completion_tokens
+            body["max_completion_tokens"] = body.pop("max_tokens")
+        headers = {"Authorization": f"Bearer {os.getenv(env_key, '')}", "Content-Type": "application/json"}
+        if provider == "openrouter":
+            headers["X-Title"] = "MCUBED Gateway"
+        req = urllib.request.Request(f"{base}/chat/completions", data=json.dumps(body).encode(), headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 data = json.loads(r.read())
@@ -133,11 +147,11 @@ if LITE:
                    503: "ServiceUnavailableError"}.get(e.code, "APIConnectionError")
             if e.code == 400 and "context" in msg.lower():
                 cls = "ContextWindowExceededError"
-            raise getattr(litellm, cls)(msg, "openrouter", model) from None
+            raise getattr(litellm, cls)(msg, provider, model) from None
         except (urllib.error.URLError, TimeoutError, OSError) as e:
-            raise litellm.APIConnectionError(str(e), "openrouter", model) from None
+            raise litellm.APIConnectionError(str(e), provider, model) from None
         if "error" in data:
-            raise litellm.ServiceUnavailableError(str(data["error"])[:500], "openrouter", model)
+            raise litellm.ServiceUnavailableError(str(data["error"])[:500], provider, model)
         resp = _wrap(data)
         cost = (data.get("usage") or {}).get("cost")
         resp["_hidden_params"] = {"response_cost": cost} if cost else {}
@@ -1040,8 +1054,8 @@ class Gateway:
 
     # -- availability ------------------------------------------------------- #
     def _route_available(self, spec: ModelSpec, route: Route) -> bool:
-        if LITE and route.via != "openrouter":
-            return False  # LITE (Android) mode: everything goes through OpenRouter
+        if LITE and route.via != "openrouter" and spec.provider not in ("openai", "deepseek"):
+            return False  # LITE (Android) mode: only OpenAI-compatible HTTPS APIs can be called directly
         if self.mock:
             return True
         prov = "openrouter" if route.via == "openrouter" else spec.provider
@@ -1419,6 +1433,57 @@ def simulate(gw: Gateway, n: int, seed: int = 7) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# OpenAI model discovery: add every chat model your key can use to models.json
+# --------------------------------------------------------------------------- #
+_OPENAI_NON_CHAT = re.compile(r"(embedding|moderation|whisper|tts|transcribe|realtime|audio|image|dall-e|"
+                              r"davinci|babbage|search|live|sora|cyber|rosalind|computer-use)", re.I)
+
+
+def openai_tier(model_id: str) -> tuple[str, int]:
+    m = model_id.lower()
+    if any(x in m for x in ("luna", "nano")):
+        return "economy", 5
+    if any(x in m for x in ("terra", "mini")):
+        return "standard", 7
+    if any(x in m for x in ("astra", "pro")):
+        return "premium", 10
+    return "premium", 9
+
+
+def discover_openai(config_path: str, write: bool = False) -> list[dict]:
+    """List models from GET /v1/models and add missing chat models (direct + OpenRouter routes)."""
+    import urllib.request
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise GatewayError("OPENAI_API_KEY is not set")
+    req = urllib.request.Request("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {key}"})
+    import urllib.error
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            ids = sorted(m["id"] for m in json.loads(r.read())["data"])
+    except urllib.error.HTTPError as e:
+        raise GatewayError(f"OpenAI rejected the request (HTTP {e.code}); check OPENAI_API_KEY") from None
+    except (urllib.error.URLError, OSError) as e:
+        raise GatewayError(f"could not reach OpenAI: {e}") from None
+    chat = [i for i in ids if (i.startswith("gpt-") or re.match(r"^o\d", i)) and not _OPENAI_NON_CHAT.search(i)
+            and not re.search(r"-\d{4}-\d{2}-\d{2}$", i)]  # skip dated snapshots of aliases
+    cfg = json.loads(Path(config_path).read_text())
+    known = {r["model"].split("/")[-1] for m in cfg["models"] for r in m["routes"]} | {m["alias"] for m in cfg["models"]}
+    added = []
+    for mid in chat:
+        if mid in known:
+            continue
+        tier, quality = openai_tier(mid)
+        added.append({"alias": mid, "provider": "openai", "tier": tier, "quality": quality, "discovered": True,
+                      "routes": [{"model": mid, "via": "direct"},
+                                 {"model": f"openrouter/openai/{mid}", "via": "openrouter"}]})
+    if write and added:
+        cfg["models"].extend(added)
+        Path(config_path).write_text(json.dumps(cfg, indent=2) + "\n")
+    return added
+
+
+# --------------------------------------------------------------------------- #
 # GUI report server (stdlib only, so it also runs on Android/Termux)
 # --------------------------------------------------------------------------- #
 HERE = Path(__file__).resolve().parent
@@ -1603,6 +1668,9 @@ def main() -> None:
 
     sub.add_parser("models", help="list model pool, prices, availability")
 
+    d = sub.add_parser("discover-openai", help="find every OpenAI chat model your key can use")
+    d.add_argument("--write", action="store_true", help="add the new models to models.json")
+
     s = sub.add_parser("simulate", help="offline learning demo with synthetic traffic")
     s.add_argument("--n", type=int, default=300)
 
@@ -1643,6 +1711,11 @@ def _run(args: argparse.Namespace) -> None:
         serve_gui(gw, args.host, args.port, args.token)
     elif args.cmd == "compact":
         print(json.dumps(gw.store.compact(force=True), indent=2))
+    elif args.cmd == "discover-openai":
+        added = discover_openai(args.config, write=args.write)
+        for m in added:
+            print(f"{'added' if args.write else 'new'}  {m['alias']:28} {m['tier']}")
+        print(f"{len(added)} new OpenAI chat models" + ("" if args.write or not added else "; rerun with --write to add them"))
     elif args.cmd == "models":
         for s_ in gw.models.values():
             for rt in s_.routes:

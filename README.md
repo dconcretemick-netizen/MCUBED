@@ -32,14 +32,29 @@ python gateway.py chat "Explain CAP theorem"
 python gateway.py gui
 ```
 
-An OpenRouter key alone is enough to reach every model in `models.json`.
+An OpenRouter key alone is enough to reach every model in `models.json`. Each provider key you add opens its direct routes:
+
+| Key | Opens |
+|---|---|
+| `OPENROUTER_API_KEY` | Every model, as the fallback route |
+| `OPENAI_API_KEY` | GPT-6 Astra, GPT-6.1 Sol/Terra, GPT-6 Luna, GPT-5.6, GPT-5.5, GPT-5.4 (direct) |
+| `ANTHROPIC_API_KEY` | Claude models (direct, desktop mode) |
+| `DEEPSEEK_API_KEY` | DeepSeek models (direct) |
+| `VERTEXAI_PROJECT` | Gemini models (direct, desktop mode) |
+
+Find every OpenAI chat model your key can use and add the new ones:
+
+```bash
+python gateway.py discover-openai          # preview
+python gateway.py discover-openai --write  # add to models.json
+```
 
 ## Android app (native APK)
 
 The `android/` project packages the gateway as a real Android app. It embeds Python with [Chaquopy](https://chaquo.com/chaquopy/), runs the gateway on `127.0.0.1` inside the app, and shows the dashboard (including the Doom tab) full screen.
 
 - Get the APK: open the repo's Actions tab, choose the latest "Build Android APK" run, and download `MCUBED-apk`. Pushing a tag like `v0.1.0` also attaches the APK to a GitHub Release.
-- First launch asks for an OpenRouter API key, which is stored only on the device. Choose "Demo mode" to try it with simulated replies. Change the key later from the menu.
+- First launch asks for OpenRouter, OpenAI and DeepSeek keys (any or all), stored only on the device. Choose "Demo mode" to try it with simulated replies. Change keys later from the "AI keys" menu. On Android, OpenAI and DeepSeek are called directly; Claude and Gemini go through OpenRouter.
 - Requires Android 8.0+ on a 64-bit device. Release builds are signed with a debug key; configure your own keystore before publishing to the Play Store.
 - Build locally: `cd android && gradle assembleRelease` (JDK 17, Android SDK, Python 3.13 on PATH).
 
@@ -64,6 +79,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 | `report [--days 7] [--html FILE]` | Usage, cost and learned policy as JSON, or a static HTML report |
 | `compact` | Force storage compaction |
 | `models` | Model pool, prices and key availability |
+| `discover-openai [--write]` | Find OpenAI chat models your key can use |
 | `gui [--host --port --token]` | Serve the web dashboard and Doom game |
 | `simulate [--n 300]` | Offline demo with synthetic traffic |
 

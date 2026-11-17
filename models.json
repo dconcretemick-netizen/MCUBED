@@ -46,10 +46,150 @@
   },
   "models": [
     {
-      "alias": "gpt-5.5",
+      "alias": "gpt-6-astra",
       "provider": "openai",
       "tier": "premium",
       "quality": 10,
+      "routes": [
+        {
+          "model": "gpt-6-astra",
+          "via": "direct",
+          "price_in": 10.0,
+          "price_out": 50.0
+        },
+        {
+          "model": "openrouter/openai/gpt-6-astra",
+          "via": "openrouter",
+          "price_in": 10.0,
+          "price_out": 50.0
+        }
+      ]
+    },
+    {
+      "alias": "gpt-6.1-sol",
+      "provider": "openai",
+      "tier": "standard",
+      "quality": 9,
+      "routes": [
+        {
+          "model": "gpt-6.1-sol",
+          "via": "direct",
+          "price_in": 2.0,
+          "price_out": 10.0
+        },
+        {
+          "model": "openrouter/openai/gpt-6.1-sol",
+          "via": "openrouter",
+          "price_in": 2.0,
+          "price_out": 10.0
+        }
+      ]
+    },
+    {
+      "alias": "gpt-6.1-terra",
+      "provider": "openai",
+      "tier": "standard",
+      "quality": 8,
+      "routes": [
+        {
+          "model": "gpt-6.1-terra",
+          "via": "direct",
+          "price_in": 1.0,
+          "price_out": 5.0
+        },
+        {
+          "model": "openrouter/openai/gpt-6.1-terra",
+          "via": "openrouter",
+          "price_in": 1.0,
+          "price_out": 5.0
+        }
+      ]
+    },
+    {
+      "alias": "gpt-6-luna",
+      "provider": "openai",
+      "tier": "economy",
+      "quality": 6,
+      "routes": [
+        {
+          "model": "gpt-6-luna",
+          "via": "direct",
+          "price_in": 0.1,
+          "price_out": 0.5
+        },
+        {
+          "model": "openrouter/openai/gpt-6-luna",
+          "via": "openrouter",
+          "price_in": 0.1,
+          "price_out": 0.5
+        }
+      ]
+    },
+    {
+      "alias": "gpt-5.6-sol",
+      "provider": "openai",
+      "tier": "premium",
+      "quality": 9,
+      "routes": [
+        {
+          "model": "gpt-5.6-sol",
+          "via": "direct",
+          "price_in": 4.0,
+          "price_out": 20.0
+        },
+        {
+          "model": "openrouter/openai/gpt-5.6-sol",
+          "via": "openrouter",
+          "price_in": 4.0,
+          "price_out": 20.0
+        }
+      ]
+    },
+    {
+      "alias": "gpt-5.6-terra",
+      "provider": "openai",
+      "tier": "standard",
+      "quality": 7,
+      "routes": [
+        {
+          "model": "gpt-5.6-terra",
+          "via": "direct",
+          "price_in": 2.0,
+          "price_out": 12.0
+        },
+        {
+          "model": "openrouter/openai/gpt-5.6-terra",
+          "via": "openrouter",
+          "price_in": 2.0,
+          "price_out": 12.0
+        }
+      ]
+    },
+    {
+      "alias": "gpt-5.6-luna",
+      "provider": "openai",
+      "tier": "economy",
+      "quality": 5,
+      "routes": [
+        {
+          "model": "gpt-5.6-luna",
+          "via": "direct",
+          "price_in": 0.2,
+          "price_out": 1.2
+        },
+        {
+          "model": "openrouter/openai/gpt-5.6-luna",
+          "via": "openrouter",
+          "price_in": 0.2,
+          "price_out": 1.2
+        }
+      ]
+    },
+    {
+      "alias": "gpt-5.5",
+      "provider": "openai",
+      "tier": "premium",
+      "quality": 9,
       "routes": [
         {
           "model": "gpt-5.5",
