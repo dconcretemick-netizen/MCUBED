@@ -1,0 +1,2 @@
+# Full mode (desktop/server). Android/Termux can skip this and run with GATEWAY_LITE=1.
+litellm>=1.50

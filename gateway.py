@@ -1483,7 +1483,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 return True
             got = self.headers.get("X-Gateway-Token") or (q.get("token") or [""])[0] or \
                 (self.headers.get("Cookie") or "").partition("mcubed_token=")[2].split(";")[0]
-            return got == token
+            import hmac
+            return bool(got) and hmac.compare_digest(got, token)
 
         def _body(self) -> dict:
             n = int(self.headers.get("Content-Length") or 0)
@@ -1524,6 +1525,9 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             q = parse_qs(u.query)
             if not self._authorized(q):
                 return self._send(401, {"error": "unauthorized"})
+            origin = self.headers.get("Origin")  # CSRF guard: reject cross-site browser POSTs
+            if origin and origin != "null" and urlparse(origin).netloc != self.headers.get("Host"):
+                return self._send(403, {"error": "cross-origin request blocked"})
             try:
                 with lock:
                     if u.path == "/api/chat":
