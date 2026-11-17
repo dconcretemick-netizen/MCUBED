@@ -372,7 +372,7 @@
       "quality": 6,
       "routes": [
         {
-          "model": "deepseek/deepseek-v4-flash",
+          "model": "deepseek/deepseek-flash",
           "via": "direct"
         },
         {
