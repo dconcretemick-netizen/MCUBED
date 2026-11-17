@@ -18,11 +18,12 @@
       "recency_window": 200,
       "weights": {
         "quality": 1.0,
-        "cost": 0.35,
+        "cost": 1.0,
         "latency": 0.15
       },
       "judge_sample_rate": 0.0,
-      "judge_model": "deepseek-v4-flash"
+      "judge_model": "deepseek-v4-flash",
+      "quality_value_usd": 0.02
     },
     "improvement": {
       "min_samples": 20,
@@ -37,13 +38,17 @@
       "trigger_tokens": 120000,
       "keep_last_turns": 6,
       "summarize_with_model": true,
-      "summary_max_tokens": 800
+      "summary_max_tokens": 800,
+      "map_chunk_tokens": 60000,
+      "map_max_chunks": 24
     },
     "storage": {
       "max_db_mb": 50,
       "max_raw_rows": 200000,
       "retain_raw_days": 30
-    }
+    },
+    "max_attempts_per_request": 8,
+    "request_deadline_s": 120
   },
   "models": [
     {

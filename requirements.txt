@@ -1,2 +1,2 @@
-# Full mode (desktop/server). Android/Termux can skip this and run with GATEWAY_LITE=1.
-litellm>=1.50
+# Full mode. Lite/Android mode (GATEWAY_LITE=1) needs nothing beyond Python 3.10+.
+litellm>=1.80

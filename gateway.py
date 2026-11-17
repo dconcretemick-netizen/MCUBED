@@ -406,7 +406,15 @@ class Store:
             if col not in cols:
                 self.conn.execute(f"ALTER TABLE attempts ADD COLUMN {col} {ddl}")
         self.conn.executescript(USAGE_VIEW)
+        try:  # WAL: readers (GUI) never block the writer (gateway); fewer fsyncs on phones
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.DatabaseError:
+            pass
         self.conn.commit()
+        self._policy_cache: dict[str, Any] = {}
+        self._policy_ts = 0.0
+        self._spent: tuple[str, float, float] = ("", 0.0, 0.0)  # (day, value, fetched_at)
 
     # -- self data compression (storage) ------------------------------------ #
     def size_mb(self) -> float:
@@ -490,15 +498,27 @@ class Store:
         row.setdefault("day", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
         cols = ",".join(row)
         self.execute(f"INSERT INTO attempts ({cols}) VALUES ({','.join('?' * len(row))})", tuple(row.values()))
+        day, val, at = self._spent
+        if day == row["day"]:
+            self._spent = (day, val + float(row.get("cost_usd") or 0), at)
 
     def spent_today(self) -> float:
         day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        cday, val, at = self._spent
+        if cday == day and time.time() - at < 2.0:  # local increments keep it exact in-process
+            return val
         r = self.query("SELECT COALESCE(SUM(cost_usd),0) s FROM usage_all WHERE day=?", (day,))
-        return float(r[0]["s"])
+        self._spent = (day, float(r[0]["s"]), time.time())
+        return self._spent[1]
 
     def get_policy(self, key: str, default: Any = None) -> Any:
-        r = self.query("SELECT value FROM policy WHERE key=?", (key,))
-        return json.loads(r[0]["value"]) if r else default
+        # cached for 3s: policy changes rarely, and other processes (GUI/CLI) pick changes up quickly
+        if time.time() - self._policy_ts > 3.0:
+            rows = self.query("SELECT key, value FROM policy")
+            self._policy_cache = {r["key"]: json.loads(r["value"]) for r in rows}
+            self._policy_ts = time.time()
+        v = self._policy_cache.get(key, default)
+        return json.loads(json.dumps(v)) if isinstance(v, (dict, list)) else v
 
     def set_policy(self, key: str, value: Any) -> None:
         self.execute(
@@ -506,6 +526,7 @@ class Store:
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated",
             (key, json.dumps(value), time.time()),
         )
+        self._policy_cache[key] = json.loads(json.dumps(value))
 
     def request_count(self) -> int:
         raw = int(self.query("SELECT COUNT(DISTINCT request_id) c FROM attempts")[0]["c"])
@@ -600,7 +621,14 @@ class Learner:
         return (prior * k + s.q_sum) / (k + s.n)
 
     def sample_utility(self, spec: ModelSpec, task_type: str, est_cost: float,
-                       max_cost: float, max_latency: float) -> float:
+                       max_cost: float, max_latency: float, target_quality: float = 0.72) -> float:
+        """
+        Value-based utility in dollars:
+            value_usd * w_q * q_eff * reliability  -  est_cost  -  latency penalty
+        q_eff counts quality fully up to the 'good enough' target and at 25% above it,
+        so the router pays for quality where it matters and saves money where it does not.
+        q and reliability are Thompson samples, so uncertain models still get explored.
+        """
         s = self.stats(spec.alias, task_type)
         k = float(self.cfg.get("prior_strength", 4))
         prior = spec.quality / 10.0
@@ -609,11 +637,12 @@ class Learner:
         q = self.rng.betavariate(a, b)
         rel = self.rng.betavariate(1 + s.ok + 3, 1 + s.fail)  # optimistic prior
         w = self.cfg.get("weights", {})
-        cost_norm = math.log1p(est_cost * 1e4) / math.log1p(max_cost * 1e4) if max_cost > 0 else 0
+        value = float(self.cfg.get("quality_value_usd", 0.02))
+        q_eff = min(q, target_quality) + 0.25 * max(0.0, q - target_quality)
         lat_norm = (s.latency_ms / max_latency) if max_latency > 0 and s.latency_ms else 0.3
-        return (w.get("quality", 1.0) * q * rel
-                - w.get("cost", 0.35) * cost_norm
-                - w.get("latency", 0.15) * lat_norm)
+        return (value * w.get("quality", 1.0) * q_eff * rel
+                - w.get("cost", 1.0) * est_cost
+                - value * w.get("latency", 0.15) * lat_norm)
 
 
 # --------------------------------------------------------------------------- #
@@ -707,6 +736,30 @@ class Compressor:
                 msgs = system + [{"role": "system", "content": note}] + recent
                 stages.append("summarize" if summary else "drop_older")
 
+        # 2b. map-reduce: summarize a single oversized message chunk by chunk (real calls only)
+        if self.tokens(msgs) > target_tokens and not self.gw.mock and self.cfg.get("summarize_with_model", True):
+            idx = max(range(len(msgs)), key=lambda i: len(str(msgs[i].get("content", ""))))
+            content = str(msgs[idx].get("content", ""))
+            others = self.tokens(msgs) - len(content) // 4
+            budget_chars = max(4000, (target_tokens - others) * 4)
+            if len(content) > budget_chars:
+                chunk_chars = int(self.cfg.get("map_chunk_tokens", 60_000)) * 4
+                chunks = [content[i:i + chunk_chars] for i in range(0, len(content), chunk_chars)]
+                max_chunks = int(self.cfg.get("map_max_chunks", 24))
+                if len(chunks) > max_chunks:  # sample evenly so cost stays bounded
+                    step = len(chunks) / max_chunks
+                    chunks = [chunks[int(i * step)] for i in range(max_chunks)]
+                parts = []
+                for n, ch in enumerate(chunks):
+                    summ = self._summarize([{"role": "user", "content": ch}])
+                    if summ is None:
+                        parts = []
+                        break
+                    parts.append(f"[part {n + 1}/{len(chunks)}] {summ}")
+                if parts:
+                    msgs[idx]["content"] = ("[gateway map-reduce summary of a long input]\n" + "\n".join(parts))
+                    stages.append("map_reduce")
+
         # 3. head/tail truncate the largest messages until under target
         guard = 0
         while self.tokens(msgs) > target_tokens and guard < 20:
@@ -754,7 +807,7 @@ class CircuitBreaker:
         self.failures[key] = self.failures.get(key, 0) + 1
         if self.failures[key] >= self.threshold:
             self.opened_at[key] = time.time()
-            log.warning("circuit opened for %s", key)
+            log.info("circuit opened for %s", key)
 
 
 # --------------------------------------------------------------------------- #
@@ -1120,7 +1173,8 @@ class Gateway:
         else:  # balanced: Thompson sampling over learned quality, reliability, cost, latency
             max_c = max(e for _, e, _ in pool) or 1e-9
             max_l = max((self.learner.stats(s.alias, task_type).latency_ms for s, _, _ in pool), default=0) or 1.0
-            scored = [(self.learner.sample_utility(s, task_type, e, max_c, max_l), s, e, x) for s, e, x in pool]
+            tq = float(self.defaults.get("improvement", {}).get("target_quality", 0.72))
+            scored = [(self.learner.sample_utility(s, task_type, e, max_c, max_l, tq), s, e, x) for s, e, x in pool]
             scored.sort(key=lambda t: -t[0])
             # an exploratory probe goes first so it actually gets traffic
             if explore_down:
@@ -1137,7 +1191,7 @@ class Gateway:
     # -- low-level call ----------------------------------------------------- #
     def _call(self, route: Route, messages: list[dict], **kw) -> Any:
         if self.mock:
-            if route.model in self.mock_fail or route.model.split("/", 1)[-1] in self.mock_fail:
+            if route.model in self.mock_fail or (route.via == "direct" and route.model.split("/")[-1] in self.mock_fail):
                 raise litellm.RateLimitError(message="mock rate limit", llm_provider=route.via, model=route.model)
             if self.mock_hook:
                 text, finish = self.mock_hook(route, messages)
@@ -1185,6 +1239,7 @@ class Gateway:
         remaining = daily - self.store.spent_today()
         if remaining <= 0:
             raise BudgetExceeded(f"Daily budget ${daily:.2f} exhausted")
+        requested_cap = max_cost
         max_cost = min(max_cost, remaining)
 
         # self data compression: only when the request would not fit context/budget/trigger
@@ -1197,13 +1252,39 @@ class Gateway:
                          comp_info["compressed_tokens"], "+".join(comp_info["stages"]))
         orig_tok = comp_info["original_tokens"] if comp_info else 0
 
-        chain, policy_tier, p_est, out_est = self.plan(messages, strategy, task_type, tier, max_cost, models)
+        try:
+            chain, policy_tier, p_est, out_est = self.plan(messages, strategy, task_type, tier, max_cost, models)
+        except GatewayError:
+            # budget-aware degradation: step down tiers rather than fail, unless a tier was forced
+            chain = None
+            if tier is None:
+                start = TIER_RANK[self.task_policy().get(task_type, "standard")]
+                for lower in reversed(TIERS[:start]):
+                    try:
+                        chain, policy_tier, p_est, out_est = self.plan(messages, strategy, task_type, lower,
+                                                                       max_cost, models)
+                        log.info("degraded %s request to %s tier to fit cost cap $%.4f", task_type, lower, max_cost)
+                        break
+                    except GatewayError:
+                        continue
+            if chain is None:
+                if remaining < requested_cap:
+                    raise BudgetExceeded(f"Only ${remaining:.4f} left of the ${daily:.2f} daily budget; "
+                                         "no model fits this request") from None
+                raise
         rid = uuid.uuid4().hex[:12]
         attempts: list[dict] = []
         retries = self.max_retries()
 
         dead_transports: set[str] = set()  # e.g. a bad OpenRouter key fails every OpenRouter route
-        for spec, route, exploratory in chain:
+        max_attempts = int(self.defaults.get("max_attempts_per_request", 8))
+        deadline = time.time() + float(self.defaults.get("request_deadline_s", 120))
+        for ci, (spec, route, exploratory) in enumerate(chain):
+            # same model reachable via another transport later in the chain? then fail over instantly
+            has_sibling = any(s2.alias == spec.alias for s2, _, _ in chain[ci + 1:])
+            if len(attempts) >= max_attempts or time.time() > deadline:
+                log.warning("request %s stopped after %d attempts (cap/deadline)", rid, len(attempts))
+                break
             bkey = f"{spec.alias}|{route.via}"
             tkey = "openrouter" if route.via == "openrouter" else spec.provider
             if tkey in dead_transports or not self.breaker.available(bkey):
@@ -1229,7 +1310,10 @@ class Gateway:
                             messages, int(min(route.max_input_tokens, self._count_tokens(messages)) * 0.7))
                         orig_tok = comp_info["original_tokens"]
                         continue  # retry same route with the compressed request
-                    if isinstance(e, TRANSIENT_ERRORS) and i < retries and self.breaker.available(bkey):
+                    if len(attempts) >= max_attempts or time.time() > deadline:
+                        break
+                    if isinstance(e, TRANSIENT_ERRORS) and not has_sibling and i < retries \
+                            and self.breaker.available(bkey):
                         time.sleep(0 if self.mock else min(8, 0.5 * 2 ** i + random.random() * 0.25))
                         continue
                     break  # next route

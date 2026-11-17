@@ -60,6 +60,8 @@ The `android/` project packages the gateway as a real Android app. It embeds Pyt
 
 ## Android (Termux)
 
+One-step setup: `bash termux-setup.sh`. Or manually:
+
 ```bash
 pkg install python git
 git clone https://github.com/dconcretemick-netizen/MCUBED && cd MCUBED
@@ -88,3 +90,58 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 - The dashboard listens on `127.0.0.1` by default. Binding to `0.0.0.0` uses `--token` (or `GATEWAY_GUI_TOKEN`), generating one if missing; open `/?token=...` once and a cookie is set.
 - Cross-origin POSTs are rejected. API keys stay in environment variables and never reach the browser.
 - Configure models, prices and budgets in `models.json`.
+
+## How a request flows
+
+1. **Classify** the prompt (simple, extraction, summarization, creative, code, reasoning).
+2. **Look up the tier** that the learned policy requires for that task (economy, standard, premium).
+3. **Check the budget.** Requests stop at the per-request cap and the daily budget. If nothing fits, the gateway drops to a cheaper tier before it gives up.
+4. **Compress if needed.** Compression runs only when a request would overflow the context window, exceed the cost cap, or pass the learned trigger size.
+5. **Rank candidates.**
+   - `cost`: cheapest first.
+   - `quality`: best first.
+   - `balanced` (the default): Thompson sampling over learned quality, reliability, latency, and real dollar cost.
+6. **Execute with fallback.** If a route fails, the gateway switches to the same model on its other route (direct ↔ OpenRouter) right away, then moves to the next model.
+   - Transient errors are retried with backoff.
+   - Auth errors disable that whole transport for the request.
+   - Circuit breakers skip routes that keep failing.
+   - Each request is capped at 8 attempts and has a deadline.
+7. **Record** tokens, cost, the all-premium baseline cost, latency and auto-evaluated quality in a SQLite ledger.
+8. **Learn.** Explicit feedback (or an optional LLM judge) overrides the auto score. The optimizer runs every 50 requests.
+
+## Balanced self-learning
+
+For each model × task pair, the gateway learns a Beta posterior over quality (seeded from the config's quality score), a reliability posterior, and running averages for latency and output size. The `balanced` strategy maximizes:
+
+```
+utility = quality_value_usd × q_eff × reliability − estimated_cost − latency_penalty
+q_eff   = min(q, target) + 0.25 × max(0, q − target)
+```
+
+Quality counts fully up to the "good enough" target and only partly above it. The gateway therefore pays for quality where it matters and saves money where it doesn't. Sampling instead of averaging keeps uncertain models in play. A 10% probe of the next-lower tier gives the optimizer evidence for safe downgrades.
+
+## Self data compression
+
+- **Context.** Stages run cheapest-first and stop once the request fits:
+  1. Normalize whitespace and remove duplicate lines.
+  2. Summarize older turns with an economy model, or drop them with a marker.
+  3. Map-reduce long documents chunk by chunk.
+  4. Trim from the middle, keeping the head and tail.
+
+  System messages and recent turns are always kept.
+- **Storage.** When the database passes its size or row limit, old rows roll up into exact daily totals and the file is vacuumed. In testing, 400k rows went from 103 MB to 13 MB with costs preserved to the cent.
+- **Network.** GUI API responses are gzip-compressed for mobile data.
+
+## Limits
+
+`python limits.py` stress-tests the gateway and writes [LIMITS.md](LIMITS.md) with measured numbers. Every test passes in both full and lite mode:
+
+- Prompts up to 6M tokens are compressed to fit.
+- Conversations up to 2,000 turns are trimmed.
+- During a provider outage, every request still gets an answer within at most 2 attempts.
+- When every route is down, it fails cleanly within 8 attempts.
+- Budget caps hold with no overspend.
+- 64 threads put 1,920 requests through one gateway with zero errors.
+- On a 400k-row ledger, compaction takes about 4 s.
+
+The main remaining limit: a single process tops out at about 220 requests/sec of gateway overhead, because of SQLite writes and the Python GIL. That's far above what real model latency allows. Run several processes on separate databases to go further.
