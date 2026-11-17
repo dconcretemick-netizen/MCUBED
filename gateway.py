@@ -1515,6 +1515,37 @@ def export_html(gw: "Gateway", path: str, days: int = 7) -> str:
     return path
 
 
+def run_scheduled_improvement(gw: "Gateway", force: bool = False) -> Optional[list]:
+    """Time-based process improvement: compact storage and tune the policy when it is due.
+
+    Complements the request-count trigger so the policy keeps improving on quiet
+    days. Interval comes from defaults.auto_improve_every_hours (0 disables).
+    """
+    hours = float(os.getenv("GATEWAY_AUTO_IMPROVE_HOURS") or gw.defaults.get("auto_improve_every_hours", 6))
+    if hours <= 0 and not force:
+        return None
+    last = float(gw.store.get_policy("last_scheduled_improve_ts", 0) or 0)
+    if not force and time.time() - last < hours * 3600:
+        return None
+    if gw.store.compaction_needed():
+        log.info("scheduled compaction: %s", gw.store.compact())
+    changes = gw.optimizer.run(apply=True)
+    gw.store.set_policy("last_scheduled_improve_ts", time.time())
+    for c in changes:
+        log.info("scheduled improve: %s %s %s -> %s (%s)", c["kind"], c["target"], c["old"], c["new"], c["reason"])
+    return changes
+
+
+def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300) -> None:
+    while True:
+        try:
+            with lock:
+                run_scheduled_improvement(gw)
+        except Exception:  # noqa: BLE001
+            log.exception("scheduled improvement failed")
+        time.sleep(poll_s)
+
+
 def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None) -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from urllib.parse import parse_qs, urlparse
@@ -1616,6 +1647,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             self._send(404, {"error": "not found"})
 
     srv = ThreadingHTTPServer((host, port), H)
+    threading.Thread(target=_scheduled_improver, args=(gw, lock), name="mcubed-improver", daemon=True).start()
     shown = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
     print(f"MCUBED GUI on http://{shown}:{port}/" + (f"?token={token}" if token else ""))
     if host == "0.0.0.0":

@@ -1,5 +1,5 @@
 {
-  "_comment": "Model pool for the gateway. Each model has an ordered list of routes: the direct provider first, then OpenRouter as a fallback. Prices are USD per 1M tokens and are only used when LiteLLM's built-in price map does not know the model. Tiers: economy < standard < premium. Quality is a 1-10 relative score used by the 'quality' and 'balanced' strategies.",
+  "_comment": "Model pool for the gateway. Each model has an ordered list of routes: the direct provider first, then OpenRouter as a fallback. Prices are USD per 1M tokens and are only used when LiteLLM's built-in price map does not know the model. Tiers: economy < standard < premium. Quality is a 1-10 relative score used by the 'quality' and 'balanced' strategies. auto_improve_every_hours runs the optimizer on a timer while the GUI or Android app is running (0 disables).",
   "defaults": {
     "expected_output_tokens": 600,
     "daily_budget_usd": 10.0,
@@ -11,6 +11,7 @@
     "cache_ttl_s": 900,
     "strategy": "balanced",
     "auto_improve_every_n_requests": 50,
+    "auto_improve_every_hours": 6,
     "learning": {
       "explore_rate": 0.1,
       "prior_strength": 4,

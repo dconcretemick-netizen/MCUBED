@@ -7,7 +7,7 @@ A multi-model AI gateway with a phone-friendly web dashboard. One entry point fo
 - Automatic fallback routing with retries, circuit breakers and quarantine
 - Usage and cost ledger (SQLite), daily and per-request budgets, response cache
 - Self-learning router that balances quality, cost and latency per task type
-- Automated policy tuning with a change log and rollback
+- Automated process improvement: the optimizer tunes tiers, route order, token estimates and quarantines every 50 requests and every 6 hours while the dashboard or app runs, with a change log and automatic rollback
 - Conversation compression for long chats and automatic storage compaction
 - Lite mode for Android/Termux: standard library only, no native builds
 - Installable web dashboard (overview, models, learning, chat, storage)
