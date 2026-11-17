@@ -1419,6 +1419,145 @@ def simulate(gw: Gateway, n: int, seed: int = 7) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# GUI report server (stdlib only, so it also runs on Android/Termux)
+# --------------------------------------------------------------------------- #
+HERE = Path(__file__).resolve().parent
+MANIFEST = {
+    "name": "MCUBED Gateway", "short_name": "MCUBED", "start_url": "/", "display": "standalone",
+    "background_color": "#0f1417", "theme_color": "#0f1417", "orientation": "any",
+    "icons": [{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}],
+}
+ICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" '
+            'fill="#14b8a6"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="#0f1417" '
+            'stroke-width="5" stroke-linejoin="round"/></svg>')
+# network-first service worker: works offline with the last report, never serves stale data when online
+SERVICE_WORKER = """
+const C='mcubed-v1';
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/manifest.webmanifest','/icon.svg'])))});
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
+  e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r})
+  .catch(()=>caches.match(e.request)))});
+"""
+
+
+def export_html(gw: "Gateway", path: str, days: int = 7) -> str:
+    """Write a self-contained static HTML report (open it on any device, no server needed)."""
+    html = (HERE / "dashboard.html").read_text()
+    data = json.dumps(gw.report(days), default=str).replace("</", "<\\/")
+    html = html.replace("<script>\nconst STATIC", f"<script>window.__REPORT__={data};</script>\n<script>\nconst STATIC", 1)
+    Path(path).write_text(html)
+    return path
+
+
+def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None) -> None:
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import parse_qs, urlparse
+
+    lock = threading.Lock()  # one gateway, many phone/browser clients
+
+    class H(BaseHTTPRequestHandler):
+        server_version = "MCUBED/1.0"
+
+        def log_message(self, fmt: str, *a: Any) -> None:
+            log.debug("gui " + fmt, *a)
+
+        def _send(self, code: int, body: Any, ctype: str = "application/json") -> None:
+            raw = body if isinstance(body, bytes) else (
+                body.encode() if isinstance(body, str) else json.dumps(body, default=str).encode())
+            gz = "gzip" in (self.headers.get("Accept-Encoding") or "") and len(raw) > 1024
+            if gz:  # compress responses: smaller payloads on mobile data
+                import gzip
+                raw = gzip.compress(raw, 6)
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            if gz:
+                self.send_header("Content-Encoding", "gzip")
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def _authorized(self, q: dict) -> bool:
+            if not token:
+                return True
+            got = self.headers.get("X-Gateway-Token") or (q.get("token") or [""])[0] or \
+                (self.headers.get("Cookie") or "").partition("mcubed_token=")[2].split(";")[0]
+            return got == token
+
+        def _body(self) -> dict:
+            n = int(self.headers.get("Content-Length") or 0)
+            if n > 1_000_000:
+                raise GatewayError("request body too large")
+            return json.loads(self.rfile.read(n) or b"{}")
+
+        def do_GET(self) -> None:  # noqa: N802
+            u = urlparse(self.path)
+            q = parse_qs(u.query)
+            static = {"/manifest.webmanifest": (json.dumps(MANIFEST), "application/manifest+json"),
+                      "/icon.svg": (ICON_SVG, "image/svg+xml"),
+                      "/sw.js": (SERVICE_WORKER, "text/javascript")}
+            if u.path in static:
+                return self._send(200, *static[u.path])
+            if not self._authorized(q):
+                return self._send(401, {"error": "token required: open /?token=..."})
+            if u.path in ("/", "/index.html"):
+                body = (HERE / "dashboard.html").read_bytes()
+                self.send_response(200)
+                if token:
+                    self.send_header("Set-Cookie", f"mcubed_token={token}; Path=/; SameSite=Strict; HttpOnly")
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if u.path == "/game.html" and (HERE / "game.html").exists():
+                return self._send(200, (HERE / "game.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/report":
+                days = int((q.get("days") or ["7"])[0])
+                with lock:
+                    return self._send(200, gw.report(days))
+            self._send(404, {"error": "not found"})
+
+        def do_POST(self) -> None:  # noqa: N802
+            u = urlparse(self.path)
+            q = parse_qs(u.query)
+            if not self._authorized(q):
+                return self._send(401, {"error": "unauthorized"})
+            try:
+                with lock:
+                    if u.path == "/api/chat":
+                        b = self._body()
+                        r = gw.chat(str(b.get("prompt", ""))[:200_000], strategy=b.get("strategy"), tier=b.get("tier"))
+                        return self._send(200, {**r.summary(), "text": r.text})
+                    if u.path == "/api/feedback":
+                        b = self._body()
+                        gw.feedback(str(b["request_id"]), float(b["score"]), source="gui")
+                        return self._send(200, {"ok": True})
+                    if u.path == "/api/improve":
+                        apply = (q.get("apply") or ["0"])[0] == "1"
+                        return self._send(200, {"changes": gw.optimizer.run(apply=apply)})
+                    if u.path == "/api/compact":
+                        return self._send(200, gw.store.compact(force=True))
+            except (GatewayError, KeyError, ValueError) as e:
+                return self._send(400, {"error": str(e)})
+            except Exception as e:  # noqa: BLE001
+                log.exception("gui error")
+                return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+            self._send(404, {"error": "not found"})
+
+    srv = ThreadingHTTPServer((host, port), H)
+    shown = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+    print(f"MCUBED GUI on http://{shown}:{port}/" + (f"?token={token}" if token else ""))
+    if host == "0.0.0.0":
+        print("Listening on all interfaces: open it from your phone with this machine's LAN IP.")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+
+# --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 def main() -> None:
@@ -1449,6 +1588,14 @@ def main() -> None:
 
     r = sub.add_parser("report", help="usage, cost, savings, learned policy")
     r.add_argument("--days", type=int, default=7)
+    r.add_argument("--html", metavar="FILE", help="export a self-contained GUI report instead of JSON")
+
+    g = sub.add_parser("gui", help="serve the live GUI dashboard (phone-friendly, installable)")
+    g.add_argument("--host", default="127.0.0.1", help="use 0.0.0.0 to reach it from a phone on your LAN")
+    g.add_argument("--port", type=int, default=8765)
+    g.add_argument("--token", default=os.getenv("GATEWAY_GUI_TOKEN"), help="require a token (recommended with 0.0.0.0)")
+
+    sub.add_parser("compact", help="force storage compaction (roll old rows into daily totals)")
 
     sub.add_parser("models", help="list model pool, prices, availability")
 
@@ -1481,7 +1628,17 @@ def _run(args: argparse.Namespace) -> None:
         changes = gw.optimizer.run(apply=not args.dry_run)
         print(json.dumps(changes, indent=2) if changes else "No changes: not enough evidence or policy already optimal.")
     elif args.cmd == "report":
-        print(json.dumps(gw.report(args.days), indent=2, default=str))
+        if args.html:
+            print("wrote", export_html(gw, args.html, args.days))
+        else:
+            print(json.dumps(gw.report(args.days), indent=2, default=str))
+    elif args.cmd == "gui":
+        if args.host == "0.0.0.0" and not args.token:
+            args.token = uuid.uuid4().hex[:16]
+            print("No --token given for a network-exposed GUI; generated one.")
+        serve_gui(gw, args.host, args.port, args.token)
+    elif args.cmd == "compact":
+        print(json.dumps(gw.store.compact(force=True), indent=2))
     elif args.cmd == "models":
         for s_ in gw.models.values():
             for rt in s_.routes:

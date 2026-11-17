@@ -38,7 +38,7 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 8
 .icon-btn{width:40px;min-height:40px;display:grid;place-items:center;border:1px solid var(--border);background:var(--surface);border-radius:10px;cursor:pointer}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:var(--surface);border-top:1px solid var(--border);
   padding-bottom:env(safe-area-inset-bottom)}
-nav.tabs button{flex:1;min-height:60px;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;cursor:pointer}
+nav.tabs button{flex:1;min-width:0;min-height:60px;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;cursor:pointer}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected=true]{color:var(--accent)}
 main{max-width:1240px;margin:0 auto;padding:14px}
@@ -46,7 +46,8 @@ section.view{display:none}section.view.active{display:block}
 .grid{display:grid;gap:var(--gap)}
 .kpis{grid-template-columns:repeat(2,1fr)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;min-width:0}
-.card h2{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card h2{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.card h2 .row{flex-wrap:nowrap;text-transform:none;letter-spacing:0}
 .kpi .v{font-size:24px;font-weight:650;margin-top:2px}
 .kpi .l{font-size:12px;color:var(--muted)}
 .kpi .d{font-size:12px;margin-top:4px;color:var(--muted)}
@@ -121,6 +122,7 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
   <button role="tab" data-v="learning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>Learning</button>
   <button role="tab" data-v="playground"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Try it</button>
   <button role="tab" data-v="storage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Storage</button>
+  <button role="tab" data-v="doom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3 4 9l4 2M18 3l2 6-4 2"/><circle cx="12" cy="14" r="7"/><path d="M9 13h.01M15 13h.01M9.5 17h5"/></svg>Doom</button>
 </nav>
 
 <main>
@@ -181,6 +183,17 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
       <pre class="out" id="compact-out" hidden style="margin-top:12px"></pre>
     </div>
   </section>
+
+  <section class="view" id="v-doom">
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="doom-frame" title="Gateway Doom" data-src="game.html" allow="fullscreen; autoplay"
+        style="display:block;width:100%;height:min(72vh,640px);border:0;background:#000"></iframe>
+    </div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span style="color:var(--muted);font-size:13px">Demons are your real error types from the last 30 days.</span>
+      <a class="btn" href="game.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
+    </div>
+  </section>
 </main>
 <div class="toast" id="toast" role="status"></div>
 
@@ -209,7 +222,13 @@ function lineChart(el, labels, series){
   let g="";
   for(let k=0;k<=3;k++){const v=max*k/3;g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)"/><text x="${P.l-6}" y="${y(v)+4}" text-anchor="end">${usd(v)}</text>`}
   const step=Math.ceil(labels.length/6);
-  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)g+=`<text x="${x(i)}" y="${H-6}" text-anchor="middle">${esc(l.slice(5))}</text>`});
+  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)g+=`<text x="${labels.length<=3?P.l+(W-P.l-P.r)/labels.length*(i+.5):x(i)}" y="${H-6}" text-anchor="middle">${esc(l.slice(5))}</text>`});
+  if(labels.length<=3){                       // too few points for a line: grouped columns
+    const gw=(W-P.l-P.r)/labels.length, bw=Math.min(46,gw/(series.length+1));
+    series.forEach((s,si)=>s.values.forEach((v,i)=>{const bx=P.l+gw*i+gw/2-(series.length*bw)/2+si*bw;
+      g+=`<rect x="${bx}" y="${y(v)}" width="${bw-4}" height="${y(0)-y(v)}" rx="4" fill="${s.color}"><title>${esc(labels[i])}: ${usd(v)}</title></rect>`}));
+    el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spend chart">${g}</svg>`; return;
+  }
   series.forEach(s=>{
     const pts=s.values.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
     if(s.fill)g+=`<polygon points="${x(0)},${y(0)} ${pts} ${x(s.values.length-1)},${y(0)}" fill="${s.color}" opacity=".14"/>`;
@@ -292,6 +311,8 @@ async function load(){
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
   document.querySelectorAll("section.view").forEach(v=>v.classList.toggle("active", v.id==="v-"+b.dataset.v));
+  const f=$("#doom-frame");  // lazy-load the game; unload it when leaving the tab to save battery
+  if(b.dataset.v==="doom"){ if(!f.src) f.src=f.dataset.src } else if(f.src){ f.removeAttribute("src") }
   window.scrollTo({top:0});
 }));
 $("#days").addEventListener("change", load);
