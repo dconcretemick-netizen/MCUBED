@@ -1,0 +1,255 @@
+{
+  "_comment": "Model pool for the gateway. Each model has an ordered list of routes: the direct provider first, then OpenRouter as a fallback. Prices are USD per 1M tokens and are only used when LiteLLM's built-in price map does not know the model. Tiers: economy < standard < premium. Quality is a 1-10 relative score used by the 'quality' and 'balanced' strategies.",
+  "defaults": {
+    "expected_output_tokens": 600,
+    "daily_budget_usd": 10.0,
+    "max_cost_per_request_usd": 0.5,
+    "request_timeout_s": 60,
+    "max_retries_per_route": 2,
+    "circuit_breaker_failures": 3,
+    "circuit_breaker_cooldown_s": 120,
+    "cache_ttl_s": 900,
+    "strategy": "balanced",
+    "auto_improve_every_n_requests": 50,
+    "learning": {
+      "explore_rate": 0.1,
+      "prior_strength": 4,
+      "recency_window": 200,
+      "weights": {
+        "quality": 1.0,
+        "cost": 0.35,
+        "latency": 0.15
+      },
+      "judge_sample_rate": 0.0,
+      "judge_model": "deepseek-v4-flash"
+    },
+    "improvement": {
+      "min_samples": 20,
+      "target_quality": 0.72,
+      "upgrade_margin": 0.15,
+      "rollback_drop": 0.1,
+      "quarantine_reliability": 0.5,
+      "quarantine_s": 3600
+    },
+    "compression": {
+      "enabled": true,
+      "trigger_tokens": 120000,
+      "keep_last_turns": 6,
+      "summarize_with_model": true,
+      "summary_max_tokens": 800
+    },
+    "storage": {
+      "max_db_mb": 50,
+      "max_raw_rows": 200000,
+      "retain_raw_days": 30
+    }
+  },
+  "models": [
+    {
+      "alias": "gpt-5.5",
+      "provider": "openai",
+      "tier": "premium",
+      "quality": 10,
+      "routes": [
+        {
+          "model": "gpt-5.5",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/openai/gpt-5.5",
+          "via": "openrouter",
+          "price_in": 5.0,
+          "price_out": 30.0
+        }
+      ]
+    },
+    {
+      "alias": "gpt-5.4-mini",
+      "provider": "openai",
+      "tier": "standard",
+      "quality": 7,
+      "routes": [
+        {
+          "model": "gpt-5.4-mini",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/openai/gpt-5.4-mini",
+          "via": "openrouter",
+          "price_in": 0.75,
+          "price_out": 4.5
+        }
+      ]
+    },
+    {
+      "alias": "gpt-5.4-nano",
+      "provider": "openai",
+      "tier": "economy",
+      "quality": 5,
+      "routes": [
+        {
+          "model": "gpt-5.4-nano",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/openai/gpt-5.4-nano",
+          "via": "openrouter",
+          "price_in": 0.2,
+          "price_out": 1.25
+        }
+      ]
+    },
+    {
+      "alias": "claude-opus-5.5",
+      "provider": "anthropic",
+      "tier": "premium",
+      "quality": 10,
+      "routes": [
+        {
+          "model": "anthropic/claude-opus-5-5",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/anthropic/claude-opus-5.5",
+          "via": "openrouter",
+          "price_in": 4.0,
+          "price_out": 20.0
+        }
+      ]
+    },
+    {
+      "alias": "claude-sonnet-5.5",
+      "provider": "anthropic",
+      "tier": "standard",
+      "quality": 9,
+      "routes": [
+        {
+          "model": "anthropic/claude-sonnet-5-5",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/anthropic/claude-sonnet-5.5",
+          "via": "openrouter",
+          "price_in": 2.0,
+          "price_out": 10.0
+        }
+      ]
+    },
+    {
+      "alias": "claude-haiku-5.5",
+      "provider": "anthropic",
+      "tier": "economy",
+      "quality": 6,
+      "routes": [
+        {
+          "model": "anthropic/claude-haiku-5-5",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/anthropic/claude-haiku-5.5",
+          "via": "openrouter",
+          "price_in": 0.1,
+          "price_out": 0.5
+        }
+      ]
+    },
+    {
+      "alias": "gemini-3.1-pro",
+      "provider": "vertex_ai",
+      "tier": "premium",
+      "quality": 9,
+      "routes": [
+        {
+          "model": "vertex_ai/gemini-3.1-pro-preview",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/google/gemini-3.1-pro-preview",
+          "via": "openrouter",
+          "price_in": 2.0,
+          "price_out": 12.0
+        }
+      ]
+    },
+    {
+      "alias": "gemini-3.5-flash",
+      "provider": "vertex_ai",
+      "tier": "standard",
+      "quality": 8,
+      "routes": [
+        {
+          "model": "vertex_ai/gemini-3.5-flash",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/google/gemini-3.5-flash",
+          "via": "openrouter",
+          "price_in": 1.5,
+          "price_out": 9.0
+        }
+      ]
+    },
+    {
+      "alias": "gemini-3.5-flash-lite",
+      "provider": "vertex_ai",
+      "tier": "economy",
+      "quality": 6,
+      "routes": [
+        {
+          "model": "vertex_ai/gemini-3.5-flash-lite",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/google/gemini-3.5-flash-lite",
+          "via": "openrouter",
+          "price_in": 0.3,
+          "price_out": 2.5
+        }
+      ]
+    },
+    {
+      "alias": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "tier": "standard",
+      "quality": 8,
+      "routes": [
+        {
+          "model": "deepseek/deepseek-v4-pro",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/deepseek/deepseek-v4-pro",
+          "via": "openrouter",
+          "price_in": 1.32,
+          "price_out": 3.96
+        }
+      ]
+    },
+    {
+      "alias": "deepseek-v4-flash",
+      "provider": "deepseek",
+      "tier": "economy",
+      "quality": 6,
+      "routes": [
+        {
+          "model": "deepseek/deepseek-v4-flash",
+          "via": "direct"
+        },
+        {
+          "model": "openrouter/deepseek/deepseek-v4-flash",
+          "via": "openrouter",
+          "price_in": 0.3,
+          "price_out": 1.2
+        }
+      ]
+    }
+  ],
+  "task_policy": {
+    "simple": "economy",
+    "extraction": "economy",
+    "summarization": "economy",
+    "creative": "standard",
+    "code": "standard",
+    "reasoning": "premium"
+  }
+}

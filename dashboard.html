@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1417" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6f5" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314b8a6'/%3E%3Cpath d='M14 46V18l9 14 9-14 9 14 9-14v28' fill='none' stroke='%230f1417' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>MCUBED Gateway</title>
+<style>
+:root{
+  --bg:#0f1417;--surface:#161d21;--surface-2:#1d262b;--border:#2a353b;
+  --text:#e6ecea;--muted:#8a9a97;--faint:#5d6c69;
+  --accent:#14b8a6;--accent-ink:#04201d;--good:#34d399;--warn:#fbbf24;--bad:#f87171;
+  --c1:#14b8a6;--c2:#818cf8;--c3:#f59e0b;--c4:#f472b6;--c5:#60a5fa;
+  --r:12px;--gap:12px;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
+  --mono:ui-monospace,"Roboto Mono","SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){
+  --bg:#f4f6f5;--surface:#ffffff;--surface-2:#eef2f1;--border:#dde4e2;--text:#132024;--muted:#5a6b68;--faint:#8b9a97;
+  --accent:#0d9488;--accent-ink:#ffffff;--good:#059669;--warn:#b45309;--bad:#dc2626;--c1:#0d9488;--c2:#6366f1;--c3:#d97706;--c4:#db2777;--c5:#2563eb}}
+:root[data-theme=light]{--bg:#f4f6f5;--surface:#ffffff;--surface-2:#eef2f1;--border:#dde4e2;--text:#132024;--muted:#5a6b68;--faint:#8b9a97;
+  --accent:#0d9488;--accent-ink:#ffffff;--good:#059669;--warn:#b45309;--bad:#dc2626;--c1:#0d9488;--c2:#6366f1;--c3:#d97706;--c4:#db2777;--c5:#2563eb}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--font);-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+.num{font-variant-numeric:tabular-nums lining-nums}
+button,select,input,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.01em;margin-right:auto;min-width:0}
+.brand svg{flex:none}
+.brand small{display:block;font-weight:450;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{min-height:40px;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:0 12px}
+.icon-btn{width:40px;min-height:40px;display:grid;place-items:center;border:1px solid var(--border);background:var(--surface);border-radius:10px;cursor:pointer}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:var(--surface);border-top:1px solid var(--border);
+  padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1;min-height:60px;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;cursor:pointer}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected=true]{color:var(--accent)}
+main{max-width:1240px;margin:0 auto;padding:14px}
+section.view{display:none}section.view.active{display:block}
+.grid{display:grid;gap:var(--gap)}
+.kpis{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;min-width:0}
+.card h2{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kpi .v{font-size:24px;font-weight:650;margin-top:2px}
+.kpi .l{font-size:12px;color:var(--muted)}
+.kpi .d{font-size:12px;margin-top:4px;color:var(--muted)}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.charts{grid-template-columns:1fr;margin-top:var(--gap)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+svg.chart text{fill:var(--muted);font-size:11px;font-family:var(--font)}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;margin:0 -14px;padding:0 14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--surface)}
+td.r,th.r{text-align:right}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:12px;background:var(--surface-2);border:1px solid var(--border)}
+.chip.economy{color:var(--good)}.chip.standard{color:var(--c5)}.chip.premium{color:var(--c3)}
+.chip.applied,.chip.kept{color:var(--good)}.chip.active{color:var(--c5)}.chip.rolled_back{color:var(--bad)}
+.bar{height:6px;border-radius:4px;background:var(--surface-2);overflow:hidden;min-width:60px}
+.bar>span{display:block;height:100%;background:var(--accent)}
+.policy{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.policy div{background:var(--surface-2);border-radius:10px;padding:10px}
+.policy b{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+textarea{width:100%;min-height:120px;border:1px solid var(--border);background:var(--surface-2);border-radius:10px;padding:12px;resize:vertical}
+pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border-radius:10px;padding:12px;font:13px/1.5 var(--mono);max-height:50vh;overflow:auto;overscroll-behavior:contain}
+.meta{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;font-size:13px;margin-top:10px}
+.meta span{color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:26px 8px;font-size:14px}
+.banner{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted);margin-bottom:var(--gap)}
+.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;transition:.2s;z-index:50;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.skel{background:linear-gradient(90deg,var(--surface-2),var(--border),var(--surface-2));background-size:200% 100%;animation:sk 1.2s infinite;border-radius:8px;height:18px}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (min-width:720px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .charts{grid-template-columns:2fr 1fr}
+  .two{grid-template-columns:1fr 1fr}
+  .meta{grid-template-columns:repeat(4,1fr)}
+}
+@media (min-width:1024px){
+  body{padding-bottom:0}
+  .kpis{grid-template-columns:repeat(6,1fr)}
+  nav.tabs{position:sticky;top:61px;bottom:auto;max-width:1240px;margin:0 auto;background:transparent;border:0;padding:8px 14px 0;gap:6px;justify-content:flex-start}
+  nav.tabs button{flex:none;flex-direction:row;min-height:40px;padding:0 14px;border-radius:10px;font-size:14px;gap:8px}
+  nav.tabs button svg{width:18px;height:18px}
+  nav.tabs button[aria-selected=true]{background:var(--surface);border:1px solid var(--border)}
+  .toast{bottom:24px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg width="32" height="32" viewBox="0 0 64 64" aria-label="MCUBED"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
+    <div>MCUBED Gateway<small id="sub">Loading…</small></div>
+  </div>
+  <select id="days" class="ctl" aria-label="Time range">
+    <option value="1">24h</option><option value="7" selected>7d</option><option value="30">30d</option><option value="365">1y</option>
+  </select>
+  <button class="icon-btn" id="refresh" aria-label="Refresh"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+  <button class="icon-btn" id="theme" aria-label="Toggle theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-v="overview" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Overview</button>
+  <button role="tab" data-v="models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>Models</button>
+  <button role="tab" data-v="learning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>Learning</button>
+  <button role="tab" data-v="playground"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Try it</button>
+  <button role="tab" data-v="storage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Storage</button>
+</nav>
+
+<main>
+  <div id="static-banner" class="banner" hidden>Static snapshot. Run <code>python gateway.py gui</code> for live data and actions.</div>
+
+  <section class="view active" id="v-overview">
+    <div class="grid kpis" id="kpis">
+      <div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div>
+      <div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div>
+    </div>
+    <div class="grid charts">
+      <div class="card"><h2>Daily spend vs premium baseline</h2><div id="ch-daily"></div>
+        <div class="legend"><span><i style="background:var(--c1)"></i>Actual spend</span><span><i style="background:var(--c3)"></i>All-premium baseline</span></div></div>
+      <div class="card"><h2>Spend by provider</h2><div id="ch-provider"></div></div>
+    </div>
+    <div class="grid charts two">
+      <div class="card"><h2>Quality by task <span class="chip">policy tier</span></h2><div id="ch-task"></div></div>
+      <div class="card"><h2>Errors by type</h2><div id="ch-errors"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-models">
+    <div class="card"><h2>Routes</h2><div class="tbl-wrap"><table id="t-models"></table></div></div>
+    <div class="card" style="margin-top:var(--gap)"><h2>Model pool</h2><div class="tbl-wrap"><table id="t-pool"></table></div></div>
+  </section>
+
+  <section class="view" id="v-learning">
+    <div class="card"><h2>Live policy</h2><div class="policy" id="policy"></div></div>
+    <div class="card" style="margin-top:var(--gap)"><h2>Process improvement
+      <span class="row"><button class="btn" id="btn-dry">Preview</button><button class="btn primary" id="btn-apply">Run now</button></span></h2>
+      <div class="tbl-wrap"><table id="t-imps"></table></div></div>
+    <div class="card" style="margin-top:var(--gap)"><h2>Learned scores <span class="chip">model × task</span></h2><div class="tbl-wrap"><table id="t-learned"></table></div></div>
+  </section>
+
+  <section class="view" id="v-playground">
+    <div class="card">
+      <h2>Send a request</h2>
+      <textarea id="prompt" placeholder="Ask anything. The gateway picks the model."></textarea>
+      <div class="row" style="margin-top:10px">
+        <select id="strategy" class="ctl" aria-label="Strategy"><option value="balanced">Balanced</option><option value="cost">Cheapest</option><option value="quality">Best quality</option></select>
+        <select id="tier" class="ctl" aria-label="Tier"><option value="">Auto tier</option><option>economy</option><option>standard</option><option>premium</option></select>
+        <button class="btn primary" id="send" style="margin-left:auto">Send</button>
+      </div>
+      <div id="answer" hidden>
+        <pre class="out" id="out" style="margin-top:12px"></pre>
+        <div class="meta num" id="meta"></div>
+        <div class="row" style="margin-top:10px"><span style="color:var(--muted);font-size:13px">Rate answer</span>
+          <button class="btn" data-score="1">Good</button><button class="btn" data-score="0.5">Okay</button><button class="btn" data-score="0">Bad</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-storage">
+    <div class="grid kpis" id="storage-kpis"></div>
+    <div class="card" style="margin-top:var(--gap)"><h2>Self compression</h2>
+      <p style="color:var(--muted);margin:0 0 12px;font-size:14px">Old rows roll up into daily totals when the database passes its size or row limit. Costs and tokens stay exact.</p>
+      <button class="btn primary" id="btn-compact">Compact now</button>
+      <pre class="out" id="compact-out" hidden style="margin-top:12px"></pre>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const STATIC = window.__REPORT__ || null;
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const usd = v => v == null ? "–" : "$" + (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(4));
+const nf = v => v == null ? "–" : Intl.NumberFormat("en", {notation: v >= 1e5 ? "compact" : "standard", maximumFractionDigits: 1}).format(v);
+const pct = v => v == null ? "–" : (v * 100).toFixed(1) + "%";
+let R = null, lastReq = null;
+
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+async function api(path, opts){
+  const r = await fetch(path, opts); const j = await r.json().catch(()=>({error:r.statusText}));
+  if(!r.ok || j.error) throw new Error(j.error || r.statusText); return j;
+}
+
+/* ---------- tiny SVG charts (no dependencies: fast + offline on Android) ---------- */
+function lineChart(el, labels, series){
+  const W=600,H=220,P={l:44,r:8,t:10,b:24};
+  if(!labels.length){el.innerHTML='<div class="empty">No traffic in this range</div>';return}
+  const max=Math.max(1e-9,...series.flatMap(s=>s.values));
+  const x=i=>P.l+(labels.length===1?(W-P.l-P.r)/2:i*(W-P.l-P.r)/(labels.length-1));
+  const y=v=>P.t+(H-P.t-P.b)*(1-v/max);
+  let g="";
+  for(let k=0;k<=3;k++){const v=max*k/3;g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)"/><text x="${P.l-6}" y="${y(v)+4}" text-anchor="end">${usd(v)}</text>`}
+  const step=Math.ceil(labels.length/6);
+  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)g+=`<text x="${x(i)}" y="${H-6}" text-anchor="middle">${esc(l.slice(5))}</text>`});
+  series.forEach(s=>{
+    const pts=s.values.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
+    if(s.fill)g+=`<polygon points="${x(0)},${y(0)} ${pts} ${x(s.values.length-1)},${y(0)}" fill="${s.color}" opacity=".14"/>`;
+    g+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" ${s.dash?'stroke-dasharray="5 4"':''}/>`;
+    s.values.forEach((v,i)=>g+=`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${s.color}"><title>${esc(labels[i])}: ${usd(v)}</title></circle>`);
+  });
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spend chart">${g}</svg>`;
+}
+function hbars(el, rows, fmt, colorFn){
+  if(!rows.length){el.innerHTML='<div class="empty">No data yet</div>';return}
+  const max=Math.max(1e-9,...rows.map(r=>r.value));
+  el.innerHTML=rows.map((r,i)=>`<div style="margin:8px 0">
+    <div class="row num" style="justify-content:space-between;font-size:13px"><span>${r.label}</span><b>${fmt(r.value)}</b></div>
+    <div class="bar" style="height:8px;margin-top:4px"><span style="width:${(100*r.value/max).toFixed(1)}%;background:${colorFn?colorFn(r,i):'var(--accent)'}"></span></div></div>`).join("");
+}
+
+/* ---------- render ---------- */
+function kpi(label, value, delta, cls=""){return `<div class="card kpi"><div class="l">${label}</div><div class="v num ${cls}">${value}</div><div class="d num">${delta||"&nbsp;"}</div></div>`}
+function render(){
+  const t=R.totals;
+  $("#sub").textContent=`${R.mode} · updated ${new Date(R.generated_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;
+  const budgetPct = R.daily_budget_usd ? R.spent_today_usd / R.daily_budget_usd : 0;
+  $("#kpis").innerHTML =
+    kpi("Requests", nf(t.requests), `${nf(t.cache_hits)} cache hits`) +
+    kpi("Spend", usd(t.cost_usd), `today ${usd(R.spent_today_usd)} of ${usd(R.daily_budget_usd)}`, budgetPct>.9?"bad":budgetPct>.7?"warn":"") +
+    kpi("Saved vs premium", usd(t.savings_vs_premium_usd), `${t.savings_pct}% lower`, "good") +
+    kpi("Success rate", pct(t.success_rate), `${nf(t.errors)} failed attempts`, t.success_rate!=null&&t.success_rate<.9?"warn":"") +
+    kpi("Avg quality", t.avg_quality==null?"–":t.avg_quality.toFixed(2), "feedback, judge or auto-eval") +
+    kpi("Tokens", nf((t.prompt_tokens||0)+(t.completion_tokens||0)), `${nf(t.tokens_saved_by_compression)} saved by compression`);
+
+  lineChart($("#ch-daily"), R.daily.map(d=>d.day), [
+    {values:R.daily.map(d=>d.baseline||0), color:"var(--c3)", dash:true},
+    {values:R.daily.map(d=>d.cost||0), color:"var(--c1)", fill:true}]);
+  const pc={openai:"var(--c1)",anthropic:"var(--c3)",vertex_ai:"var(--c5)",deepseek:"var(--c2)"};
+  hbars($("#ch-provider"), R.by_provider.map(p=>({label:esc(p.provider), value:p.cost||0, p:p.provider})), usd, r=>pc[r.p]||"var(--c4)");
+  hbars($("#ch-task"), R.by_task.map(r=>({label:`${esc(r.task_type)} <span class="chip ${r.tier_policy}">${r.tier_policy}</span>`, value:r.quality||0})),
+        v=>v.toFixed(2), r=>r.value>=.8?"var(--good)":r.value>=.65?"var(--warn)":"var(--bad)");
+  hbars($("#ch-errors"), R.errors.map(e=>({label:esc(e.error_type), value:e.n})), nf, ()=>"var(--bad)");
+
+  $("#t-models").innerHTML = `<thead><tr><th>Model</th><th>Via</th><th>Tier</th><th class="r">Attempts</th><th>Success</th><th class="r">Tokens</th><th class="r">Cost</th><th class="r">Avg ms</th></tr></thead><tbody>` +
+    (R.by_model.length ? R.by_model.map(m=>{const sr=m.attempts?m.ok/m.attempts:0;return `<tr class="num"><td>${esc(m.alias)}</td><td>${esc(m.via)}</td><td><span class="chip ${m.tier}">${m.tier}</span></td><td class="r">${nf(m.attempts)}</td>
+      <td><div class="row" style="flex-wrap:nowrap"><div class="bar" style="flex:1"><span style="width:${sr*100}%;background:${sr>.9?'var(--good)':sr>.7?'var(--warn)':'var(--bad)'}"></span></div>${pct(sr)}</div></td>
+      <td class="r">${nf((m.p_tok||0)+(m.c_tok||0))}</td><td class="r">${usd(m.cost)}</td><td class="r">${nf(m.avg_ms)}</td></tr>`}).join("") : `<tr><td colspan="8" class="empty">No requests yet</td></tr>`) + "</tbody>";
+  $("#t-pool").innerHTML = `<thead><tr><th>Alias</th><th>Provider</th><th>Tier</th><th class="r">$/1M in</th><th class="r">$/1M out</th><th>Routes</th></tr></thead><tbody>` +
+    R.models.map(m=>`<tr class="num"><td>${esc(m.alias)}</td><td>${esc(m.provider)}</td><td><span class="chip ${m.tier}">${m.tier}</span></td><td class="r">${m.price_in_per_m}</td><td class="r">${m.price_out_per_m}</td>
+      <td>${m.routes.map(r=>`<span class="chip" title="${esc(r.model)}" style="margin-right:4px">${r.available?"●":"○"} ${esc(r.via)}</span>`).join("")}</td></tr>`).join("") + "</tbody>";
+
+  const p=R.policy;
+  $("#policy").innerHTML = Object.entries(p.task_policy).map(([k,v])=>`<div><b>${esc(k)}</b><span class="chip ${v}">${v}</span></div>`).join("") +
+    `<div><b>Retries per route</b><span class="num">${p.max_retries_per_route}</span></div>` +
+    `<div><b>Compress above</b><span class="num">${nf(p.compression_trigger_tokens)} tok</span></div>` +
+    `<div><b>Keep recent turns</b><span class="num">${p.compression_keep_turns}</span></div>` +
+    `<div><b>OpenRouter-first</b>${Object.entries(p.route_order).filter(([,v])=>v==="openrouter").map(([k])=>esc(k)).join(", ")||"none"}</div>` +
+    `<div><b>Quarantined</b>${Object.keys(p.quarantine).map(esc).join(", ")||"none"}</div>`;
+  renderImps(R.recent_improvements);
+  $("#t-learned").innerHTML = `<thead><tr><th>Model</th><th>Task</th><th class="r">n</th><th>Quality</th><th class="r">Reliability</th><th class="r">Avg out tok</th></tr></thead><tbody>` +
+    (R.learned.length ? R.learned.sort((a,b)=>b.n-a.n).map(a=>`<tr class="num"><td>${esc(a.alias)}</td><td>${esc(a.task_type)}</td><td class="r">${a.n}</td>
+      <td><div class="row" style="flex-wrap:nowrap"><div class="bar" style="flex:1"><span style="width:${a.quality*100}%"></span></div>${a.quality.toFixed(2)}</div></td>
+      <td class="r">${pct(a.reliability)}</td><td class="r">${nf(a.avg_out_tokens)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">The router learns as traffic flows</td></tr>`) + "</tbody>";
+
+  const s=R.storage;
+  $("#storage-kpis").innerHTML = kpi("Database", s.db_mb.toFixed(2)+" MB", `limit ${s.max_db_mb} MB`, s.db_mb>s.max_db_mb*.8?"warn":"") +
+    kpi("Raw rows", nf(s.raw_rows), `limit ${nf(s.max_raw_rows)}`) + kpi("Daily rollups", nf(s.aggregated_rows), `${nf(s.attempts_in_aggregates)} attempts inside`);
+}
+function renderImps(list, preview){
+  $("#t-imps").innerHTML = `<thead><tr><th>${preview?"Proposed":"When"}</th><th>Change</th><th>Target</th><th>Old → New</th><th>Why</th></tr></thead><tbody>` +
+    (list.length ? list.map(i=>`<tr><td>${preview?'<span class="chip active">preview</span>':`<span class="chip ${i.status}">${esc(i.status)}</span> <span class="num" style="color:var(--muted)">${new Date(i.ts*1000).toLocaleDateString()}</span>`}</td>
+      <td>${esc(i.kind)}</td><td>${esc(i.target)}</td><td class="num">${esc(i.old_value ?? JSON.stringify(i.old))} → ${esc(i.new_value ?? JSON.stringify(i.new))}</td><td style="white-space:normal;min-width:240px;color:var(--muted)">${esc(i.reason)}</td></tr>`).join("")
+     : `<tr><td colspan="5" class="empty">${preview?"Nothing to change yet: more evidence needed":"No changes yet"}</td></tr>`) + "</tbody>";
+}
+
+async function load(){
+  try{
+    R = STATIC || await api(`/api/report?days=${$("#days").value}`);
+    render();
+  }catch(e){ $("#sub").textContent="Offline"; toast("Could not load report: "+e.message) }
+}
+
+/* ---------- interactions ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
+  document.querySelectorAll("section.view").forEach(v=>v.classList.toggle("active", v.id==="v-"+b.dataset.v));
+  window.scrollTo({top:0});
+}));
+$("#days").addEventListener("change", load);
+$("#refresh").addEventListener("click", load);
+$("#theme").addEventListener("click",()=>{
+  const cur=document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  document.documentElement.dataset.theme = cur==="dark"?"light":"dark";
+});
+async function improve(apply){
+  try{ const r=await api(`/api/improve?apply=${apply?1:0}`,{method:"POST"});
+    if(apply){toast(r.changes.length?`${r.changes.length} changes applied`:"Policy already optimal"); await load()} else renderImps(r.changes,true);
+  }catch(e){toast(e.message)}
+}
+$("#btn-dry").addEventListener("click",()=>improve(false));
+$("#btn-apply").addEventListener("click",()=>improve(true));
+$("#btn-compact").addEventListener("click",async()=>{
+  try{const r=await api("/api/compact",{method:"POST"});const o=$("#compact-out");o.hidden=false;o.textContent=JSON.stringify(r,null,2);toast("Compaction done");load()}catch(e){toast(e.message)}
+});
+$("#send").addEventListener("click",async()=>{
+  const prompt=$("#prompt").value.trim(); if(!prompt){toast("Type a prompt first");return}
+  const b=$("#send"); b.disabled=true; b.textContent="Routing…";
+  try{
+    const r=await api("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({prompt,strategy:$("#strategy").value,tier:$("#tier").value||null})});
+    lastReq=r.request_id; $("#answer").hidden=false; $("#out").textContent=r.text;
+    const m=[["Model",r.model_alias],["Via",r.via],["Task",r.task_type],["Tier",r.tier_policy],["Tokens",`${r.prompt_tokens}+${r.completion_tokens}`],
+      ["Cost",usd(r.cost_usd)],["Saved",usd(r.savings_usd)],["Latency",`${r.latency_ms} ms`],["Attempts",r.attempts],["Cached",r.cached?"yes":"no"],
+      ["Compressed",r.compression?`${r.compression.original_tokens}→${r.compression.compressed_tokens}`:"no"],["Explore",r.exploratory?"yes":"no"]];
+    $("#meta").innerHTML=m.map(([k,v])=>`<div><span>${k}</span><br>${esc(v)}</div>`).join("");
+  }catch(e){toast(e.message)} finally{b.disabled=false;b.textContent="Send"}
+});
+document.querySelectorAll("[data-score]").forEach(b=>b.addEventListener("click",async()=>{
+  if(!lastReq)return;
+  try{await api("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:lastReq,score:+b.dataset.score})});toast("Thanks, the router learned from that")}catch(e){toast(e.message)}
+}));
+
+if(STATIC){
+  $("#static-banner").hidden=false;
+  ["#btn-dry","#btn-apply","#btn-compact","#send","#refresh"].forEach(s=>$(s).disabled=true);
+  $("#days").disabled=true;
+}else{
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) load() }); // refresh on return, no background polling (battery)
+}
+load();
+</script>
+</body>
+</html>
