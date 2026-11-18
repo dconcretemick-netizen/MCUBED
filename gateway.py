@@ -1951,6 +1951,78 @@ def _update_backups() -> list[Path]:
     return sorted((p for p in d.iterdir() if p.is_dir()), reverse=True) if d.exists() else []
 
 
+# Only code signed with this certificate is accepted as an MCUBED APK update (SHA-256 of the DER certificate).
+MCUBED_CERT_SHA256 = "53b57eb8251c6528061e05766f424c41ee1e94801a76a9f944f7c1a19dd9cccc"
+
+
+def apk_signer_sha256(path) -> list[str]:
+    """SHA-256 of each signing certificate in an APK's v2/v3 signature block (stdlib only)."""
+    import hashlib
+    import struct
+    d = Path(path).read_bytes()
+    eocd = d.rfind(b"PK\x05\x06")
+    if eocd < 0:
+        raise GatewayError("not an APK (zip end record missing)")
+    cd = struct.unpack("<I", d[eocd + 16:eocd + 20])[0]
+    if d[cd - 16:cd] != b"APK Sig Block 42":
+        raise GatewayError("APK has no v2/v3 signature block")
+    size = struct.unpack("<Q", d[cd - 24:cd - 16])[0]
+    p, end, out = cd - size - 8 + 8, cd - 24, []
+
+    def lp(b: bytes, o: int) -> tuple[bytes, int]:
+        n = struct.unpack("<I", b[o:o + 4])[0]
+        return b[o + 4:o + 4 + n], o + 4 + n
+    while p < end:
+        n = struct.unpack("<Q", d[p:p + 8])[0]
+        bid = struct.unpack("<I", d[p + 8:p + 12])[0]
+        if bid in (0x7109871A, 0xF05368C0):  # v2, v3
+            signers, _ = lp(d[p + 12:p + 8 + n], 0)
+            o = 0
+            while o < len(signers):
+                signer, o = lp(signers, o)
+                signed, _ = lp(signer, 0)
+                _, k = lp(signed, 0)
+                certs, _ = lp(signed, k)
+                c, _ = lp(certs, 0)
+                out.append(hashlib.sha256(c).hexdigest())
+        p += 8 + n
+    return sorted(set(out))
+
+
+def apk_signature_schemes(path) -> list[str]:
+    """Which APK signature schemes are present: v1 (JAR), v2, v3."""
+    import struct
+    import zipfile
+    found = []
+    with zipfile.ZipFile(path) as z:
+        if any(re.fullmatch(r"META-INF/[^/]+\.(RSA|EC|DSA)", n) for n in z.namelist()):
+            found.append("v1")
+    d = Path(path).read_bytes()
+    cd = struct.unpack("<I", d[d.rfind(b"PK\x05\x06") + 16:][:4])[0]
+    if d[cd - 16:cd] == b"APK Sig Block 42":
+        size = struct.unpack("<Q", d[cd - 24:cd - 16])[0]
+        p, end = cd - size, cd - 24
+        while p < end:
+            n = struct.unpack("<Q", d[p:p + 8])[0]
+            bid = struct.unpack("<I", d[p + 8:p + 12])[0]
+            found += {0x7109871A: ["v2"], 0xF05368C0: ["v3"], 0x1B93AD61: ["v3.1"]}.get(bid, [])
+            p += 8 + n
+    return found
+
+
+def _check_lineage(current: str, new: str) -> None:
+    """Refuse an update unless the new commit builds on the installed one (blocks rewritten history)."""
+    if not current or not new or current == new:
+        return
+    try:
+        cmp = _gh_api(f"repos/{UPDATE_REPO}/compare/{current}...{new}")
+    except GatewayError as e:
+        raise GatewayError(f"could not confirm the update continues from this version ({e}); not installing") from None
+    if cmp.get("status") not in ("ahead", "identical"):
+        raise GatewayError(f"update refused: {new[:7]} does not build on the installed {current[:7]} "
+                           f"(history was {cmp.get('status')}). Someone may have rewritten main.")
+
+
 def apply_update() -> dict:
     """Install the newest files from GitHub. Every file is checked against GitHub's hash and the new
     gateway.py must compile before anything is replaced; the old files are backed up for rollback."""
@@ -1968,6 +2040,7 @@ def apply_update() -> dict:
         return {"mode": "git", "output": r.stdout.strip()[-1000:], "restart": True, **current_version()}
     head = _gh_api(f"repos/{UPDATE_REPO}/commits/{UPDATE_BRANCH}")
     sha = head["sha"]
+    _check_lineage(cur.get("commit", ""), sha)
     tree = _gh_api(f"repos/{UPDATE_REPO}/git/trees/{sha}")
     files = [t for t in tree["tree"] if t["type"] == "blob" and "/" not in t["path"]
              and t["path"].endswith(UPDATE_EXT) and t["path"] not in UPDATE_SKIP and not t["path"].startswith(".")]
@@ -2060,8 +2133,24 @@ def download_apk() -> dict:
     if tmp.stat().st_size != asset["size"]:
         tmp.unlink(missing_ok=True)
         raise GatewayError("download was incomplete; try again")
+    digest = (asset.get("digest") or "").removeprefix("sha256:")
+    if digest and __import__("hashlib").sha256(tmp.read_bytes()).hexdigest() != digest:
+        tmp.unlink(missing_ok=True)
+        raise GatewayError("downloaded APK does not match GitHub's SHA-256; not installing")
+    try:
+        signers = apk_signer_sha256(tmp)
+    except (GatewayError, OSError, ValueError) as e:
+        tmp.unlink(missing_ok=True)
+        raise GatewayError(f"could not read the APK signature: {e}") from None
+    if signers != [MCUBED_CERT_SHA256]:
+        tmp.unlink(missing_ok=True)
+        raise GatewayError("APK is not signed with the MCUBED key; not installing")
+    target = rel.get("target_commitish", "")
+    if re.fullmatch(r"[0-9a-f]{40}", target or ""):
+        _check_lineage(current_version().get("commit", ""), target)
     os.replace(tmp, out)
-    return {"path": str(out), "size": asset["size"], "name": asset["name"], "commit": rel.get("target_commitish", "")}
+    return {"path": str(out), "size": asset["size"], "name": asset["name"], "commit": target,
+            "sha256": digest, "signer": MCUBED_CERT_SHA256[:16]}
 
 
 def restart_process(delay: float = 0.8) -> None:

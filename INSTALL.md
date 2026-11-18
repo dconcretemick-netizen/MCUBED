@@ -15,6 +15,17 @@ The newest MCUBED is always at the **[MCUBED install](https://github.com/dconcre
 
 If Android says the app conflicts with an existing package, you have an older build signed with a temporary key. Uninstall it once, then install again. Every build since then uses the same permanent key.
 
+## If Android says the file is unsafe
+
+Android and Chrome warn about every APK that does not come from the Play Store. That warning is about where the file came from, not what is in it. To install MCUBED safely:
+
+1. Check that the file is genuine: the [MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest) page lists the APK's SHA-256 and the MCUBED signing certificate. Only download from that page.
+2. In Chrome, tap Download anyway (or Keep).
+3. If Play Protect shows "Unsafe app blocked" or "Unknown app", tap More details, then Install anyway. You can also tap Scan app, which sends it to Google for a check.
+4. After the first install, updates come through the app's Update tab, which checks the signature and SHA-256 for you.
+
+The permanent way to remove the warning is to register the app with Google's [Android developer verification](https://developer.android.com/developer-verification). The free limited distribution account needs only an email address and covers up to 20 devices. Google plans to require registration for sideloaded apps on all certified devices in 2027.
+
 ## Windows, Mac or Linux
 
 1. Install Python 3.10 or newer from [python.org](https://www.python.org/downloads/).

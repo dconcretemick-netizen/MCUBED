@@ -35,6 +35,11 @@ android {
                 storePassword = System.getenv("MCUBED_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("MCUBED_KEY_ALIAS") ?: "mcubed"
                 keyPassword = System.getenv("MCUBED_KEYSTORE_PASSWORD")
+                // Every signature scheme: v1 (JAR) for older tools and scanners, v2 for Android 7+,
+                // v3 so the key can be rotated later without breaking updates.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }

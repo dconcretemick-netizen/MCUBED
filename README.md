@@ -1,6 +1,6 @@
 # MCUBED
 
-**[MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest)**: [Android APK](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED.apk) · [Desktop zip](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED-desktop.zip) · [How to install](INSTALL.md). Always the newest build.
+**[MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest)**: [Android APK](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED.apk) · [Desktop zip](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED-desktop.zip) · [How to install](INSTALL.md) · [Security](SECURITY.md). Always the newest build.
 
 A multi-model AI gateway with a phone-friendly web dashboard. One entry point for OpenAI, Anthropic, Google and DeepSeek models, with OpenRouter as a fallback route for every model.
 
