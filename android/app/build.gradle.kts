@@ -8,7 +8,7 @@ plugins {
 val repoRoot = rootDir.parentFile
 val pyDir = file("src/main/python")
 copy {
-    from(repoRoot) { include("gateway.py", "models.json", "dashboard.html", "game.html", "solitaire.html", "news.json") }
+    from(repoRoot) { include("gateway.py", "models.json", "dashboard.html", "game.html", "solitaire.html", "tetris.html", "news.json", "build_info.json") }
     into(pyDir)
 }
 
@@ -25,11 +25,25 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
+    // One permanent release key (from CI secrets) so each new APK installs as an update over the last one.
+    val ks = System.getenv("MCUBED_KEYSTORE_FILE")
+    signingConfigs {
+        if (ks != null && file(ks).exists()) {
+            create("mcubed") {
+                storeFile = file(ks)
+                storeType = "pkcs12"
+                storePassword = System.getenv("MCUBED_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("MCUBED_KEY_ALIAS") ?: "mcubed"
+                keyPassword = System.getenv("MCUBED_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key unless you configure your own keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            // Local builds without the key fall back to the debug key.
+            signingConfig = signingConfigs.findByName("mcubed") ?: signingConfigs.getByName("debug")
         }
     }
 

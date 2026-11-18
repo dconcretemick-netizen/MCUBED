@@ -34,6 +34,8 @@ def start(data_dir: str, keys_json: str = "{}") -> str:
         set_keys(keys_json)
         return _state["url"]
     os.environ["GATEWAY_LITE"] = "1"
+    os.environ["MCUBED_ANDROID"] = "1"  # Update tab installs a new APK instead of replacing files
+    os.environ["MCUBED_DATA"] = data_dir  # update.apk lands here (files/gateway), where MainActivity reads it
     has_key = _apply_keys(keys_json)
     import gateway  # imported after GATEWAY_LITE is set
 

@@ -1509,8 +1509,8 @@ ICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect w
             'stroke-width="5" stroke-linejoin="round"/></svg>')
 # network-first service worker: works offline with the last report, never serves stale data when online
 SERVICE_WORKER = """
-const C='mcubed-v3';
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/manifest.webmanifest','/icon.svg'])))});
+const C='mcubed-v4';
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/tetris.html','/manifest.webmanifest','/icon.svg'])))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
   e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r})
@@ -1826,6 +1826,252 @@ def fetch_page(url: str, max_bytes: int = 3_000_000) -> dict:
             links.append(lk)
     return {"url": final, "title": " ".join(rd.title.split()) or final, "text": "\n".join(text)[:100_000],
             "links": links[:200], "content_type": ctype}
+
+
+# --------------------------------------------------------------------------- #
+# Self-update: install the newest MCUBED from GitHub (verified, backed up, reversible)
+# --------------------------------------------------------------------------- #
+UPDATE_REPO = os.getenv("MCUBED_REPO", "dconcretemick-netizen/MCUBED")
+UPDATE_BRANCH = os.getenv("MCUBED_BRANCH", "main")
+UPDATE_EXT = (".py", ".html", ".json", ".sh", ".md", ".txt")
+UPDATE_SKIP = {"repos.json", "build_info.json", "package.json", "package-lock.json"}  # data, not program files
+UPDATE_CONFIG = {"models.json", "news.json"}  # your edits here are kept (the new version is saved as *.new)
+_update_cache: dict = {}
+
+
+def _is_android() -> bool:
+    return os.getenv("MCUBED_ANDROID") == "1"
+
+
+def _gh_api(path: str, raw: bool = False, timeout: float = 30) -> Any:
+    """GitHub API GET with GITHUB_TOKEN, else the signed-in GitHub CLI, else anonymous (public repos)."""
+    import shutil
+    import subprocess
+    import urllib.error
+    import urllib.request
+    accept = "application/vnd.github.raw" if raw else "application/vnd.github+json"
+    token = _github_token()
+    if not token and shutil.which("gh"):
+        try:
+            out = subprocess.run(["gh", "api", "-H", f"Accept: {accept}", path], capture_output=True, timeout=timeout,
+                                 check=True).stdout
+            return out if raw else json.loads(out)
+        except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
+            pass
+    headers = {"Accept": accept, "User-Agent": "MCUBED", "X-GitHub-Api-Version": "2022-11-28"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request("https://api.github.com/" + path.lstrip("/"),
+                                                           headers=headers), timeout=timeout) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        hint = " (private repository: add a GitHub token in AI keys or .env)" if e.code in (401, 403, 404) and not token else ""
+        raise GatewayError(f"GitHub returned HTTP {e.code} for {path.split('?')[0]}{hint}") from None
+    except (urllib.error.URLError, OSError) as e:
+        raise GatewayError(f"could not reach GitHub: {e}") from None
+    return data if raw else json.loads(data)
+
+
+def _git_blob_sha(data: bytes) -> str:
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def _update_manifest_path() -> Path:
+    return HERE / ".mcubed_update.json"
+
+
+def current_version() -> dict:
+    """What is installed now: git checkout, a previous self-update, or the APK's build info."""
+    import subprocess
+    bi = HERE / "build_info.json"
+    if bi.exists():
+        try:
+            d = json.loads(bi.read_text())
+            return {"commit": d.get("commit", ""), "date": d.get("built_at", ""), "source": "apk" if _is_android() else "build"}
+        except (OSError, json.JSONDecodeError):
+            pass
+    if (HERE / ".git").exists():
+        try:
+            out = subprocess.run(["git", "-C", str(HERE), "log", "-1", "--format=%H%n%cI"], capture_output=True,
+                                 text=True, timeout=10, check=True).stdout.split("\n")
+            return {"commit": out[0], "date": out[1], "source": "git"}
+        except (subprocess.SubprocessError, OSError, IndexError):
+            pass
+    mp = _update_manifest_path()
+    if mp.exists():
+        try:
+            d = json.loads(mp.read_text())
+            return {"commit": d.get("commit", ""), "date": d.get("date", ""), "source": "update"}
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {"commit": "", "date": "", "source": "unknown"}
+
+
+def check_update(force: bool = False) -> dict:
+    hit = _update_cache.get("check")
+    if hit and not force and time.time() - hit["checked_at"] < 900:
+        return hit
+    cur = current_version()
+    head = _gh_api(f"repos/{UPDATE_REPO}/commits/{UPDATE_BRANCH}")
+    latest = {"commit": head["sha"], "date": head["commit"]["committer"]["date"],
+              "message": head["commit"]["message"].split("\n")[0]}
+    changes: list[dict] = []
+    behind = None
+    if cur["commit"] and cur["commit"] != latest["commit"]:
+        try:
+            cmp_ = _gh_api(f"repos/{UPDATE_REPO}/compare/{cur['commit']}...{latest['commit']}")
+            behind = cmp_.get("ahead_by")
+            changes = [{"commit": c["sha"][:7], "date": c["commit"]["committer"]["date"],
+                        "message": c["commit"]["message"].split("\n")[0]} for c in reversed(cmp_.get("commits", []))][:30]
+        except GatewayError:
+            pass
+    elif cur["commit"] == latest["commit"]:
+        behind = 0
+    res = {"checked_at": time.time(), "repo": UPDATE_REPO, "branch": UPDATE_BRANCH, "current": cur, "latest": latest,
+           "behind": behind, "available": cur["commit"] != latest["commit"], "changes": changes,
+           "mode": "apk" if _is_android() else "git" if cur["source"] == "git" else "files",
+           "backups": [b.name for b in _update_backups()]}
+    if res["mode"] == "apk":
+        res["apk"] = None
+        try:
+            rel = _gh_api(f"repos/{UPDATE_REPO}/releases/tags/latest")
+            asset = next((a for a in rel.get("assets", []) if a["name"].endswith(".apk")), None)
+            res["apk"] = {"commit": rel.get("target_commitish", ""), "name": asset["name"] if asset else "",
+                          "size": asset["size"] if asset else 0, "page": rel.get("html_url", "")}
+            res["available"] = bool(asset) and rel.get("target_commitish", "") != cur["commit"]
+        except GatewayError as e:
+            res["apk_error"] = str(e)
+    _update_cache["check"] = res
+    return res
+
+
+def _update_backups() -> list[Path]:
+    d = HERE / ".mcubed_backup"
+    return sorted((p for p in d.iterdir() if p.is_dir()), reverse=True) if d.exists() else []
+
+
+def apply_update() -> dict:
+    """Install the newest files from GitHub. Every file is checked against GitHub's hash and the new
+    gateway.py must compile before anything is replaced; the old files are backed up for rollback."""
+    import shutil
+    import subprocess
+    if _is_android():
+        raise GatewayError("in the Android app, updates install as a new APK: use Download and install")
+    cur = current_version()
+    if cur["source"] == "git":
+        r = subprocess.run(["git", "-C", str(HERE), "pull", "--ff-only", "origin", UPDATE_BRANCH],
+                           capture_output=True, text=True, timeout=180)
+        if r.returncode:
+            raise GatewayError("git pull failed: " + (r.stderr or r.stdout).strip()[-300:])
+        _update_cache.clear()
+        return {"mode": "git", "output": r.stdout.strip()[-1000:], "restart": True, **current_version()}
+    head = _gh_api(f"repos/{UPDATE_REPO}/commits/{UPDATE_BRANCH}")
+    sha = head["sha"]
+    tree = _gh_api(f"repos/{UPDATE_REPO}/git/trees/{sha}")
+    files = [t for t in tree["tree"] if t["type"] == "blob" and "/" not in t["path"]
+             and t["path"].endswith(UPDATE_EXT) and t["path"] not in UPDATE_SKIP and not t["path"].startswith(".")]
+    manifest = json.loads(_update_manifest_path().read_text()) if _update_manifest_path().exists() else {}
+    installed = manifest.get("files", {})
+    staged: dict[str, bytes] = {}
+    for t in files:
+        data = _gh_api(f"repos/{UPDATE_REPO}/contents/{t['path']}?ref={sha}", raw=True, timeout=60)
+        if _git_blob_sha(data) != t["sha"]:
+            raise GatewayError(f"{t['path']} failed its integrity check; nothing was changed")
+        staged[t["path"]] = data
+    if "gateway.py" in staged:
+        compile(staged["gateway.py"], "gateway.py", "exec")  # SyntaxError aborts before any file is touched
+    for name, data in staged.items():
+        if name.endswith(".json"):
+            json.loads(data)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    bdir = HERE / ".mcubed_backup" / stamp
+    bdir.mkdir(parents=True, exist_ok=True)
+    changed, kept, same = [], [], []
+    for name, data in staged.items():
+        dst = HERE / name
+        old = dst.read_bytes() if dst.exists() else None
+        if old == data:
+            same.append(name)
+            continue
+        if old is not None:
+            (bdir / name).write_bytes(old)
+        edited = old is not None and name in UPDATE_CONFIG and installed.get(name) not in (None, _git_blob_sha(old))
+        if edited:  # you changed this config since the last update: keep yours, save ours beside it
+            (HERE / (name + ".new")).write_bytes(data)
+            kept.append(name)
+            continue
+        tmp = dst.with_name(dst.name + ".tmp")
+        tmp.write_bytes(data)
+        if old is not None:
+            shutil.copymode(dst, tmp)
+        os.replace(tmp, dst)
+        changed.append(name)
+    (bdir / "_info.json").write_text(json.dumps({"from": cur, "to": sha, "files": changed}))
+    _update_manifest_path().write_text(json.dumps({"commit": sha, "date": head["commit"]["committer"]["date"],
+                                                   "files": {n: _git_blob_sha(d) for n, d in staged.items()}}, indent=1))
+    for old_b in _update_backups()[5:]:  # keep the five most recent backups
+        shutil.rmtree(old_b, ignore_errors=True)
+    if not any((bdir / n).exists() for n in changed):
+        shutil.rmtree(bdir, ignore_errors=True)
+    _update_cache.clear()
+    return {"mode": "files", "commit": sha, "changed": changed, "kept_your_edits": kept, "unchanged": len(same),
+            "backup": bdir.name if bdir.exists() else None, "restart": bool(changed)}
+
+
+def rollback_update() -> dict:
+    bs = _update_backups()
+    if not bs:
+        raise GatewayError("no backup to roll back to")
+    b = bs[0]
+    info = json.loads((b / "_info.json").read_text()) if (b / "_info.json").exists() else {}
+    restored = []
+    for f in b.iterdir():
+        if f.name == "_info.json":
+            continue
+        os.replace(f, HERE / f.name)
+        restored.append(f.name)
+    prev = info.get("from") or {}
+    mp = _update_manifest_path()
+    if prev.get("commit") and mp.exists():
+        m = json.loads(mp.read_text())
+        m.update(commit=prev["commit"], date=prev.get("date", ""))
+        mp.write_text(json.dumps(m, indent=1))
+    __import__("shutil").rmtree(b, ignore_errors=True)
+    _update_cache.clear()
+    return {"restored": restored, "commit": prev.get("commit", ""), "restart": True}
+
+
+def download_apk() -> dict:
+    """Android: fetch the newest APK into the app's data folder; the app then opens the system installer."""
+    import urllib.request
+    rel = _gh_api(f"repos/{UPDATE_REPO}/releases/tags/latest")
+    asset = next((a for a in rel.get("assets", []) if a["name"].endswith(".apk")), None)
+    if not asset:
+        raise GatewayError("the latest release has no APK yet")
+    headers = {"Accept": "application/octet-stream", "User-Agent": "MCUBED"}
+    if _github_token():
+        headers["Authorization"] = f"Bearer {_github_token()}"
+    out = Path(os.getenv("MCUBED_DATA", str(HERE))) / "update.apk"
+    tmp = out.with_suffix(".part")
+    with urllib.request.urlopen(urllib.request.Request(asset["url"], headers=headers), timeout=60) as r, open(tmp, "wb") as f:
+        shutil_copy = __import__("shutil").copyfileobj
+        shutil_copy(r, f, 1 << 16)
+    if tmp.stat().st_size != asset["size"]:
+        tmp.unlink(missing_ok=True)
+        raise GatewayError("download was incomplete; try again")
+    os.replace(tmp, out)
+    return {"path": str(out), "size": asset["size"], "name": asset["name"], "commit": rel.get("target_commitish", "")}
+
+
+def restart_process(delay: float = 0.8) -> None:
+    """Re-exec this process so the newly installed files take effect (server sockets close on exec)."""
+    import sys
+
+    def go() -> None:
+        time.sleep(delay)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    threading.Thread(target=go, name="mcubed-restart", daemon=True).start()
 
 
 # --------------------------------------------------------------------------- #
@@ -2276,7 +2522,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            if u.path in ("/game.html", "/solitaire.html") and (HERE / u.path[1:]).exists():
+            if u.path in ("/game.html", "/solitaire.html", "/tetris.html") and (HERE / u.path[1:]).exists():
                 return self._send(200, (HERE / u.path[1:]).read_bytes(), "text/html; charset=utf-8")
             if u.path == "/api/repos":
                 return self._send(200, dict(load_repos(gw.repo_registry),
@@ -2289,6 +2535,13 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                     return self._send(502, {"error": f"news unavailable ({type(e).__name__}: {str(e)[:160]})"})
             if u.path == "/api/wine":
                 return self._send(200, wine_status())
+            if u.path == "/api/update":
+                try:
+                    return self._send(200, check_update(force=(q.get("refresh") or ["0"])[0] == "1"))
+                except GatewayError as e:
+                    return self._send(200, {"error_detail": str(e), "current": current_version(),
+                                            "mode": "apk" if _is_android() else "files", "available": False,
+                                            "backups": [b.name for b in _update_backups()]})
             if u.path == "/api/report":
                 days = int((q.get("days") or ["7"])[0])
                 with lock:
@@ -2308,6 +2561,16 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 return self._send(403, {"error": "cross-origin request blocked"})
             if u.path == "/v1/chat/completions":
                 return self._openai()
+            if u.path in ("/api/update/apply", "/api/update/rollback", "/api/update/apk"):
+                try:  # outside the gateway lock: downloads can take a while
+                    res = apply_update() if u.path.endswith("apply") else rollback_update() \
+                        if u.path.endswith("rollback") else download_apk()
+                except (GatewayError, ValueError, SyntaxError, OSError) as e:
+                    return self._send(400, {"error": f"{type(e).__name__}: {e}" if isinstance(e, SyntaxError) else str(e)})
+                self._send(200, res)
+                if res.get("restart") and not _is_android():
+                    restart_process()
+                return
             try:
                 with lock:
                     if u.path == "/api/chat":
@@ -2430,6 +2693,9 @@ def main() -> None:
     wn.add_argument("args", nargs=argparse.REMAINDER)
     wn.add_argument("--wait", action="store_true")
 
+    up = sub.add_parser("update", help="install the newest MCUBED from GitHub (verified, with backup)")
+    up.add_argument("action", nargs="?", default="check", choices=["check", "apply", "rollback"])
+
     s = sub.add_parser("simulate", help="offline learning demo with synthetic traffic")
     s.add_argument("--n", type=int, default=300)
 
@@ -2516,6 +2782,17 @@ def _run(args: argparse.Namespace) -> None:
             if not args.file:
                 raise SystemExit("usage: gateway.py wine run FILE.exe [args...]")
             print(json.dumps(wine_run(args.file, args.args, wait=args.wait), indent=2))
+    elif args.cmd == "update":
+        if args.action == "check":
+            r = check_update(force=True)
+            print(f"installed {r['current']['commit'][:7] or 'unknown'} ({r['current']['source']}), "
+                  f"newest {r['latest']['commit'][:7]}: {r['latest']['message']}")
+            for c in r["changes"]:
+                print(f"  {c['commit']}  {c['message']}")
+            print("Update available: run `python gateway.py update apply`" if r["available"] else "Up to date.")
+        else:
+            print(json.dumps(apply_update() if args.action == "apply" else rollback_update(), indent=2))
+            print("Restart MCUBED to use the new version.")
     elif args.cmd == "simulate":
         before = gw.task_policy()
         simulate(gw, args.n)

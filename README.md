@@ -15,9 +15,11 @@ A multi-model AI gateway with a phone-friendly web dashboard. One entry point fo
 - Web browser tab: search or open any address in a reader view, follow links, open the full page, or send the page to the chat
 - News tab built for fairness: 15 outlets rated from left to right, stories grouped so you can compare how each outlet covers the same event, blindspot flags, and an AI balanced brief
 - Windows apps through Wine (Box64 on ARM, Winlator on Android)
-- Installable web dashboard (chat, news, web, games, stats)
+- Installable web dashboard (chat, news, web, games, stats, update)
 - Gateway Doom: a touch-friendly game where the demons are your real error types
 - Solitaire (Klondike): tap or drag, undo, hints, draw 1 or 3, saved progress
+- Tetris: swipe and tap controls, hold, next queue, ghost piece, wall kicks, saved game and best score
+- Update tab: installs the newest MCUBED from GitHub with integrity checks, a backup and one-tap rollback; the Android app downloads and installs the newest APK
 - Native Android APK built automatically by GitHub Actions
 
 ## Quick start (no API keys)
@@ -96,6 +98,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 | `gui [--host --port --token]` | Serve the web dashboard and Doom game |
 | `news [--limit 15] [--brief N] [--sources]` | Headlines grouped by story with left/center/right coverage; `--brief N` writes a balanced brief of story N |
 | `wine status` / `wine run FILE.exe [args]` | Check for Wine and run Windows programs |
+| `update [check\|apply\|rollback]` | Install the newest MCUBED from GitHub (verified, backed up) |
 | `simulate [--n 300]` | Offline demo with synthetic traffic |
 
 ## Security
@@ -145,6 +148,14 @@ The News tab (`GET /api/news`, CLI `news`) reads RSS feeds from a balanced set o
 | Arch | `sudo pacman -S wine` |
 | macOS | `brew install --cask wine-stable` |
 | Android | [Winlator](https://winlator.org), which runs Windows x86_64 apps with Wine and Box64 on Android 9 and newer, no root needed |
+
+## Updates
+
+The Update tab (CLI `update`) compares your version with the newest commit on GitHub and lists what changed.
+
+- **Git checkout:** runs `git pull --ff-only` and restarts.
+- **Plain copy (zip or Termux):** downloads each program file, checks it against GitHub's hash, confirms the new `gateway.py` compiles, backs up the old files to `.mcubed_backup/`, then restarts. If you edited `models.json` or `news.json`, your copy is kept and the new one is saved as `*.new`. Roll back restores the last backup.
+- **Android app:** every push to `main` publishes a rolling `latest` release. The app downloads that APK (a GitHub token in AI keys is needed while the repository is private) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
 
 ## How a request flows
 

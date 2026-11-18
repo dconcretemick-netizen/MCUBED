@@ -41,6 +41,8 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;backgrou
 nav.tabs button{flex:1;min-width:0;min-height:60px;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;cursor:pointer}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected=true]{color:var(--accent)}
+nav.tabs button{position:relative}nav.tabs .dot{position:absolute;top:9px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--warn)}
+@media (min-width:900px){nav.tabs .dot{position:static;margin-left:-2px}}
 main{max-width:1240px;margin:0 auto;padding:14px}
 section.view{display:none}section.view.active{display:block}
 .grid{display:grid;gap:var(--gap)}
@@ -124,6 +126,7 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .brief small{display:block;margin-top:8px;color:var(--muted);font-size:12px;white-space:normal}
 .more-hl{list-style:none;padding:0;margin:0;display:grid;gap:8px}
 .more-hl li{display:flex;gap:8px;align-items:baseline;min-width:0;font-size:14px}.more-hl li button{background:none;border:0;padding:0;color:var(--text);text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.upd-log{list-style:none;padding:0;margin:0;display:grid;gap:8px;font-size:14px}.upd-log li{display:flex;gap:10px;min-width:0}.upd-log code{flex:none;color:var(--muted)}.upd-log span{overflow-wrap:anywhere}
 .web-empty p{color:var(--muted);margin:0 0 12px}
 .msg.page{align-self:flex-end;background:var(--surface-2);border:1px dashed var(--border);border-radius:12px;padding:8px 12px;font-size:13px;color:var(--muted)}
 .chat{display:flex;flex-direction:column;min-height:calc(100dvh - 61px - 60px - 28px - env(safe-area-inset-bottom))}
@@ -194,6 +197,7 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
   <button role="tab" data-v="web"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>Web</button>
   <button role="tab" data-v="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg>Games</button>
   <button role="tab" data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Stats</button>
+  <button role="tab" data-v="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Update<i class="dot" id="upd-dot" hidden></i></button>
 </nav>
 
 <main>
@@ -288,7 +292,7 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 
   <section class="view" id="v-games">
     <div class="seg" role="tablist" aria-label="Game">
-      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="doom" aria-selected="false">Doom</button>
+      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="tetris" aria-selected="false">Tetris</button><button role="tab" data-g="doom" aria-selected="false">Doom</button>
     </div>
     <div class="game-pane" id="g-solitaire">
     <div class="card" style="padding:0;overflow:hidden">
@@ -298,6 +302,16 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">Klondike. Tap a card to auto-move it, or drag. Progress is saved.</span>
       <a class="btn" href="solitaire.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
+    </div>
+  </div>
+    <div class="game-pane" id="g-tetris" hidden>
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="tet-frame" title="Tetris" data-src="tetris.html"
+        style="display:block;width:100%;height:min(78vh,760px);border:0;background:#0d1216"></iframe>
+    </div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span style="color:var(--muted);font-size:13px">Swipe to move, tap to rotate, flick down to drop. Pauses when you leave.</span>
+      <a class="btn" href="tetris.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
     </div>
   </div>
     <div class="game-pane" id="g-doom" hidden>
@@ -329,6 +343,24 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
       <ul id="news-src-list"></ul>
     </div>
     <div id="news-list"><div class="card"><div class="skel"></div><div class="skel" style="margin-top:8px"></div></div></div>
+  </section>
+
+  <section class="view" id="v-update">
+    <div class="card"><h2>MCUBED version <span class="chip" id="upd-chip">checking</span></h2>
+      <div class="kv"><span>Installed</span><code id="upd-cur">…</code></div>
+      <div class="kv"><span>Newest</span><code id="upd-new">…</code></div>
+      <p id="upd-msg" style="color:var(--muted);margin:10px 0 12px;font-size:14px">Checking GitHub for the newest version…</p>
+      <div class="row">
+        <button class="btn primary" id="upd-apply" disabled>Update now</button>
+        <button class="btn" id="upd-check">Check again</button>
+        <button class="btn" id="upd-rollback" hidden>Roll back</button>
+      </div>
+      <pre class="out" id="upd-out" hidden style="margin-top:12px"></pre>
+    </div>
+    <div class="card" style="margin-top:var(--gap)"><h2>What's new</h2><ul class="upd-log" id="upd-log"><li class="empty">Nothing to show yet</li></ul></div>
+    <div class="card" style="margin-top:var(--gap)"><h2>How updates work</h2>
+      <p class="news-note" id="upd-how">MCUBED downloads the newest files from GitHub, checks each against GitHub's hash, makes sure the new code starts, keeps a backup of the old files, then restarts. Your keys, history and edited settings are kept. Roll back restores the previous version.</p>
+    </div>
   </section>
 
   <section class="view" id="v-web">
@@ -466,6 +498,7 @@ function showView(v){
   document.querySelectorAll("section.view").forEach(s=>s.classList.toggle("active", s.id==="v-"+target));
   syncGames(v==="games");
   if(v==="news") loadNews();
+  if(v==="update") loadUpdate();
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
@@ -506,9 +539,11 @@ loadRepos();
 let game=localStorage.getItem("mcubed.game")||"solitaire";
 function syncGames(visible){
   document.querySelectorAll(".seg [data-g]").forEach(x=>x.setAttribute("aria-selected",String(x.dataset.g===game)));
-  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-doom").hidden=game!=="doom";
-  const sf=$("#sol-frame"), df=$("#doom-frame");
+  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-tetris").hidden=game!=="tetris"; $("#g-doom").hidden=game!=="doom";
+  const sf=$("#sol-frame"), tf=$("#tet-frame"), df=$("#doom-frame");
   if(visible&&game==="solitaire"&&!sf.src) sf.src=sf.dataset.src;          // Solitaire stays loaded and keeps its state
+  if(visible&&game==="tetris"&&!tf.src) tf.src=tf.dataset.src;             // Tetris pauses itself when hidden
+  if((!visible||game!=="tetris")&&tf.src) tf.contentWindow?.postMessage("mcubed:pause","*");
   if(visible&&game==="doom"){ if(!df.src) df.src=df.dataset.src } else if(df.src) df.removeAttribute("src");  // Doom unloads to save battery
 }
 document.querySelectorAll(".seg [data-g]").forEach(x=>x.addEventListener("click",()=>{game=x.dataset.g;localStorage.setItem("mcubed.game",game);syncGames(true)}));
@@ -595,6 +630,51 @@ async function loadWine(){ if(STATIC) return; try{ const w=await api("/api/wine"
   else if(w.needs_box64) $("#wine-sub").textContent="This is an ARM device: install Box64 and an x86_64 Wine build, or use Winlator on Android.";
 }catch(e){ $("#wine-chip").textContent="unknown" } }
 loadWine();
+
+/* ---------- update: install the newest MCUBED from GitHub ---------- */
+let UPD=null;
+const short=c=>c?c.slice(0,7):"unknown";
+const when=d=>d?new Date(d).toLocaleString([], {dateStyle:"medium",timeStyle:"short"}):"";
+async function loadUpdate(force=false){
+  if(STATIC){ $("#upd-msg").textContent="Run python gateway.py gui to check for updates."; return }
+  $("#upd-chip").textContent="checking"; $("#upd-chip").className="chip";
+  try{ UPD=await api("/api/update"+(force?"?refresh=1":"")) }catch(e){ $("#upd-msg").textContent=e.message; return }
+  const u=UPD, apk=u.mode==="apk";
+  $("#upd-dot").hidden=!u.available;
+  $("#upd-cur").textContent=`${short(u.current?.commit)} ${u.current?.date?"· "+when(u.current.date):""}`;
+  $("#upd-new").textContent=u.latest?`${short(apk&&u.apk?u.apk.commit:u.latest.commit)} · ${when(u.latest.date)}`:"unavailable";
+  $("#upd-rollback").hidden=apk||!(u.backups||[]).length;
+  $("#upd-apply").textContent=apk?"Download and install":"Update now";
+  $("#upd-how").textContent=apk?"The app downloads the newest APK built from GitHub and opens Android's installer. It installs over this version and keeps your keys and history. The first time, Android asks you to allow MCUBED to install updates."
+    :u.mode==="git"?"This copy is a git checkout, so Update runs git pull (fast-forward only) and restarts. Your keys, history and local files are kept.":$("#upd-how").textContent;
+  if(u.error_detail){ $("#upd-chip").textContent="offline"; $("#upd-msg").textContent=u.error_detail; $("#upd-apply").disabled=true; return }
+  $("#upd-chip").textContent=u.available?"update available":"up to date"; $("#upd-chip").className="chip "+(u.available?"active":"kept");
+  $("#upd-msg").textContent=u.available?(u.behind?`${u.behind} new ${u.behind===1?"change":"changes"} since your version.`:"A newer version is available.")+(apk&&!u.apk?" The APK for it is still building.":"")
+    :"You have the newest version.";
+  $("#upd-apply").disabled=!u.available||(apk&&!u.apk?.name);
+  const log=u.changes?.length?u.changes:(u.latest?[{commit:short(u.latest.commit),message:u.latest.message,date:u.latest.date}]:[]);
+  $("#upd-log").innerHTML=log.map(c=>`<li><code>${esc(c.commit)}</code><span>${esc(c.message)}</span></li>`).join("")||'<li class="empty">Nothing to show yet</li>';
+}
+async function waitForRestart(prev){
+  const t0=Date.now(); await new Promise(r=>setTimeout(r,1500));
+  while(Date.now()-t0<40000){ try{ const r=await fetch("/api/update",{cache:"no-store"}); if(r.ok){ toast("Updated. Reloading"); setTimeout(()=>location.reload(),600); return } }catch(e){} await new Promise(r=>setTimeout(r,1000)) }
+  toast("MCUBED did not come back. Start it again with python gateway.py gui");
+}
+$("#upd-apply").addEventListener("click",async()=>{
+  const b=$("#upd-apply"); b.disabled=true; const apk=UPD?.mode==="apk"; b.textContent=apk?"Downloading…":"Updating…";
+  try{
+    if(apk){ const r=await api("/api/update/apk",{method:"POST"}); toast(`Downloaded ${Math.round(r.size/1048576)} MB. Opening the installer`); location.href="mcubed://install-update"; b.textContent="Install again"; b.disabled=false; return }
+    const r=await api("/api/update/apply",{method:"POST"}); const o=$("#upd-out"); o.hidden=false;
+    o.textContent=r.mode==="git"?r.output:`Updated ${r.changed.length} files: ${r.changed.join(", ")||"none"}`+(r.kept_your_edits?.length?`\nKept your edited ${r.kept_your_edits.join(", ")} (new version saved as .new)`:"");
+    if(r.restart){ b.textContent="Restarting…"; await waitForRestart() } else { toast("Already up to date"); loadUpdate(true) }
+  }catch(e){ toast(e.message); b.disabled=false; b.textContent=apk?"Download and install":"Update now" }
+});
+$("#upd-check").addEventListener("click",()=>loadUpdate(true));
+$("#upd-rollback").addEventListener("click",async()=>{
+  if(!confirm("Restore the version from before the last update?")) return;
+  try{ const r=await api("/api/update/rollback",{method:"POST"}); toast(`Restored ${r.restored.length} files. Restarting`); await waitForRestart() }catch(e){ toast(e.message) }
+});
+if(!STATIC) setTimeout(()=>api("/api/update").then(u=>{ UPD=u; $("#upd-dot").hidden=!u.available }).catch(()=>{}),2500);
 
 /* ---------- web browser (reader mode + full page) ---------- */
 let page=null, webHist=[], recent=[]; try{recent=JSON.parse(localStorage.getItem("mcubed.web")||"[]")}catch(e){}

@@ -21,6 +21,9 @@ android/app/src/main/python/dashboard.html
 android/app/src/main/python/game.html
 android/app/src/main/python/solitaire.html
 android/app/src/main/python/news.json
+android/app/src/main/python/tetris.html
+android/app/src/main/python/build_info.json
+build_info.json
 *.log
 repos.json
 repos/
