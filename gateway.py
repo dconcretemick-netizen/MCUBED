@@ -1085,7 +1085,22 @@ class Gateway:
         return int(self.store.get_policy("max_retries_per_route", self.defaults.get("max_retries_per_route", 2)))
 
     # -- availability ------------------------------------------------------- #
+    def allow_paid(self) -> bool:
+        """MCUBED is free by default: paid AI is used only if the owner turns it on."""
+        env = os.getenv("MCUBED_ALLOW_PAID")
+        if env in ("0", "1"):
+            return env == "1"
+        return bool(self.store.get_policy("allow_paid", not (self.defaults.get("cost") or {}).get("free_only", True)))
+
+    def route_is_free(self, spec: ModelSpec, route: Route) -> bool:
+        if route.model.startswith("node/"):
+            n = self._node_info.get(route.model.split("/")[1], {})
+            return n.get("kind", "local") != "cloud" or n.get("id") in FREE_NODE_IDS
+        return route.via == "openrouter" and route.model.endswith(":free")
+
     def _route_available(self, spec: ModelSpec, route: Route) -> bool:
+        if not self.mock and not self.route_is_free(spec, route) and not self.allow_paid():
+            return False  # free-only mode (the default): never call anything that could cost money
         if route.model.startswith("node/"):
             n = self._node_info.get(route.model.split("/")[1])
             return bool(n) and (self.mock or not n.get("env") or bool(node_key(n["env"])))
@@ -1143,6 +1158,10 @@ class Gateway:
             pool.append((spec, est, exploratory))
 
         if not pool:
+            if not self.mock and not self.allow_paid():
+                raise GatewayError(
+                    "No free AI is set up yet. Add a free key (Google Gemini, Groq, Mistral, OpenRouter, SambaNova or "
+                    "NVIDIA) in AI keys, or run a local model with Ollama or LM Studio. Paid AI is off.")
             raise GatewayError(
                 f"No eligible models (tier>={policy_tier}). "
                 "Check API keys in the AI keys menu or .env, or pass --tier / --models.")
@@ -1363,6 +1382,78 @@ class Gateway:
                 log.info("auto-improve: %s %s %s -> %s (%s)", c["kind"], c["target"], c["old"], c["new"], c["reason"])
 
     # -- reporting ---------------------------------------------------------- #
+    UNIT_NAMES = {"openai": "OpenAI", "anthropic": "Anthropic", "vertex_ai": "Google Vertex AI",
+                  "deepseek": "DeepSeek", "openrouter": "OpenRouter"}
+
+    def ai_units(self) -> dict:
+        """Every AI unit (provider, local server or network node) MCUBED can reach right now, with live state:
+        working = answered in the last 24 hours, ready = usable but idle, resting = paused after errors."""
+        now = time.time()
+        quarantine = {k: v for k, v in self.store.get_policy("quarantine", {}).items() if v > now}
+        units: dict[str, dict] = {}
+        model_unit: dict[str, str] = {}
+        for spec in self.models.values():
+            for r in spec.routes:
+                if not self._route_available(spec, r):
+                    continue
+                key = "openrouter" if r.via == "openrouter" else spec.provider
+                if key.startswith("node:"):
+                    n = self._node_info.get(key[5:], {})
+                    name, kind = n.get("name", key[5:]), n.get("kind", "local")
+                else:
+                    name, kind = self.UNIT_NAMES.get(key, key), "cloud"
+                u = units.setdefault(key, {"id": key, "name": name, "kind": kind, "models": [], "resting_models": []})
+                if spec.alias not in u["models"]:
+                    u["models"].append(spec.alias)
+                    model_unit.setdefault(spec.alias, key)
+                t = self.breaker.opened_at.get(f"{spec.alias}|{r.via}")
+                if (t is not None and now - t < self.breaker.cooldown) or spec.alias in quarantine:
+                    u["resting_models"].append(spec.alias)
+        since = now - 86400
+        rows = self.store.query("""SELECT alias, via, provider, COUNT(*) n, SUM(status='ok') ok, MAX(ts) last,
+                                   SUM(prompt_tokens+completion_tokens) tok FROM attempts
+                                   WHERE ts>=? AND cached=0 GROUP BY alias, via""", (since,))
+        for r in rows:
+            key = "openrouter" if r["via"] == "openrouter" else (r["provider"] or model_unit.get(r["alias"], ""))
+            u = units.get(key)
+            if not u:
+                continue
+            u["requests_24h"] = u.get("requests_24h", 0) + (r["ok"] or 0)
+            u["errors_24h"] = u.get("errors_24h", 0) + (r["n"] - (r["ok"] or 0))
+            u["tokens_24h"] = u.get("tokens_24h", 0) + (r["tok"] or 0)
+            if (r["ok"] or 0) and r["last"] > u.get("last_used", 0):
+                u["last_used"], u["last_model"] = r["last"], r["alias"]
+        last = self.store.query("""SELECT alias, via, provider, ts FROM attempts WHERE status='ok' AND cached=0
+                                   ORDER BY id DESC LIMIT 1""")
+        for u in units.values():
+            for k in ("requests_24h", "errors_24h", "tokens_24h"):
+                u.setdefault(k, 0)
+            u["resting_models"] = sorted(set(u["resting_models"]))
+            if u["models"] and len(u["resting_models"]) == len(u["models"]):
+                u["state"] = "resting"
+            elif u.get("last_used"):
+                u["state"] = "working"
+            else:
+                u["state"] = "ready"
+        order = {"working": 0, "ready": 1, "resting": 2}
+        out = sorted(units.values(), key=lambda u: (order[u["state"]], -u["requests_24h"], u["name"].lower()))
+        latest = None
+        if last:
+            lr = last[0]
+            latest = {"model": lr["alias"], "unit": "openrouter" if lr["via"] == "openrouter" else lr["provider"],
+                      "ts": lr["ts"]}
+        nd = load_nodes(self.nodes_path) if getattr(self, "nodes_path", None) else {}
+        free_only = not self.allow_paid()
+        for u in out:
+            u["free"] = u["id"].startswith("node:") and (u["kind"] != "cloud" or u["id"][5:] in FREE_NODE_IDS) \
+                or u["id"] == "openrouter"
+        return {"units": out, "latest": latest, "mock": self.mock, "free_only": free_only,
+                "in_use": sum(u["state"] == "working" for u in out), "available": len(out),
+                "models": sum(len(u["models"]) for u in out),
+                "more_with_key": sum(n.get("status") == "needs_key" and (not free_only or n.get("id") in FREE_NODE_IDS)
+                                     for n in nd.get("nodes", [])),
+                "scanned_at": nd.get("scanned_at")}
+
     def report(self, days: int = 7) -> dict:
         since = time.time() - days * 86400
         q = self.store.query
@@ -1558,7 +1649,11 @@ CLOUD_NODES = [
     ("dashscope", "Alibaba Qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY", "https://modelstudio.console.alibabacloud.com", "/models"),
     ("zai", "Z.ai GLM", "https://api.z.ai/api/paas/v4", "ZAI_API_KEY", "https://z.ai/manage-apikey/apikey-list", "/models"),
     ("minimax", "MiniMax", "https://api.minimax.io/v1", "MINIMAX_API_KEY", "https://platform.minimax.io", "/models"),
+    ("cohere", "Cohere", "https://api.cohere.ai/compatibility/v1", "COHERE_API_KEY", "https://dashboard.cohere.com/api-keys", "/models"),
 ]
+# Providers whose API keys work on a no-card free plan, so they cannot charge anything. The OpenRouter node only
+# ever adds ":free" models. Everything else (and every paid OpenRouter route) is off unless paid AI is allowed.
+FREE_NODE_IDS = {"openrouter", "gemini", "groq", "mistral", "sambanova", "nvidia", "huggingface", "cohere"}
 NODE_KEY_NAMES = sorted({c[3] for c in CLOUD_NODES})
 # local model servers: port -> software that usually listens there
 LOCAL_PORTS = {11434: "Ollama", 1234: "LM Studio", 8080: "llama.cpp / LocalAI", 8000: "vLLM", 1337: "Jan",
@@ -1652,7 +1747,8 @@ def _norm(model_id: str) -> str:
 def _list_cloud(node: tuple, cfg: dict) -> dict:
     nid, name, base, env, signup, path = node
     rec = {"id": nid, "name": name, "kind": "cloud", "base_url": base, "env": env, "signup": signup,
-           "trusted": True, "models": [], "models_total": 0}
+           "trusted": True, "models": [], "models_total": 0,
+           "free": nid in FREE_NODE_IDS}
     key = node_key(env)
     if not key:
         rec["status"] = "needs_key"
@@ -1989,12 +2085,15 @@ def run_node_scan(gw: "Gateway", lock: threading.Lock, force: bool = False) -> O
     if not force and (minutes <= 0 or os.getenv("MCUBED_NODE_SCAN", "1") == "0" or gw.mock):
         return None
     last = float(gw.store.get_policy("last_node_scan_ts", 0) or 0)
-    if not force and time.time() - last < minutes * 60:
+    keys_now = ",".join(k for k in NODE_KEY_NAMES if node_key(k))  # names only, never values
+    keys_changed = keys_now != gw.store.get_policy("node_keys_seen", None)
+    if not force and not keys_changed and time.time() - last < minutes * 60:
         return None
     res = scan_nodes(gw.nodes_path, gw)  # network work happens outside the lock
     with lock:
         n = gw.load_nodes()
         gw.store.set_policy("last_node_scan_ts", time.time())
+        gw.store.set_policy("node_keys_seen", keys_now)
     s = nodes_summary(res)
     log.info("AI node scan: %s online, %s in use with %s models, %s need a key%s", s["online"], s["in_use"], n,
              s["needs_key"], (", new: " + ", ".join(s["new"])) if s["new"] else "")
@@ -2974,6 +3073,9 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                     return self._send(502, {"error": f"news unavailable ({type(e).__name__}: {str(e)[:160]})"})
             if u.path == "/api/wine":
                 return self._send(200, wine_status())
+            if u.path == "/api/units":
+                with lock:
+                    return self._send(200, gw.ai_units())
             if u.path == "/api/nodes":
                 d = load_nodes(gw.nodes_path)
                 return self._send(200, dict(d, summary=nodes_summary(d), config=nodes_config(gw)))
@@ -3013,6 +3115,12 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 if res.get("restart") and not _is_android():
                     restart_process()
                 return
+            if u.path == "/api/cost":
+                b = self._body()
+                with lock:
+                    gw.store.set_policy("allow_paid", bool(b.get("allow_paid")))
+                    gw.store._policy_ts = 0
+                    return self._send(200, gw.ai_units())
             if u.path in ("/api/nodes/scan", "/api/nodes/trust"):
                 try:
                     if u.path.endswith("scan"):

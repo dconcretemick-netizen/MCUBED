@@ -134,6 +134,23 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .chat-top{display:flex;gap:8px;align-items:center;margin-bottom:10px}
 .chat-top select{flex:1;min-width:0;max-width:340px}
 .chat-top .btn{min-height:40px;padding:0 12px}
+.u-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;flex:none}
+.u-dot.working{background:#2fa36b;box-shadow:0 0 0 3px color-mix(in srgb,#2fa36b 25%,transparent)}.u-dot.resting{background:#d49a2a}
+#btn-units{display:inline-flex;align-items:center;white-space:nowrap}
+@media (max-width:520px){.chat-top{flex-wrap:wrap}.chat-top select{flex:1 1 100%;max-width:none}.chat-top .btn{flex:1}}
+.units{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.units li{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border);border-radius:10px;min-width:0}
+.units li .u-dot{margin-top:6px}.units .u-main{flex:1;min-width:0}.units .u-name{font-weight:600}
+.units .u-sub{color:var(--muted);font-size:13px;overflow-wrap:anywhere}.units .u-state{font-size:12px;color:var(--muted);flex:none;text-align:right}
+.free-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin:0 0 10px;border-radius:12px;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));cursor:pointer}
+.free-row small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+.free-row input{appearance:none;-webkit-appearance:none;width:50px;height:30px;border-radius:999px;background:var(--border);position:relative;flex:none;cursor:pointer;transition:background .15s;margin:0}
+.free-row input::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.free-row input:checked{background:var(--accent)}.free-row input:checked::after{transform:translateX(20px)}
+.tag{font-size:11px;font-weight:650;padding:1px 7px;border-radius:999px;margin-left:6px;vertical-align:1px;border:1px solid var(--border);color:var(--muted)}
+.tag.free{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent)}
+.units-more{margin:10px 0 0!important;font-size:13px}
 .api-info{margin-bottom:10px}.api-info p{margin:0 0 10px;color:var(--muted);font-size:14px}
 .kv{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0;font-size:14px}.kv>span:first-child{color:var(--muted);width:68px}
 .kv code{flex:1;min-width:0}
@@ -176,6 +193,57 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
   nav.tabs button svg{width:18px;height:18px}
   nav.tabs button[aria-selected=true]{background:var(--surface);border:1px solid var(--border)}
   .toast{bottom:24px}
+}
+/* ---- modern refresh: softer shapes, slightly larger touch targets ---- */
+:root{--r:16px;--gap:14px}
+.btn{min-height:46px;padding:0 18px;border-radius:12px;transition:background .15s,border-color .15s,transform .08s}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn:hover:not(:disabled){border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+.btn.primary:hover:not(:disabled){filter:brightness(1.06)}
+.ctl{min-height:46px;border-radius:12px;padding:0 14px}
+.icon-btn{width:46px;min-height:46px;border-radius:12px;transition:border-color .15s}
+.icon-btn:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card{box-shadow:0 1px 2px rgba(0,0,0,.06)}
+nav.tabs button{min-height:66px;font-size:12.5px;gap:4px}
+nav.tabs button svg{width:24px;height:24px;padding:2px 14px;box-sizing:content-box;border-radius:999px;transition:background .15s}
+nav.tabs button[aria-selected=true] svg{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+nav.tabs button[aria-selected=true]{font-weight:650}
+body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+.chat-top{gap:10px;margin-bottom:12px}
+.chat-top .btn{min-height:46px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.chat-top .btn svg{width:17px;height:17px;flex:none}
+.chat-top select{border-radius:999px;padding:0 16px;font-weight:600}
+.empty-chat{padding:28px 6px 18px}
+.empty-chat .hero-logo{width:64px;height:64px;filter:drop-shadow(0 8px 24px color-mix(in srgb,var(--accent) 45%,transparent))}
+.empty-chat h1{font-size:30px;letter-spacing:-.02em;margin:16px 0 6px;font-weight:700;
+  background:linear-gradient(120deg,var(--text) 30%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.empty-chat p{font-size:15.5px;margin-bottom:22px}
+.empty-chat .sugg{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}
+.empty-chat .sugg .chip-btn{border-radius:16px;padding:14px;min-height:76px;display:flex;flex-direction:column;gap:4px;font-size:15px;font-weight:600;
+  background:var(--surface);transition:border-color .15s,transform .08s,box-shadow .15s}
+.empty-chat .sugg .chip-btn small{font-weight:450;color:var(--muted);font-size:13px;line-height:1.35}
+.empty-chat .sugg .chip-btn svg{width:20px;height:20px;color:var(--accent);margin-bottom:4px}
+.empty-chat .sugg .chip-btn:hover{box-shadow:0 4px 16px rgba(0,0,0,.10)}
+.empty-chat .sugg .chip-btn:active{transform:scale(.98)}
+.chip-btn{padding:11px 16px;font-size:15px}
+.msg{font-size:15.5px}
+.msg.user{padding:12px 16px;border-radius:20px 20px 6px 20px}
+.msg.bot{padding:12px 16px;border-radius:20px 20px 20px 6px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.msg .mfoot button{min-height:34px;padding:0 12px;border-radius:999px;font-size:13px}
+.composer{border-radius:26px;padding:8px 8px 8px 14px;bottom:calc(76px + env(safe-area-inset-bottom));
+  box-shadow:0 10px 30px rgba(0,0,0,.16);transition:border-color .15s}
+.composer:focus-within{border-color:color-mix(in srgb,var(--accent) 60%,var(--border))}
+.composer textarea{font-size:16px;min-height:48px;padding:12px 4px}
+.composer .send{width:48px;min-height:48px;border-radius:50%}
+.composer .send svg{width:20px;height:20px}
+@media (max-width:520px){.chat-top .btn{flex:1;justify-content:center;padding:0 10px}}
+@media (min-width:720px){.composer{bottom:16px}.empty-chat .sugg{grid-template-columns:repeat(4,1fr)}.empty-chat{max-width:860px}}
+@media (min-width:1024px){
+  body{padding-bottom:0}
+  nav.tabs button{min-height:44px;padding:0 16px;border-radius:999px;font-size:14.5px}
+  nav.tabs button svg{width:19px;height:19px;padding:0;background:none!important}
+  nav.tabs button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--border))}
 }
 </style>
 </head>
@@ -246,8 +314,17 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
     <div class="chat">
       <div class="chat-top">
         <select id="model" class="ctl" aria-label="Model"><option value="mcubed">MCUBED (auto)</option><option value="mcubed-efficient">MCUBED fast</option><option value="mcubed-quality">MCUBED best quality</option></select>
-        <button class="btn" id="btn-api" aria-expanded="false" aria-controls="api-info">API</button>
-        <button class="btn" id="btn-newchat">New chat</button>
+        <button class="btn" id="btn-units" aria-expanded="false" aria-controls="units-info" title="AI units in use"><span class="u-dot" id="units-dot"></span><span id="units-count">AI</span></button>
+        <button class="btn" id="btn-api" aria-expanded="false" aria-controls="api-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>API</button>
+        <button class="btn" id="btn-newchat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+      </div>
+      <div class="card api-info" id="units-info" hidden>
+        <h2>AI units in use <span class="chip" id="units-chip">checking</span></h2>
+        <p id="units-latest">Each message goes to the best AI unit that is working.</p>
+        <label class="free-row"><span><b>Free AI only</b><small id="free-note">MCUBED never calls anything that costs money.</small></span>
+          <input type="checkbox" id="free-only" role="switch" checked></label>
+        <ul class="units" id="units-list"></ul>
+        <p class="units-more" id="units-more"></p>
       </div>
       <div class="card api-info" id="api-info" hidden>
         <h2>Use MCUBED as an OpenAI model</h2>
@@ -259,13 +336,14 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
       </div>
       <div class="msgs" id="msgs" aria-live="polite">
         <div class="empty-chat" id="chat-empty">
-          <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
+          <svg class="hero-logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
           <h1>How can I help?</h1>
-          <p>MCUBED routes every message to the best AI model that has a key.</p>
+          <p id="empty-sub">MCUBED sends each message to the best AI that is working.</p>
           <div class="sugg">
-            <button class="chip-btn">Explain the CAP theorem in two lines</button>
-            <button class="chip-btn">Write a Python function that dedupes a list</button>
-            <button class="chip-btn">Summarize the pros and cons of SQLite</button>
+            <button class="chip-btn" data-q="Explain the CAP theorem in two lines"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Explain<small>The CAP theorem in two lines</small></button>
+            <button class="chip-btn" data-q="Write a Python function that dedupes a list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>Code<small>A Python function that dedupes a list</small></button>
+            <button class="chip-btn" data-q="Summarize the pros and cons of SQLite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>Summarize<small>Pros and cons of SQLite</small></button>
+            <button class="chip-btn" data-q="Plan a healthy dinner for four with a shopping list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Plan<small>Dinner for four with a shopping list</small></button>
           </div>
         </div>
       </div>
@@ -738,7 +816,7 @@ function msgEl(m,i){
   d.className="msg bot"+(m.error?" err":"");
   d.innerHTML=m.error?esc(m.content):md(m.content);
   if(m.meta){ const f=document.createElement("div"); f.className="mfoot num";
-    f.innerHTML=`<span>${esc(m.meta.model_alias)} · ${esc(m.meta.via)} · ${nf(m.meta.latency_ms)} ms${m.meta.cached?" · cached":""}</span>
+    f.innerHTML=`<span>${esc(String(m.meta.model_alias||"").replace(/^(local|lan|custom)-[\w-]+?:/,""))} · ${esc(m.meta.via)} · ${nf(m.meta.latency_ms)} ms${m.meta.cached?" · cached":""}</span>
       <button data-r="1" class="${m.rated===1?"on":""}" aria-label="Good answer">Good</button><button data-r="0" class="${m.rated===0?"on":""}" aria-label="Bad answer">Bad</button>
       <button data-copy-msg aria-label="Copy answer">Copy</button>`;
     f.querySelectorAll("[data-r]").forEach(b=>b.onclick=async()=>{ try{ await api("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:m.meta.request_id,score:+b.dataset.r})});
@@ -764,7 +842,7 @@ async function sendChat(text){
   try{
     const r=await api("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({messages:convo.filter(m=>!m.error).map(m=>({role:m.role,content:m.content})),strategy:strat||null,model:strat?null:sel})});
-    lastReq=r.request_id; convo.push({role:"assistant",content:r.text,meta:r});
+    lastReq=r.request_id; convo.push({role:"assistant",content:r.text,meta:r}); setTimeout(loadUnits,300);
   }catch(e){ convo.push({role:"assistant",content:"Could not get an answer: "+e.message+". Add a key in AI keys (or .env), or pick another model.",error:true}) }
   finally{ sending=false; $("#send").disabled=false; saveConvo(); renderChat(); $("#prompt").focus() }
 }
@@ -772,7 +850,7 @@ function growPrompt(){const t=$("#prompt"); t.style.height="auto"; t.style.heigh
 $("#prompt").addEventListener("input",growPrompt);
 $("#prompt").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); sendChat($("#prompt").value) } });
 $("#composer").addEventListener("submit",e=>{ e.preventDefault(); sendChat($("#prompt").value) });
-document.querySelectorAll(".chip-btn").forEach(b=>b.addEventListener("click",()=>sendChat(b.textContent)));
+document.querySelectorAll("#chat-empty .chip-btn").forEach(b=>b.addEventListener("click",()=>sendChat(b.dataset.q||b.textContent)));
 $("#btn-newchat").addEventListener("click",()=>{ convo=[]; saveConvo(); renderChat(); $("#prompt").focus() });
 $("#model").value=localStorage.getItem("mcubed.model")||"mcubed";
 $("#model").addEventListener("change",()=>localStorage.setItem("mcubed.model",$("#model").value));
@@ -796,7 +874,7 @@ if(STATIC){
   $("#days").disabled=true;
 }else{
   if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
-  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) load() }); // refresh on return, no background polling (battery)
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ load(); loadUnits() } }); // refresh on return, no background polling (battery)
 }
 load();
 
@@ -805,13 +883,14 @@ function renderNodes(d){
   const sm=d.summary||{}, ns=d.nodes||[];
   $("#nodes-chip").textContent = d.scanned_at ? `${sm.in_use||0} in use, ${sm.models_in_use||0} models` : "not scanned";
   if(d.scanned_at) $("#nodes-msg").textContent = `Last scan ${new Date(d.scanned_at).toLocaleString()}. ${sm.needs_key||0} more providers are ready once you add a key in AI keys.`;
-  const order={online:0,needs_key:1}; const rows=[...ns].sort((a,b)=>(order[a.status]??2)-(order[b.status]??2));
-  $("#t-nodes").innerHTML = rows.length ? `<thead><tr><th>Node</th><th>Status</th><th></th></tr></thead><tbody>` + rows.map(n=>{
+  const order={online:0,needs_key:1}; const isFree=n=>n.kind!=="cloud"||n.free; const rows=[...ns].sort((a,b)=>(order[a.status]??2)-(order[b.status]??2)||(isFree(b)-isFree(a)));
+  $("#t-nodes").innerHTML = rows.length ? `<thead><tr><th>Node</th><th class="r">Status</th></tr></thead><tbody>` + rows.map(n=>{
     let st=n.status==="online"?(n.trusted?"in use":"found, not trusted"):n.status==="needs_key"?"needs key":esc(n.status||"");
     let act="";
-    if(n.status==="needs_key"&&n.signup) act=`<a class="btn" style="text-decoration:none;color:inherit;white-space:nowrap" href="${esc(n.signup)}" target="_blank" rel="noopener">Get key</a>`;
+    if(n.status==="needs_key"&&n.signup&&!n.free&&!(UNITS&&UNITS.free_only===false)) act=`<span style="color:var(--muted);font-size:12px">off: paid</span>`;
+    else if(n.status==="needs_key"&&n.signup) act=`<a class="btn" style="text-decoration:none;color:inherit;white-space:nowrap" href="${esc(n.signup)}" target="_blank" rel="noopener">Get key</a>`;
     else if(n.kind==="lan"&&n.status==="online") act=`<button class="btn" data-trust="${esc(n.base_url)}" data-to="${n.trusted?0:1}">${n.trusted?"Stop using":"Trust"}</button>`;
-    return `<tr><td>${esc(n.name||n.id)}<div style="color:var(--muted);font-size:12px;overflow-wrap:anywhere">${n.kind==="cloud"?"cloud":esc(n.kind)+" · "+esc(n.base_url.replace(/^https?:\/\//,""))}</div></td><td>${st}${n.status==="online"?`<div style="color:var(--muted);font-size:12px">${(n.models||[]).length} of ${n.models_total||0} models</div>`:""}</td><td class="r">${act}</td></tr>`}).join("")+"</tbody>" : "";
+    return `<tr><td>${esc(n.name||n.id)}${n.kind==="cloud"?`<span class="tag ${n.free?"free":""}">${n.free?"free":"paid"}</span>`:`<span class="tag free">free</span>`}<div style="color:var(--muted);font-size:12px;overflow-wrap:anywhere">${n.kind==="cloud"?"cloud":esc(n.kind)+" · "+esc(n.base_url.replace(/^https?:\/\//,""))}</div></td><td class="r">${st}${n.status==="online"?`<div style="color:var(--muted);font-size:12px">${(n.models||[]).length} of ${n.models_total||0} models</div>`:""}${act?`<div style="margin-top:6px">${act}</div>`:""}</td></tr>`}).join("")+"</tbody>" : "";
 }
 async function loadNodes(){ if(STATIC) return; try{ renderNodes(await api("/api/nodes")) }catch(e){ $("#nodes-msg").textContent=e.message } }
 $("#nodes-scan").addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true; b.textContent="Scanning";
@@ -819,6 +898,40 @@ $("#nodes-scan").addEventListener("click", async e=>{ const b=e.currentTarget; b
 $("#t-nodes").addEventListener("click", async e=>{ const b=e.target.closest("[data-trust]"); if(!b) return;
   try{ renderNodes(await api("/api/nodes/trust",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({base_url:b.dataset.trust,trusted:b.dataset.to==="1"})})); loadNodes() }catch(err){ toast(err.message) } });
 setTimeout(loadNodes, 1500);
+
+/* ---- AI units in use ---- */
+let UNITS=null;
+function agoShort(ts){ const s=Math.max(0,Date.now()/1000-ts); return s<60?"just now":s<3600?`${Math.floor(s/60)} min ago`:s<86400?`${Math.floor(s/3600)} h ago`:`${Math.floor(s/86400)} d ago` }
+const shortModel=a=>String(a||"").replace(/^(local|lan|custom)-[\w-]+?:/,"");
+function renderUnits(){
+  const d=UNITS; if(!d) return;
+  const working=d.in_use, avail=d.available;
+  $("#units-count").textContent = working ? `${working} AI working` : `${avail} AI ready`;
+  $("#units-dot").className = "u-dot"+(working?" working":"");
+  $("#units-chip").textContent = `${working} working · ${avail} available · ${d.models} models`;
+  const name=id=>(d.units.find(u=>u.id===id)||{}).name||id;
+  $("#units-latest").textContent = d.mock ? "Demo mode: no AI keys are set, so replies are simulated. Add keys in AI keys to use real AI."
+    : d.latest ? `Last answer came from ${shortModel(d.latest.model)} on ${name(d.latest.unit)}, ${agoShort(d.latest.ts)}.` : "No answers yet. Send a message and MCUBED picks the best AI unit.";
+  const label={working:"working",ready:"ready",resting:"resting after errors"};
+  $("#units-list").innerHTML = d.units.length ? d.units.map(u=>{
+    const bits=[`${u.kind==="cloud"?"cloud":u.kind==="lan"?"your network":"this device"}`, `${u.models.length} model${u.models.length===1?"":"s"}`];
+    if(u.requests_24h) bits.push(`${nf(u.requests_24h)} answer${u.requests_24h===1?"":"s"} today`);
+    if(u.last_model) bits.push(`last ${esc(shortModel(u.last_model))} ${agoShort(u.last_used)}`);
+    if(u.resting_models.length && u.state!=="resting") bits.push(`${u.resting_models.length} resting`);
+    return `<li><span class="u-dot ${u.state}"></span><div class="u-main"><div class="u-name">${esc(u.name)}<span class="tag ${u.free?"free":""}">${u.free?"free":"paid"}</span></div><div class="u-sub">${bits.join(" · ")}</div></div><span class="u-state">${label[u.state]}</span></li>`}).join("")
+    : '<li class="empty">No AI units yet. Add a key in AI keys.</li>';
+  const es=$("#empty-sub"); if(es) es.textContent = d.mock ? "Demo mode: add an AI key to get real answers." : working ? `${working} AI working now, ${avail} ready. MCUBED picks the best one for each message.` : avail ? `${avail} AI ready. MCUBED picks the best one for each message.` : "Add an AI key in AI keys to get started.";
+  $("#free-only").checked = d.free_only !== false;
+  $("#free-note").textContent = d.free_only!==false ? "MCUBED never calls anything that costs money." : "Paid AI is allowed. Providers may charge your account.";
+  $("#units-more").textContent = d.more_with_key ? `${d.more_with_key} more providers are ready to add with a key. See Stats > Models > AI nodes.` : "";
+}
+async function loadUnits(){ if(STATIC) return; try{ UNITS=await api("/api/units"); renderUnits() }catch(e){ $("#units-count").textContent="AI" } }
+$("#free-only").addEventListener("change", async e=>{
+  const allow=!e.target.checked;
+  if(allow && !confirm("Allow paid AI? Providers such as OpenAI or DeepSeek may then charge your account.")){ e.target.checked=true; return }
+  try{ UNITS=await api("/api/cost",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({allow_paid:allow})}); renderUnits(); toast(allow?"Paid AI allowed":"Free AI only") }catch(err){ toast(err.message); e.target.checked=!allow } });
+$("#btn-units").addEventListener("click",()=>{ const box=$("#units-info"); box.hidden=!box.hidden; $("#btn-units").setAttribute("aria-expanded",String(!box.hidden)); if(!box.hidden) loadUnits() });
+loadUnits();
 </script>
 </body>
 </html>

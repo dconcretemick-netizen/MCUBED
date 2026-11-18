@@ -40,27 +40,28 @@ public class MainActivity extends Activity {
     private static final String KEY_CONFIGURED = "keys_configured";
     /** Provider key slots: environment variable name and label shown in the dialog. */
     private static final String[][] KEYS = {
-            {"OPENROUTER_API_KEY", "OpenRouter (reaches every model)"},
-            {"OPENAI_API_KEY", "OpenAI (direct)"},
-            {"DEEPSEEK_API_KEY", "DeepSeek (direct)"},
-            {"GITHUB_TOKEN", "GitHub token (optional: repositories, fewer update limits)"},
-            {"GEMINI_API_KEY", "Google Gemini (free tier)"},
-            {"GROQ_API_KEY", "Groq (free tier)"},
-            {"CEREBRAS_API_KEY", "Cerebras (free tier)"},
-            {"MISTRAL_API_KEY", "Mistral (free tier)"},
-            {"HF_TOKEN", "Hugging Face token"},
-            {"NVIDIA_API_KEY", "NVIDIA NIM"},
-            {"SAMBANOVA_API_KEY", "SambaNova"},
-            {"XAI_API_KEY", "xAI Grok"},
-            {"TOGETHER_API_KEY", "Together AI"},
-            {"FIREWORKS_API_KEY", "Fireworks AI"},
-            {"DEEPINFRA_API_KEY", "DeepInfra"},
-            {"NOVITA_API_KEY", "Novita AI"},
-            {"HYPERBOLIC_API_KEY", "Hyperbolic"},
-            {"MOONSHOT_API_KEY", "Moonshot Kimi"},
-            {"DASHSCOPE_API_KEY", "Alibaba Qwen"},
-            {"ZAI_API_KEY", "Z.ai GLM"},
-            {"MINIMAX_API_KEY", "MiniMax"},
+            {"GEMINI_API_KEY", "Google Gemini (free)"},
+            {"GROQ_API_KEY", "Groq (free)"},
+            {"OPENROUTER_API_KEY", "OpenRouter (free models only unless paid AI is on)"},
+            {"MISTRAL_API_KEY", "Mistral (free)"},
+            {"SAMBANOVA_API_KEY", "SambaNova (free)"},
+            {"NVIDIA_API_KEY", "NVIDIA NIM (free credits)"},
+            {"HF_TOKEN", "Hugging Face (free credits)"},
+            {"COHERE_API_KEY", "Cohere (free trial key)"},
+            {"GITHUB_TOKEN", "GitHub token (optional: repositories)"},
+            {"OPENAI_API_KEY", "OpenAI (paid, off unless paid AI is on)"},
+            {"DEEPSEEK_API_KEY", "DeepSeek (paid, off unless paid AI is on)"},
+            {"CEREBRAS_API_KEY", "Cerebras (paid)"},
+            {"XAI_API_KEY", "xAI Grok (paid)"},
+            {"TOGETHER_API_KEY", "Together AI (paid)"},
+            {"FIREWORKS_API_KEY", "Fireworks AI (paid)"},
+            {"DEEPINFRA_API_KEY", "DeepInfra (paid)"},
+            {"NOVITA_API_KEY", "Novita AI (paid)"},
+            {"HYPERBOLIC_API_KEY", "Hyperbolic (paid)"},
+            {"MOONSHOT_API_KEY", "Moonshot Kimi (paid)"},
+            {"DASHSCOPE_API_KEY", "Alibaba Qwen (paid)"},
+            {"ZAI_API_KEY", "Z.ai GLM (paid)"},
+            {"MINIMAX_API_KEY", "MiniMax (paid)"},
     };
     private static final int MENU_KEY = 1, MENU_RELOAD = 2;
 
@@ -169,7 +170,7 @@ public class MainActivity extends Activity {
         scroll.addView(box);
         new AlertDialog.Builder(this)
                 .setTitle("AI provider keys")
-                .setMessage("Add any keys you have. They are stored only on this device. "
+                .setMessage("MCUBED is free: only free AI is used unless you turn on paid AI. Keys are stored only on this device. "
                         + "With no keys, MCUBED runs in demo mode with simulated replies.")
                 .setView(scroll)
                 .setCancelable(false)

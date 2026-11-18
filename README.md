@@ -13,7 +13,8 @@ A multi-model AI gateway with a phone-friendly web dashboard. One entry point fo
 - Conversation compression for long chats and automatic storage compaction
 - Lite mode for Android/Termux: standard library only, no native builds
 - OpenAI-style chat as the main screen: multi-turn conversations, model picker (MCUBED auto, fast, best quality, or any model with a key), ratings that teach the router
-- AI nodes: finds 20 cloud providers (Gemini, Groq, Mistral, Cerebras, Hugging Face, NVIDIA and more) plus local model servers such as Ollama and LM Studio, and adds every model it can use
+- Free by default: only free AI (local models and no-card free plans) unless you switch paid AI on
+- AI nodes: finds 21 cloud providers (Gemini, Groq, Mistral, Cerebras, Hugging Face, NVIDIA and more) plus local model servers such as Ollama and LM Studio, and adds every model it can use
 - OpenAI-compatible API: MCUBED acts as a model named `mcubed` at `/v1/chat/completions` and `/v1/models`, including streaming
 - Web browser tab: search or open any address in a reader view, follow links, open the full page, or send the page to the chat
 - News tab built for fairness: 15 outlets rated from left to right, stories grouped so you can compare how each outlet covers the same event, blindspot flags, and an AI balanced brief
@@ -116,7 +117,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 
 MCUBED looks for more AI every hour while the dashboard or app runs, and on demand with Stats > Models > "Scan now" or `python gateway.py nodes scan`.
 
-- **Cloud providers:** 20 OpenAI-compatible services, including Google Gemini, Groq, Cerebras, Mistral, Hugging Face, NVIDIA NIM, SambaNova, xAI, Together, Fireworks, DeepInfra, Moonshot, Qwen, Z.ai and MiniMax. Add a key in AI keys (Android) or `.env` and the next scan adds that provider's chat models. Several have free tiers. With OpenRouter, free models are added too.
+- **Cloud providers:** 21 OpenAI-compatible services (only the free ones are used in free-only mode), including Google Gemini, Groq, Cerebras, Mistral, Hugging Face, NVIDIA NIM, SambaNova, xAI, Together, Fireworks, DeepInfra, Moonshot, Qwen, Z.ai and MiniMax. Add a key in AI keys (Android) or `.env` and the next scan adds that provider's chat models. Several have free tiers. With OpenRouter, free models are added too.
 - **This device:** Ollama, LM Studio, vLLM, Jan, KoboldCpp, GPT4All and llama.cpp servers on their usual ports are used automatically.
 - **Local network:** model servers elsewhere on your Wi-Fi are listed but not used until you tap Trust. Set `MCUBED_LAN_SCAN=0` to skip the network scan, `MCUBED_NODE_SCAN=0` to turn scanning off, or `MCUBED_NODES` to add your own servers.
 
@@ -212,6 +213,15 @@ Quality counts fully up to the "good enough" target and only partly above it. Ef
   System messages and recent turns are always kept.
 - **Storage.** When the database passes its size or row limit, old rows roll up into exact daily totals and the file is vacuumed. In testing, 400k rows went from 103 MB to 13 MB with request and token totals preserved exactly.
 - **Network.** GUI API responses are gzip-compressed for mobile data.
+
+## Free of cost
+
+MCUBED and everything it depends on is free, and it stays that way by default.
+
+- **AI:** free-only mode is on out of the box (`"cost": {"free_only": true}` in `models.json`, or the "Free AI only" switch in the AI units panel). MCUBED then uses only local models (Ollama, LM Studio and others) and providers with no-card free plans: Google Gemini, Groq, Mistral, SambaNova, NVIDIA, Hugging Face, the Cohere trial key and OpenRouter's `:free` models. Paid keys such as OpenAI or DeepSeek are ignored until you switch paid AI on, and the app asks first. Free plans are rate limited. If one runs out, MCUBED moves to the next free option.
+- **Stay on free plans:** do not link a billing account or card to a provider you use for free (for example Google AI Studio). Then nothing on that key can turn into a charge.
+- **Software:** Python standard library (Lite and Android mode), optional `litellm` (MIT), Chaquopy (MIT), Android Gradle plugin and Android SDK (free), no paid libraries or services.
+- **Building and hosting:** GitHub Actions, Releases and Dependabot are free for public repositories, so every APK build and the MCUBED install page cost nothing. Build files expire after 3 days.
 
 ## Limits
 
