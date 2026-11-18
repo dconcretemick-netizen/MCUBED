@@ -397,6 +397,8 @@ class Store:
         self.path = path
         self.cfg = storage_cfg or {}
         self._lock = threading.Lock()
+        if os.path.dirname(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
@@ -1607,13 +1609,40 @@ def _github_token() -> Optional[str]:
     return os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
 
 
+def _shape_repo(x: dict) -> dict:
+    return {"full_name": x["full_name"], "private": x["private"], "fork": x["fork"],
+            "archived": x.get("archived", False), "default_branch": x.get("default_branch"),
+            "clone_url": x["clone_url"], "html_url": x["html_url"],
+            "description": x.get("description") or "", "updated_at": x.get("updated_at")}
+
+
+def _gh_cli_repos() -> Optional[list[dict]]:
+    """Use `gh api` when no token is exported; gh keeps its own credentials."""
+    import shutil
+    import subprocess
+    if not shutil.which("gh"):
+        return None
+    try:
+        out = subprocess.run(["gh", "api", "--paginate",
+                              "user/repos?per_page=100&affiliation=owner,collaborator,organization_member"],
+                             check=True, capture_output=True, text=True, timeout=120).stdout
+    except (subprocess.SubprocessError, OSError):
+        return None
+    data = json.loads("[" + out.replace("][", "],[") + "]") if out.strip() else []
+    flat = [x for page in data for x in (page if isinstance(page, list) else [page])]
+    return [_shape_repo(x) for x in flat]
+
+
 def discover_repos(token: Optional[str] = None) -> list[dict]:
     """All repositories the token can access: owned, collaborator and organization repos."""
     import urllib.error
     import urllib.request
     token = token or _github_token()
     if not token:
-        raise GatewayError("GITHUB_TOKEN is not set")
+        gh = _gh_cli_repos()  # fall back to an authenticated GitHub CLI, if present
+        if gh is not None:
+            return gh
+        raise GatewayError("GITHUB_TOKEN is not set and the GitHub CLI (gh) is not signed in")
     repos, page = [], 1
     while True:
         req = urllib.request.Request(
@@ -1628,10 +1657,7 @@ def discover_repos(token: Optional[str] = None) -> list[dict]:
             raise GatewayError(f"GitHub rejected the request (HTTP {e.code}); check GITHUB_TOKEN") from None
         except (urllib.error.URLError, OSError) as e:
             raise GatewayError(f"could not reach GitHub: {e}") from None
-        repos += [{"full_name": x["full_name"], "private": x["private"], "fork": x["fork"],
-                   "archived": x.get("archived", False), "default_branch": x.get("default_branch"),
-                   "clone_url": x["clone_url"], "html_url": x["html_url"],
-                   "description": x.get("description") or "", "updated_at": x.get("updated_at")} for x in batch]
+        repos += [_shape_repo(x) for x in batch]
         if len(batch) < 100:
             return repos
         page += 1
@@ -1652,9 +1678,10 @@ def sync_repos(registry_path: str = "repos.json", clone_dir: Optional[str] = Non
     cloned, updated, failed = [], [], []
     if clone_dir:
         token = _github_token()
-        # token goes in a per-command header, never into the remote URL or .git/config
+        # token goes in a per-command header, never into the remote URL or .git/config;
+        # without a token, git uses whatever credential helper is configured (e.g. `gh auth setup-git`)
         auth = ["-c", f"http.extraHeader=Authorization: Basic "
-                f"{__import__('base64').b64encode(f'x-access-token:{token}'.encode()).decode()}"]
+                f"{__import__('base64').b64encode(f'x-access-token:{token}'.encode()).decode()}"] if token else []
         for r in found:
             dest = Path(clone_dir) / r["full_name"]
             cmd = (["git", *auth, "-C", str(dest), "pull", "--ff-only", "-q"] if (dest / ".git").exists()
@@ -1707,7 +1734,8 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
         try:  # auto-add new repositories (registry only; cloning stays manual)
             hours = float(os.getenv("GATEWAY_REPO_SYNC_HOURS") or gw.defaults.get("repo_sync_every_hours", 6))
             last = float(gw.store.get_policy("last_repo_sync_ts", 0) or 0)
-            if _github_token() and hours > 0 and time.time() - last >= hours * 3600:
+            if (_github_token() or __import__("shutil").which("gh")) and hours > 0 \
+                    and time.time() - last >= hours * 3600:
                 res = sync_repos(gw.repo_registry)
                 gw.store.set_policy("last_repo_sync_ts", time.time())
                 if res["added"]:
@@ -1782,7 +1810,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             if u.path == "/game.html" and (HERE / "game.html").exists():
                 return self._send(200, (HERE / "game.html").read_bytes(), "text/html; charset=utf-8")
             if u.path == "/api/repos":
-                return self._send(200, dict(load_repos(gw.repo_registry), github_token=bool(_github_token())))
+                return self._send(200, dict(load_repos(gw.repo_registry),
+                                             github_token=bool(_github_token() or __import__("shutil").which("gh"))))
             if u.path == "/api/report":
                 days = int((q.get("days") or ["7"])[0])
                 with lock:

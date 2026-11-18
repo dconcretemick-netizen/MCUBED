@@ -51,7 +51,7 @@ python gateway.py discover-openai --write  # add to models.json
 
 ## Repositories
 
-With `GITHUB_TOKEN` set, MCUBED finds every repository you own, collaborate on, or reach through an organization, and records it in `repos.json`. New repositories are added automatically every 6 hours while the dashboard or app runs (`repo_sync_every_hours` in `models.json`), and the Storage tab has a "Sync now" button. Run `python gateway.py repos --clone repos` to also clone them and fast-forward existing copies; the token is sent per command and never written into `.git/config`. Archived repositories are skipped unless you pass `--include-archived`. Use a fine-grained token with read-only access.
+With `GITHUB_TOKEN` set (or the GitHub CLI signed in via `gh auth login`), MCUBED finds every repository you own, collaborate on, or reach through an organization, and records it in `repos.json`. New repositories are added automatically every 6 hours while the dashboard or app runs (`repo_sync_every_hours` in `models.json`), and the Storage tab has a "Sync now" button. Run `python gateway.py repos --clone repos` to also clone them and fast-forward existing copies; the token is sent per command and never written into `.git/config`. Archived repositories are skipped unless you pass `--include-archived`. Use a fine-grained token with read-only access.
 
 ## Android app (native APK)
 
