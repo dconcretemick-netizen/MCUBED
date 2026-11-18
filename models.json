@@ -11,6 +11,7 @@
     "auto_improve_every_n_requests": 50,
     "auto_improve_every_hours": 6,
     "repo_sync_every_hours": 6,
+    "nodes": {"scan_every_minutes": 60, "lan_scan": true, "max_models_per_node": 12, "max_free_openrouter": 20},
     "learning": {
       "explore_rate": 0.1,
       "prior_strength": 4,

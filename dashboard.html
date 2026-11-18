@@ -227,6 +227,11 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
   <section class="view" id="v-models">
     <div class="card"><h2>Routes</h2><div class="tbl-wrap"><table id="t-models"></table></div></div>
     <div class="card" style="margin-top:var(--gap)"><h2>Model pool</h2><div class="tbl-wrap"><table id="t-pool"></table></div></div>
+    <div class="card" style="margin-top:var(--gap)"><h2>AI nodes <span class="chip" id="nodes-chip">not scanned</span></h2>
+      <p class="news-note" id="nodes-msg">MCUBED looks for AI providers and local model servers (Ollama, LM Studio and others) every hour and adds the ones it can use.</p>
+      <div class="row"><button class="btn" id="nodes-scan">Scan now</button></div>
+      <div style="margin-top:10px"><table id="t-nodes" style="width:100%"></table></div>
+    </div>
   </section>
 
   <section class="view" id="v-learning">
@@ -794,6 +799,26 @@ if(STATIC){
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden) load() }); // refresh on return, no background polling (battery)
 }
 load();
+
+/* ---- AI nodes ---- */
+function renderNodes(d){
+  const sm=d.summary||{}, ns=d.nodes||[];
+  $("#nodes-chip").textContent = d.scanned_at ? `${sm.in_use||0} in use, ${sm.models_in_use||0} models` : "not scanned";
+  if(d.scanned_at) $("#nodes-msg").textContent = `Last scan ${new Date(d.scanned_at).toLocaleString()}. ${sm.needs_key||0} more providers are ready once you add a key in AI keys.`;
+  const order={online:0,needs_key:1}; const rows=[...ns].sort((a,b)=>(order[a.status]??2)-(order[b.status]??2));
+  $("#t-nodes").innerHTML = rows.length ? `<thead><tr><th>Node</th><th>Status</th><th></th></tr></thead><tbody>` + rows.map(n=>{
+    let st=n.status==="online"?(n.trusted?"in use":"found, not trusted"):n.status==="needs_key"?"needs key":esc(n.status||"");
+    let act="";
+    if(n.status==="needs_key"&&n.signup) act=`<a class="btn" style="text-decoration:none;color:inherit;white-space:nowrap" href="${esc(n.signup)}" target="_blank" rel="noopener">Get key</a>`;
+    else if(n.kind==="lan"&&n.status==="online") act=`<button class="btn" data-trust="${esc(n.base_url)}" data-to="${n.trusted?0:1}">${n.trusted?"Stop using":"Trust"}</button>`;
+    return `<tr><td>${esc(n.name||n.id)}<div style="color:var(--muted);font-size:12px;overflow-wrap:anywhere">${n.kind==="cloud"?"cloud":esc(n.kind)+" · "+esc(n.base_url.replace(/^https?:\/\//,""))}</div></td><td>${st}${n.status==="online"?`<div style="color:var(--muted);font-size:12px">${(n.models||[]).length} of ${n.models_total||0} models</div>`:""}</td><td class="r">${act}</td></tr>`}).join("")+"</tbody>" : "";
+}
+async function loadNodes(){ if(STATIC) return; try{ renderNodes(await api("/api/nodes")) }catch(e){ $("#nodes-msg").textContent=e.message } }
+$("#nodes-scan").addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true; b.textContent="Scanning";
+  try{ const d=await api("/api/nodes/scan",{method:"POST"}); renderNodes(d); toast(`${(d.summary||{}).in_use||0} nodes in use`); if(typeof refresh==="function") refresh() }catch(err){ toast(err.message) } finally{ b.disabled=false; b.textContent="Scan now" } });
+$("#t-nodes").addEventListener("click", async e=>{ const b=e.target.closest("[data-trust]"); if(!b) return;
+  try{ renderNodes(await api("/api/nodes/trust",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({base_url:b.dataset.trust,trusted:b.dataset.to==="1"})})); loadNodes() }catch(err){ toast(err.message) } });
+setTimeout(loadNodes, 1500);
 </script>
 </body>
 </html>

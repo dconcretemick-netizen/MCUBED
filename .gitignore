@@ -28,3 +28,8 @@ build_info.json
 *.log
 repos.json
 repos/
+nodes.json
+update.apk
+.mcubed_backup/
+.mcubed_update.json
+zipadd/

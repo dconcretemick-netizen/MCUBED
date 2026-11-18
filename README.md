@@ -13,6 +13,7 @@ A multi-model AI gateway with a phone-friendly web dashboard. One entry point fo
 - Conversation compression for long chats and automatic storage compaction
 - Lite mode for Android/Termux: standard library only, no native builds
 - OpenAI-style chat as the main screen: multi-turn conversations, model picker (MCUBED auto, fast, best quality, or any model with a key), ratings that teach the router
+- AI nodes: finds 20 cloud providers (Gemini, Groq, Mistral, Cerebras, Hugging Face, NVIDIA and more) plus local model servers such as Ollama and LM Studio, and adds every model it can use
 - OpenAI-compatible API: MCUBED acts as a model named `mcubed` at `/v1/chat/completions` and `/v1/models`, including streaming
 - Web browser tab: search or open any address in a reader view, follow links, open the full page, or send the page to the chat
 - News tab built for fairness: 15 outlets rated from left to right, stories grouped so you can compare how each outlet covers the same event, blindspot flags, and an AI balanced brief
@@ -98,6 +99,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 | `models` | Model pool and key availability |
 | `discover-openai [--write]` | Find OpenAI chat models your key can use |
 | `repos [--clone DIR] [--list]` | Auto-add every GitHub repository your token can access; optionally clone/update them |
+| `nodes scan\|list\|trust URL\|untrust URL` | Find more AI providers and local model servers; trust a server on your network |
 | `gui [--host --port --token]` | Serve the web dashboard and Doom game |
 | `news [--limit 15] [--brief N] [--sources]` | Headlines grouped by story with left/center/right coverage; `--brief N` writes a balanced brief of story N |
 | `wine status` / `wine run FILE.exe [args]` | Check for Wine and run Windows programs |
@@ -109,6 +111,16 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 - The dashboard listens on `127.0.0.1` by default. Binding to `0.0.0.0` uses `--token` (or `GATEWAY_GUI_TOKEN`), generating one if missing; open `/?token=...` once and a cookie is set.
 - Cross-origin POSTs are rejected. API keys stay in environment variables and never reach the browser.
 - Configure models, tiers and routing in `models.json`.
+
+## AI nodes
+
+MCUBED looks for more AI every hour while the dashboard or app runs, and on demand with Stats > Models > "Scan now" or `python gateway.py nodes scan`.
+
+- **Cloud providers:** 20 OpenAI-compatible services, including Google Gemini, Groq, Cerebras, Mistral, Hugging Face, NVIDIA NIM, SambaNova, xAI, Together, Fireworks, DeepInfra, Moonshot, Qwen, Z.ai and MiniMax. Add a key in AI keys (Android) or `.env` and the next scan adds that provider's chat models. Several have free tiers. With OpenRouter, free models are added too.
+- **This device:** Ollama, LM Studio, vLLM, Jan, KoboldCpp, GPT4All and llama.cpp servers on their usual ports are used automatically.
+- **Local network:** model servers elsewhere on your Wi-Fi are listed but not used until you tap Trust. Set `MCUBED_LAN_SCAN=0` to skip the network scan, `MCUBED_NODE_SCAN=0` to turn scanning off, or `MCUBED_NODES` to add your own servers.
+
+Nodes join the same learning router as every other model, so the good ones earn more traffic. Results are kept in `nodes.json` next to the database.
 
 ## Use MCUBED as an OpenAI model
 
@@ -158,7 +170,7 @@ The Update tab (CLI `update`) compares your version with the newest commit on Gi
 
 - **Git checkout:** runs `git pull --ff-only` and restarts.
 - **Plain copy (zip or Termux):** downloads each program file, checks it against GitHub's hash, confirms the new `gateway.py` compiles, backs up the old files to `.mcubed_backup/`, then restarts. If you edited `models.json` or `news.json`, your copy is kept and the new one is saved as `*.new`. Roll back restores the last backup.
-- **Android app:** every push to `main` refreshes the "MCUBED install" release (tag `latest`). The app downloads that APK (a GitHub token in AI keys is needed while the repository is private) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
+- **Android app:** every push to `main` refreshes the "MCUBED install" release (tag `latest`). The app downloads that APK (no GitHub token needed) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
 
 ## How a request flows
 

@@ -6,7 +6,10 @@ MCUBED has one source code editor: the repository owner, [@dconcretemick-netizen
 
 | Layer | Protection |
 | --- | --- |
-| Repository | Private, single collaborator, no deploy keys or webhooks. |
+| Repository | Public to read, but only the owner can write: single collaborator, no deploy keys or webhooks. Anyone can read or fork the code, but a fork cannot change this repository. |
+| Main branch | A ruleset blocks force pushes and deletion of `main`, so published history cannot be rewritten. |
+| Outside pull requests | Pull requests from anyone else never run Actions until the owner approves them, never receive secrets, and can only be merged by the owner. |
+| Secret scanning | GitHub secret scanning and push protection are on: a push containing an API key or token is blocked. |
 | Security updates | Dependabot alerts and security updates are on for Python packages, the Android Gradle build and GitHub Actions (`.github/dependabot.yml`). A fix arrives as a pull request labeled `security`, and nothing merges until the owner approves it. |
 | Build | GitHub Actions runs only GitHub-owned actions plus `gradle/actions/setup-gradle` and `softprops/action-gh-release`, each pinned to a full commit SHA (pinning is enforced by a repository setting). The signing key is never given to pull request builds. |
 | Signing | Every APK is signed with one permanent MCUBED key (v1, v2 and v3 signatures). The key lives only in GitHub Actions secrets and an offline backup. CI fails if an APK is signed by any other key. |
@@ -22,10 +25,10 @@ MCUBED signing certificate SHA-256:
 The repository is only as safe as the GitHub account that owns it.
 
 - Keep two-factor authentication on, preferably with a passkey or security key.
-- Give the MCUBED app a fine-grained token with read-only Contents access to this one repository, so a lost phone cannot push code.
+- Updates no longer need a GitHub token. If you add one for repository sync, make it a fine-grained token with read-only access, so a lost phone cannot push code.
 - Review [tokens](https://github.com/settings/tokens), [SSH keys](https://github.com/settings/keys), [authorized apps](https://github.com/settings/applications) and [security log](https://github.com/settings/security-log) now and then, and remove anything you do not recognize.
 - Keep the offline backup of the signing key somewhere safe. Anyone with it could sign an APK that Android accepts as MCUBED.
 
 ## Reporting a problem
 
-Open a private issue in this repository or contact the owner directly.
+Use the private [Report a vulnerability](https://github.com/dconcretemick-netizen/MCUBED/security/advisories/new) form. Please do not open a public issue for security problems.

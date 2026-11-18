@@ -43,7 +43,24 @@ public class MainActivity extends Activity {
             {"OPENROUTER_API_KEY", "OpenRouter (reaches every model)"},
             {"OPENAI_API_KEY", "OpenAI (direct)"},
             {"DEEPSEEK_API_KEY", "DeepSeek (direct)"},
-            {"GITHUB_TOKEN", "GitHub token (auto-add repositories)"},
+            {"GITHUB_TOKEN", "GitHub token (optional: repositories, fewer update limits)"},
+            {"GEMINI_API_KEY", "Google Gemini (free tier)"},
+            {"GROQ_API_KEY", "Groq (free tier)"},
+            {"CEREBRAS_API_KEY", "Cerebras (free tier)"},
+            {"MISTRAL_API_KEY", "Mistral (free tier)"},
+            {"HF_TOKEN", "Hugging Face token"},
+            {"NVIDIA_API_KEY", "NVIDIA NIM"},
+            {"SAMBANOVA_API_KEY", "SambaNova"},
+            {"XAI_API_KEY", "xAI Grok"},
+            {"TOGETHER_API_KEY", "Together AI"},
+            {"FIREWORKS_API_KEY", "Fireworks AI"},
+            {"DEEPINFRA_API_KEY", "DeepInfra"},
+            {"NOVITA_API_KEY", "Novita AI"},
+            {"HYPERBOLIC_API_KEY", "Hyperbolic"},
+            {"MOONSHOT_API_KEY", "Moonshot Kimi"},
+            {"DASHSCOPE_API_KEY", "Alibaba Qwen"},
+            {"ZAI_API_KEY", "Z.ai GLM"},
+            {"MINIMAX_API_KEY", "MiniMax"},
     };
     private static final int MENU_KEY = 1, MENU_RELOAD = 2;
 
@@ -148,11 +165,13 @@ public class MainActivity extends Activity {
             box.addView(input);
             fields[i] = input;
         }
+        final android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(box);
         new AlertDialog.Builder(this)
                 .setTitle("AI provider keys")
                 .setMessage("Add any keys you have. They are stored only on this device. "
                         + "With no keys, MCUBED runs in demo mode with simulated replies.")
-                .setView(box)
+                .setView(scroll)
                 .setCancelable(false)
                 .setPositiveButton("Save", (d, w) -> {
                     SharedPreferences.Editor e = prefs().edit();

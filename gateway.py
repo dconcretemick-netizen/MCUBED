@@ -1019,6 +1019,30 @@ class Gateway:
         self.optimizer = Optimizer(self)
         self.compressor = Compressor(self)
         self._cache: dict[str, tuple[float, GatewayResponse]] = {}
+        self.nodes_path = str(Path(db_path).resolve().parent / "nodes.json")
+        self._node_info: dict[str, dict] = {}
+        self.load_nodes()
+
+    # -- discovered AI nodes -------------------------------------------------- #
+    def load_nodes(self) -> int:
+        """Add chat models from trusted, online nodes in nodes.json to the pool (replacing older node entries)."""
+        d = load_nodes(self.nodes_path)
+        models = {a: s for a, s in self.models.items() if not s.provider.startswith("node:")}
+        info: dict[str, dict] = {}
+        for n in d.get("nodes", []):
+            if n.get("status") != "online" or not n.get("trusted"):
+                continue
+            info[n["id"]] = n
+            for m in n.get("models", []):
+                alias = f"{n['id']}:{m['id']}"
+                if alias in models:
+                    continue
+                models[alias] = ModelSpec(alias=alias, provider=f"node:{n['id']}", tier=m.get("tier", "standard"),
+                                          quality=int(m.get("quality", 5)),
+                                          routes=[Route(model=f"node/{n['id']}/{m['id']}", via="direct",
+                                                        max_input_tokens=int(m.get("ctx") or 32_000))])
+        self.models, self._node_info = models, info
+        return sum(1 for s in models.values() if s.provider.startswith("node:"))
 
     # -- policy accessors (learned values override config) ------------------ #
     def task_policy(self) -> dict:
@@ -1062,6 +1086,9 @@ class Gateway:
 
     # -- availability ------------------------------------------------------- #
     def _route_available(self, spec: ModelSpec, route: Route) -> bool:
+        if route.model.startswith("node/"):
+            n = self._node_info.get(route.model.split("/")[1])
+            return bool(n) and (self.mock or not n.get("env") or bool(node_key(n["env"])))
         if LITE and route.via != "openrouter" and spec.provider not in ("openai", "deepseek"):
             return False  # LITE (Android) mode: only OpenAI-compatible HTTPS APIs can be called directly
         if self.mock:
@@ -1157,6 +1184,13 @@ class Gateway:
                 model=route.model,
                 choices=[{"index": 0, "finish_reason": finish, "message": {"role": "assistant", "content": text}}],
                 usage={"prompt_tokens": p_tok, "completion_tokens": c_tok, "total_tokens": p_tok + c_tok})
+        if route.model.startswith("node/"):
+            _, nid, wire = route.model.split("/", 2)
+            n = self._node_info[nid]
+            extra = {"X-Title": "MCUBED Gateway"} if nid == "openrouter" else None
+            return node_completion(n["base_url"], node_key(n.get("env", "")), wire, messages,
+                                   float(self.defaults.get("request_timeout_s", 60)) * (3 if n["kind"] != "cloud" else 1),
+                                   nid, route.model, extra, **kw)
         params = dict(model=route.model, messages=messages,
                       timeout=float(self.defaults.get("request_timeout_s", 60)), **kw)
         if route.model.startswith("vertex_ai/"):
@@ -1496,6 +1530,281 @@ def discover_openai(config_path: str, write: bool = False) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- #
+# AI nodes: keep looking for more AI providers and servers, and route to them
+# --------------------------------------------------------------------------- #
+# A node is any OpenAI-compatible endpoint: a cloud provider you have a key for, a model server on this
+# device (Ollama, LM Studio, llama.cpp, vLLM, Jan, KoboldCpp, LocalAI, text-generation-webui, GPT4All),
+# or one on your home network. Discovered chat models join the router with a cautious tier/quality guess;
+# the learner and quarantine then promote or drop them based on real results.
+# (id, name, base_url, env key or "", where to get a key, models list path or "")
+CLOUD_NODES = [
+    ("openai", "OpenAI", "https://api.openai.com/v1", "OPENAI_API_KEY", "https://platform.openai.com/api-keys", "/models"),
+    ("deepseek", "DeepSeek", "https://api.deepseek.com", "DEEPSEEK_API_KEY", "https://platform.deepseek.com/api_keys", "/models"),
+    ("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "https://openrouter.ai/keys", "/models"),
+    ("gemini", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_API_KEY", "https://aistudio.google.com/apikey", "/models"),
+    ("groq", "Groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY", "https://console.groq.com/keys", "/models"),
+    ("mistral", "Mistral", "https://api.mistral.ai/v1", "MISTRAL_API_KEY", "https://console.mistral.ai/api-keys", "/models"),
+    ("xai", "xAI Grok", "https://api.x.ai/v1", "XAI_API_KEY", "https://console.x.ai", "/models"),
+    ("together", "Together AI", "https://api.together.xyz/v1", "TOGETHER_API_KEY", "https://api.together.ai/settings/api-keys", "/models"),
+    ("fireworks", "Fireworks", "https://api.fireworks.ai/inference/v1", "FIREWORKS_API_KEY", "https://fireworks.ai/account/api-keys", "/models"),
+    ("cerebras", "Cerebras", "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY", "https://cloud.cerebras.ai", "/models"),
+    ("sambanova", "SambaNova", "https://api.sambanova.ai/v1", "SAMBANOVA_API_KEY", "https://cloud.sambanova.ai/apis", "/models"),
+    ("huggingface", "Hugging Face", "https://router.huggingface.co/v1", "HF_TOKEN", "https://huggingface.co/settings/tokens", "/models"),
+    ("nvidia", "NVIDIA NIM", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY", "https://build.nvidia.com", "/models"),
+    ("deepinfra", "DeepInfra", "https://api.deepinfra.com/v1/openai", "DEEPINFRA_API_KEY", "https://deepinfra.com/dash/api_keys", "/models"),
+    ("novita", "Novita AI", "https://api.novita.ai/v3/openai", "NOVITA_API_KEY", "https://novita.ai/settings/key-management", "/models"),
+    ("hyperbolic", "Hyperbolic", "https://api.hyperbolic.xyz/v1", "HYPERBOLIC_API_KEY", "https://app.hyperbolic.xyz/settings", "/models"),
+    ("moonshot", "Moonshot Kimi", "https://api.moonshot.ai/v1", "MOONSHOT_API_KEY", "https://platform.moonshot.ai/console/api-keys", "/models"),
+    ("dashscope", "Alibaba Qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY", "https://modelstudio.console.alibabacloud.com", "/models"),
+    ("zai", "Z.ai GLM", "https://api.z.ai/api/paas/v4", "ZAI_API_KEY", "https://z.ai/manage-apikey/apikey-list", "/models"),
+    ("minimax", "MiniMax", "https://api.minimax.io/v1", "MINIMAX_API_KEY", "https://platform.minimax.io", "/models"),
+]
+NODE_KEY_NAMES = sorted({c[3] for c in CLOUD_NODES})
+# local model servers: port -> software that usually listens there
+LOCAL_PORTS = {11434: "Ollama", 1234: "LM Studio", 8080: "llama.cpp / LocalAI", 8000: "vLLM", 1337: "Jan",
+               5001: "KoboldCpp", 5000: "text-generation-webui", 4891: "GPT4All", 8081: "llama.cpp"}
+LAN_PORTS = (11434, 1234, 8080, 8000)
+_NON_CHAT = re.compile(r"(embed|moderation|whisper|tts|transcri|realtime|audio|image|dall-e|sora|rerank|guard|"
+                       r"safety|vision-only|ocr|speech|clip|bge|e5-|nomic|davinci|babbage|search|computer-use|"
+                       r"flux|stable-diffusion|sdxl|video|music|lyria|veo|imagen)", re.I)
+NODE_DEFAULTS = {"scan_every_minutes": 60, "lan_scan": True, "max_models_per_node": 12, "max_free_openrouter": 20}
+
+
+class _AttrDict(dict):
+    __getattr__ = dict.get
+
+
+def _attr(d: Any) -> Any:
+    if isinstance(d, dict):
+        return _AttrDict({k: _attr(v) for k, v in d.items()})
+    if isinstance(d, list):
+        return [_attr(x) for x in d]
+    return d
+
+
+def node_key(env: str) -> Optional[str]:
+    return os.getenv(env) if env else None
+
+
+def _http_json(url: str, key: Optional[str] = None, timeout: float = 8, data: Optional[dict] = None,
+               headers: Optional[dict] = None) -> Any:
+    import urllib.request
+    h = {"User-Agent": "MCUBED", "Accept": "application/json", **(headers or {})}
+    if key:
+        h["Authorization"] = f"Bearer {key}"
+    body = None
+    if data is not None:
+        body = json.dumps(data).encode()
+        h["Content-Type"] = "application/json"
+    with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=h), timeout=timeout) as r:
+        return json.loads(r.read() or b"null")
+
+
+def node_completion(base_url: str, key: Optional[str], wire_model: str, messages: list, timeout: float,
+                    provider: str, model: str, extra_headers: Optional[dict] = None, **kw: Any) -> Any:
+    """POST {base}/chat/completions on any OpenAI-compatible node; errors map onto the router's error types."""
+    import urllib.error
+    body = {"model": wire_model, "messages": messages,
+            **{k: v for k, v in kw.items() if k in ("max_tokens", "temperature", "top_p", "response_format",
+                                                    "stop", "seed", "tools", "tool_choice")}}
+    if provider == "openai" and "max_tokens" in body:  # current OpenAI models use max_completion_tokens
+        body["max_completion_tokens"] = body.pop("max_tokens")
+    try:
+        data = _http_json(f"{base_url.rstrip('/')}/chat/completions", key, timeout, body, extra_headers)
+    except urllib.error.HTTPError as e:
+        msg = e.read().decode(errors="replace")[:500]
+        cls = {400: "BadRequestError", 401: "AuthenticationError", 402: "RateLimitError",
+               403: "PermissionDeniedError", 404: "NotFoundError", 408: "Timeout", 413: "ContextWindowExceededError",
+               429: "RateLimitError", 500: "InternalServerError", 502: "ServiceUnavailableError",
+               503: "ServiceUnavailableError"}.get(e.code, "APIConnectionError")
+        if e.code == 400 and "context" in msg.lower():
+            cls = "ContextWindowExceededError"
+        raise getattr(litellm, cls)(msg, provider, model) from None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
+        raise litellm.APIConnectionError(str(e), provider, model) from None
+    if not isinstance(data, dict) or "error" in data or not data.get("choices"):
+        raise litellm.ServiceUnavailableError(str((data or {}).get("error", data))[:500], provider, model)
+    for c in data["choices"]:
+        c.setdefault("message", {}).setdefault("content", "")
+    data.setdefault("usage", {})
+    return _attr(data)
+
+
+def guess_tier(model_id: str, local: bool = False) -> tuple[str, int]:
+    """Cautious tier and quality guess from the model name; real results take over once traffic flows."""
+    m = model_id.lower()
+    size = max((float(x) for x in re.findall(r"(\d+(?:\.\d+)?)b\b", m)), default=0.0)
+    if re.search(r"(nano|mini|small|tiny|lite|flash|haiku|instant|\b[1-9]b\b|:free)", m) or (0 < size <= 14):
+        tier, q = "economy", 4
+    elif re.search(r"(opus|ultra|large|-pro\b|pro-|max\b|reasoner|r1\b|405b|671b|235b|480b)", m) or size >= 120:
+        tier, q = "premium", 7
+    else:
+        tier, q = "standard", 6
+    if local:
+        q = min(q, 5)
+    return tier, q
+
+
+def _norm(model_id: str) -> str:
+    return re.sub(r"[^a-z0-9.]", "", model_id.lower().split("/")[-1].split(":")[0])
+
+
+def _list_cloud(node: tuple, cfg: dict) -> dict:
+    nid, name, base, env, signup, path = node
+    rec = {"id": nid, "name": name, "kind": "cloud", "base_url": base, "env": env, "signup": signup,
+           "trusted": True, "models": [], "models_total": 0}
+    key = node_key(env)
+    if not key:
+        rec["status"] = "needs_key"
+        return rec
+    try:
+        raw = _http_json(base + path, key, 12)
+        raw = raw.get("data", raw) if isinstance(raw, dict) else raw
+        items = [{"id": m.get("id") or m.get("name", ""), "ctx": m.get("context_length") or m.get("context_window"),
+                  "free": str((m.get("pricing") or {}).get("prompt", "x")) in ("0", "0.0")} for m in raw or []]
+    except Exception as e:  # noqa: BLE001
+        rec.update(status="error", error=str(e)[:200])
+        return rec
+    for i in items:
+        i["id"] = i["id"].removeprefix("models/")  # Gemini lists ids as models/<id>
+    items = [i for i in items if i["id"] and not _NON_CHAT.search(i["id"])]
+    rec["models_total"] = len(items)
+    if nid == "openrouter":  # every paid model is already an OpenRouter fallback route; add the free ones
+        items = [i for i in items if i["id"].endswith(":free") or i.get("free")][: int(cfg["max_free_openrouter"])]
+    rec["models"] = items[: int(cfg["max_models_per_node"])] if nid != "openrouter" else items
+    rec["status"] = "online"
+    return rec
+
+
+def _probe_local(host: str, port: int, kind: str, timeout: float = 1.5) -> Optional[dict]:
+    base = f"http://{host}:{port}/v1"
+    try:
+        raw = _http_json(base + "/models", None, timeout)
+        ids = [m.get("id") for m in (raw.get("data") if isinstance(raw, dict) else raw) or [] if m.get("id")]
+    except Exception:  # noqa: BLE001
+        if port != 11434:
+            return None
+        try:  # older Ollama without the OpenAI-compatible model list
+            ids = [m["name"] for m in _http_json(f"http://{host}:{port}/api/tags", None, timeout).get("models", [])]
+        except Exception:  # noqa: BLE001
+            return None
+    ids = [i for i in ids if not _NON_CHAT.search(i)]
+    local = host in ("127.0.0.1", "localhost")
+    return {"id": f"{'local' if local else 'lan'}-{host.replace('.', '-')}-{port}",
+            "name": f"{LOCAL_PORTS.get(port, 'Model server')} on {'this device' if local else host}",
+            "kind": "local" if local else "lan", "base_url": base, "env": "", "status": "online",
+            "trusted": local, "models": [{"id": i, "ctx": None} for i in ids], "models_total": len(ids)}
+
+
+def _lan_hosts() -> list[str]:
+    """Hosts on this device's private /24 network that have a common model-server port open."""
+    import ipaddress
+    import socket
+    from concurrent.futures import ThreadPoolExecutor
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))  # no packet is sent; this only picks the outgoing interface
+        me = s.getsockname()[0]
+        s.close()
+    except OSError:
+        return []
+    ip = ipaddress.ip_address(me)
+    if not ip.is_private or ip.is_loopback:
+        return []
+    net = ipaddress.ip_network(f"{me}/24", strict=False)
+
+    def check(target: tuple[str, int]) -> Optional[str]:
+        try:
+            with socket.create_connection(target, timeout=0.3):
+                return f"{target[0]}:{target[1]}"
+        except OSError:
+            return None
+    targets = [(str(h), p) for h in net.hosts() if str(h) != me for p in LAN_PORTS]
+    with ThreadPoolExecutor(max_workers=128) as ex:
+        return [r for r in ex.map(check, targets) if r]
+
+
+def nodes_config(gw: Optional["Gateway"] = None) -> dict:
+    cfg = dict(NODE_DEFAULTS, **((gw.defaults.get("nodes") or {}) if gw else {}))
+    if os.getenv("MCUBED_LAN_SCAN") is not None:
+        cfg["lan_scan"] = os.getenv("MCUBED_LAN_SCAN") == "1"
+    return cfg
+
+
+def load_nodes(path: str) -> dict:
+    p = Path(path)
+    try:
+        return json.loads(p.read_text()) if p.exists() else {"scanned_at": None, "nodes": [], "trusted": []}
+    except (OSError, json.JSONDecodeError):
+        return {"scanned_at": None, "nodes": [], "trusted": []}
+
+
+def scan_nodes(path: str, gw: Optional["Gateway"] = None) -> dict:
+    """Look for every reachable AI node and save the result. Safe to call often; it only reads model lists."""
+    from concurrent.futures import ThreadPoolExecutor
+    cfg = nodes_config(gw)
+    prev = load_nodes(path)
+    trusted = set(prev.get("trusted", []))
+    extra = [u.strip().rstrip("/") for u in os.getenv("MCUBED_NODES", "").split(",") if u.strip()]
+    with ThreadPoolExecutor(max_workers=24) as ex:
+        cloud = list(ex.map(lambda n: _list_cloud(n, cfg), CLOUD_NODES))
+        local = [r for r in ex.map(lambda p: _probe_local("127.0.0.1", p[0], p[1]), LOCAL_PORTS.items()) if r]
+        lan = []
+        if cfg.get("lan_scan"):
+            hp = [h.split(":") for h in _lan_hosts()]
+            lan = [r for r in ex.map(lambda x: _probe_local(x[0], int(x[1]), ""), hp) if r]
+    for url in extra:  # nodes you list yourself in MCUBED_NODES are trusted
+        from urllib.parse import urlparse
+        u = urlparse(url if "://" in url else "http://" + url)
+        r = _probe_local(u.hostname or "", u.port or 80, "", 3)
+        if r:
+            r.update(kind="custom", trusted=True, name=f"Model server at {u.hostname}:{u.port or 80}")
+            lan.append(r)
+    for r in lan:
+        if r["base_url"] in trusted:
+            r["trusted"] = True
+    nodes = cloud + local + lan
+    seen = {_norm(r.model.split("/", 1)[-1]) for s in (gw.models.values() if gw else []) if not s.provider.startswith("node:")
+            for r in s.routes} | {_norm(a) for a in (gw.models if gw else {}) if ":" not in a}
+    for n in nodes:  # tier guess, context window, and skip models the main pool already covers
+        fresh = []
+        for m in n["models"]:
+            k = _norm(m["id"])
+            if n["id"] in ("openai", "deepseek") and k in seen:
+                continue
+            tier, q = guess_tier(m["id"], local=n["kind"] != "cloud")
+            fresh.append({"id": m["id"], "tier": tier, "quality": q,
+                          "ctx": int(m.get("ctx") or (32_000 if n["kind"] != "cloud" else 128_000))})
+        n["models"] = fresh
+    before = {n["id"] for n in prev.get("nodes", []) if n.get("status") == "online"}
+    out = {"scanned_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "nodes": nodes,
+           "trusted": sorted(trusted), "lan_scan": bool(cfg.get("lan_scan")),
+           "new": sorted(n["id"] for n in nodes if n["status"] == "online" and n["id"] not in before)}
+    Path(path).write_text(json.dumps(out, indent=1))
+    return out
+
+
+def trust_node(path: str, base_url: str, trusted: bool) -> dict:
+    d = load_nodes(path)
+    t = set(d.get("trusted", []))
+    (t.add if trusted else t.discard)(base_url)
+    d["trusted"] = sorted(t)
+    for n in d.get("nodes", []):
+        if n.get("base_url") == base_url and n.get("kind") == "lan":
+            n["trusted"] = trusted
+    Path(path).write_text(json.dumps(d, indent=1))
+    return d
+
+
+def nodes_summary(d: dict) -> dict:
+    ns = d.get("nodes", [])
+    used = [n for n in ns if n.get("status") == "online" and n.get("trusted")]
+    return {"scanned_at": d.get("scanned_at"), "online": sum(n.get("status") == "online" for n in ns),
+            "in_use": len(used), "models_in_use": sum(len(n.get("models", [])) for n in used),
+            "needs_key": sum(n.get("status") == "needs_key" for n in ns), "new": d.get("new", [])}
+
+
+# --------------------------------------------------------------------------- #
 # GUI report server (stdlib only, so it also runs on Android/Termux)
 # --------------------------------------------------------------------------- #
 HERE = Path(__file__).resolve().parent
@@ -1667,7 +1976,29 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
                     log.info("auto-added repositories: %s", ", ".join(res["added"]))
         except Exception:  # noqa: BLE001
             log.exception("repository sync failed")
+        try:  # keep looking for more AI nodes (cloud keys, this device, home network)
+            run_node_scan(gw, lock)
+        except Exception:  # noqa: BLE001
+            log.exception("AI node scan failed")
         time.sleep(poll_s)
+
+
+def run_node_scan(gw: "Gateway", lock: threading.Lock, force: bool = False) -> Optional[dict]:
+    """Scan for AI nodes when due (defaults.nodes.scan_every_minutes; 0 or MCUBED_NODE_SCAN=0 disables)."""
+    minutes = float(nodes_config(gw).get("scan_every_minutes", 60))
+    if not force and (minutes <= 0 or os.getenv("MCUBED_NODE_SCAN", "1") == "0" or gw.mock):
+        return None
+    last = float(gw.store.get_policy("last_node_scan_ts", 0) or 0)
+    if not force and time.time() - last < minutes * 60:
+        return None
+    res = scan_nodes(gw.nodes_path, gw)  # network work happens outside the lock
+    with lock:
+        n = gw.load_nodes()
+        gw.store.set_policy("last_node_scan_ts", time.time())
+    s = nodes_summary(res)
+    log.info("AI node scan: %s online, %s in use with %s models, %s need a key%s", s["online"], s["in_use"], n,
+             s["needs_key"], (", new: " + ", ".join(s["new"])) if s["new"] else "")
+    return res
 
 
 # --------------------------------------------------------------------------- #
@@ -1866,7 +2197,7 @@ def _gh_api(path: str, raw: bool = False, timeout: float = 30) -> Any:
                                                            headers=headers), timeout=timeout) as r:
             data = r.read()
     except urllib.error.HTTPError as e:
-        hint = " (private repository: add a GitHub token in AI keys or .env)" if e.code in (401, 403, 404) and not token else ""
+        hint = " (GitHub may be rate limiting this network: add a GitHub token in AI keys or .env)" if e.code in (403, 429) and not token else ""
         raise GatewayError(f"GitHub returned HTTP {e.code} for {path.split('?')[0]}{hint}") from None
     except (urllib.error.URLError, OSError) as e:
         raise GatewayError(f"could not reach GitHub: {e}") from None
@@ -1882,15 +2213,20 @@ def _update_manifest_path() -> Path:
 
 
 def current_version() -> dict:
-    """What is installed now: git checkout, a previous self-update, or the APK's build info."""
+    """What is installed now. Android: the APK's build info. Desktop: git checkout, then the last
+    self-update, then the build info shipped in the download (so a fresh zip knows its version)."""
     import subprocess
-    bi = HERE / "build_info.json"
-    if bi.exists():
+
+    def build_info() -> Optional[dict]:
+        bi = HERE / "build_info.json"
         try:
-            d = json.loads(bi.read_text())
-            return {"commit": d.get("commit", ""), "date": d.get("built_at", ""), "source": "apk" if _is_android() else "build"}
+            d = json.loads(bi.read_text()) if bi.exists() else None
         except (OSError, json.JSONDecodeError):
-            pass
+            return None
+        return d and {"commit": d.get("commit", ""), "date": d.get("built_at", ""),
+                      "source": "apk" if _is_android() else "build"}
+    if _is_android():
+        return build_info() or {"commit": "", "date": "", "source": "unknown"}
     if (HERE / ".git").exists():
         try:
             out = subprocess.run(["git", "-C", str(HERE), "log", "-1", "--format=%H%n%cI"], capture_output=True,
@@ -1905,7 +2241,7 @@ def current_version() -> dict:
             return {"commit": d.get("commit", ""), "date": d.get("date", ""), "source": "update"}
         except (OSError, json.JSONDecodeError):
             pass
-    return {"commit": "", "date": "", "source": "unknown"}
+    return build_info() or {"commit": "", "date": "", "source": "unknown"}
 
 
 def check_update(force: bool = False) -> dict:
@@ -2023,6 +2359,20 @@ def _check_lineage(current: str, new: str) -> None:
                            f"(history was {cmp.get('status')}). Someone may have rewritten main.")
 
 
+def _gh_file(path: str, sha: str) -> bytes:
+    """One file at a commit. Without a token, use raw.githubusercontent.com (no API rate limit for public repos)."""
+    import shutil
+    import urllib.request
+    if _github_token() or not os.getenv("MCUBED_RAW_DOWNLOADS", "1") == "1" and shutil.which("gh"):
+        return _gh_api(f"repos/{UPDATE_REPO}/contents/{path}?ref={sha}", raw=True, timeout=60)
+    url = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{sha}/{path}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "MCUBED"}), timeout=60) as r:
+            return r.read()
+    except OSError:
+        return _gh_api(f"repos/{UPDATE_REPO}/contents/{path}?ref={sha}", raw=True, timeout=60)
+
+
 def apply_update() -> dict:
     """Install the newest files from GitHub. Every file is checked against GitHub's hash and the new
     gateway.py must compile before anything is replaced; the old files are backed up for rollback."""
@@ -2048,7 +2398,7 @@ def apply_update() -> dict:
     installed = manifest.get("files", {})
     staged: dict[str, bytes] = {}
     for t in files:
-        data = _gh_api(f"repos/{UPDATE_REPO}/contents/{t['path']}?ref={sha}", raw=True, timeout=60)
+        data = _gh_file(t["path"], sha)
         if _git_blob_sha(data) != t["sha"]:
             raise GatewayError(f"{t['path']} failed its integrity check; nothing was changed")
         staged[t["path"]] = data
@@ -2624,6 +2974,9 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                     return self._send(502, {"error": f"news unavailable ({type(e).__name__}: {str(e)[:160]})"})
             if u.path == "/api/wine":
                 return self._send(200, wine_status())
+            if u.path == "/api/nodes":
+                d = load_nodes(gw.nodes_path)
+                return self._send(200, dict(d, summary=nodes_summary(d), config=nodes_config(gw)))
             if u.path == "/api/update":
                 try:
                     return self._send(200, check_update(force=(q.get("refresh") or ["0"])[0] == "1"))
@@ -2660,6 +3013,18 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 if res.get("restart") and not _is_android():
                     restart_process()
                 return
+            if u.path in ("/api/nodes/scan", "/api/nodes/trust"):
+                try:
+                    if u.path.endswith("scan"):
+                        res = run_node_scan(gw, lock, force=True)
+                    else:
+                        b = self._body()
+                        res = trust_node(gw.nodes_path, str(b.get("base_url", "")), bool(b.get("trusted")))
+                        with lock:
+                            gw.load_nodes()
+                except (GatewayError, ValueError, OSError) as e:
+                    return self._send(400, {"error": str(e)})
+                return self._send(200, dict(res, summary=nodes_summary(res)))
             try:
                 with lock:
                     if u.path == "/api/chat":
@@ -2785,6 +3150,10 @@ def main() -> None:
     up = sub.add_parser("update", help="install the newest MCUBED from GitHub (verified, with backup)")
     up.add_argument("action", nargs="?", default="check", choices=["check", "apply", "rollback"])
 
+    nd = sub.add_parser("nodes", help="find more AI nodes: cloud providers, local model servers, home network")
+    nd.add_argument("action", nargs="?", default="scan", choices=["scan", "list", "trust", "untrust"])
+    nd.add_argument("url", nargs="?", help="node base URL for trust/untrust")
+
     s = sub.add_parser("simulate", help="offline learning demo with synthetic traffic")
     s.add_argument("--n", type=int, default=300)
 
@@ -2882,6 +3251,23 @@ def _run(args: argparse.Namespace) -> None:
         else:
             print(json.dumps(apply_update() if args.action == "apply" else rollback_update(), indent=2))
             print("Restart MCUBED to use the new version.")
+    elif args.cmd == "nodes":
+        if args.action in ("trust", "untrust"):
+            if not args.url:
+                raise SystemExit("usage: gateway.py nodes trust|untrust BASE_URL")
+            trust_node(gw.nodes_path, args.url.rstrip("/"), args.action == "trust")
+            d = load_nodes(gw.nodes_path)
+        else:
+            d = scan_nodes(gw.nodes_path, gw) if args.action == "scan" else load_nodes(gw.nodes_path)
+        sm = nodes_summary(d)
+        print(f"{sm['online']} nodes online, {sm['in_use']} in use with {sm['models_in_use']} models, "
+              f"{sm['needs_key']} more available with a key (scanned {d.get('scanned_at')})")
+        for n in sorted(d.get("nodes", []), key=lambda n: (n["status"] != "online", n["kind"], n["name"])):
+            state = n["status"] if n["status"] != "online" else ("in use" if n.get("trusted") else "found, not trusted")
+            extra = f"  set {n['env']} ({n.get('signup', '')})" if n["status"] == "needs_key" else \
+                f"  {len(n.get('models', []))} of {n.get('models_total', 0)} models" if n["status"] == "online" else \
+                f"  {n.get('error', '')[:80]}"
+            print(f"  {n['kind']:6} {n['name']:34} {state:18}{extra}")
     elif args.cmd == "simulate":
         before = gw.task_policy()
         simulate(gw, args.n)
