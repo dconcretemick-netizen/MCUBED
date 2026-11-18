@@ -115,7 +115,7 @@ jobs:
             for a in $(gh release view latest -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name'); do
               case "$a" in MCUBED.apk|MCUBED.apk.sha256|MCUBED-desktop.zip) ;; *) gh release delete-asset latest "$a" -y -R "$GITHUB_REPOSITORY" ;; esac
             done
-            gh release edit latest -R "$GITHUB_REPOSITORY" --title "MCUBED install" --notes-file notes.md --prerelease=false --latest
+            gh release edit latest -R "$GITHUB_REPOSITORY" --title "MCUBED install" --notes-file notes.md --prerelease=false --latest --target "$GITHUB_SHA"
           else
             gh release create latest MCUBED.apk MCUBED.apk.sha256 MCUBED-desktop.zip -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "MCUBED install" --notes-file notes.md --latest

@@ -2594,7 +2594,17 @@ def download_apk() -> dict:
     if signers != [MCUBED_CERT_SHA256]:
         tmp.unlink(missing_ok=True)
         raise GatewayError("APK is not signed with the MCUBED key; not installing")
-    target = rel.get("target_commitish", "")
+    # The commit the APK was built from is the one the "latest" tag points at. The release's target_commitish
+    # can be stale (it is not moved with the tag), so it is only a fallback.
+    target = ""
+    try:
+        ref = _gh_api(f"repos/{UPDATE_REPO}/git/ref/tags/latest")
+        obj = ref.get("object", {})
+        if obj.get("type") == "tag":  # annotated tag: follow to the commit
+            obj = _gh_api(f"repos/{UPDATE_REPO}/git/tags/{obj['sha']}").get("object", {})
+        target = obj.get("sha", "")
+    except GatewayError:
+        target = rel.get("target_commitish", "")
     if re.fullmatch(r"[0-9a-f]{40}", target or ""):
         _check_lineage(current_version().get("commit", ""), target)
     os.replace(tmp, out)
