@@ -93,15 +93,6 @@ def long_convo(quick: bool):
             "stages": c.get("stages"), "kept_system": True}
 
 
-@test("Over-budget request -> compress to fit cost cap")
-def cost_cap(quick: bool):
-    gw = fresh("cost")
-    text = "data " * 400_000  # ~400k tokens
-    r = gw.chat("Extract the fields as JSON: " + text, max_cost=0.02, use_cache=False)
-    return {"cost_usd": round(r.cost_usd, 5), "cap": 0.02, "sent_tokens": r.prompt_tokens,
-            "status": "pass" if r.cost_usd <= 0.02 * 1.05 else "FAIL"}
-
-
 @test("Provider outage: every direct route down -> OpenRouter fallback")
 def outage(quick: bool):
     gw = fresh("outage")
@@ -128,21 +119,6 @@ def total_outage(quick: bool):
         return {"status": "FAIL", "error": "should have raised"}
     except G.AllRoutesFailed as e:
         return {"attempts": len(e.attempts), "ms": round((time.time() - t0) * 1000, 1)}
-
-
-@test("Daily budget exhaustion")
-def budget(quick: bool):
-    gw = fresh("budget", daily_budget_usd=0.002)
-    served = 0
-    try:
-        for i in range(500):
-            gw.chat(f"Analyze the trade-offs step by step #{i} " + "x" * 2000, use_cache=False)
-            served += 1
-        return {"status": "FAIL", "error": "budget never enforced"}
-    except G.BudgetExceeded:
-        spent = gw.store.spent_today()
-        return {"served_before_stop": served, "spent": round(spent, 5), "budget": 0.002,
-                "overshoot_pct": round(100 * (spent - 0.002) / 0.002, 1)}
 
 
 @test("Concurrency: many threads, one gateway")
@@ -188,28 +164,28 @@ def ledger_scale(quick: bool):
         ts = now - random.random() * 60 * 86400
         batch.append((ts, datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d"), uuid.uuid4().hex[:12], a,
                       s.provider, s.tier, s.routes[0].model, "direct", random.choice(G.TASK_TYPES),
-                      "ok" if random.random() > .05 else "error", 300, 400, 0.001, 0.004, 900, 0.8))
+                      "ok" if random.random() > .05 else "error", 300, 400, 900, 0.8))
     with gw.store._lock:
         gw.store.conn.executemany(
             "INSERT INTO attempts(ts,day,request_id,alias,provider,tier,model,via,task_type,status,prompt_tokens,"
-            "completion_tokens,cost_usd,baseline_cost_usd,latency_ms,auto_quality) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "completion_tokens,latency_ms,auto_quality) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             batch)
         gw.store.conn.commit()
     t0 = time.time(); gw.learner.invalidate(); gw.learner.all_stats(); t_learn = time.time() - t0
     t0 = time.time(); gw.chat("hello", use_cache=False); t_chat = time.time() - t0
-    before_cost = gw.store.query("SELECT SUM(cost_usd) c FROM usage_all")[0]["c"]
+    before_tok = gw.store.query("SELECT SUM(prompt_tokens+completion_tokens) c FROM usage_all")[0]["c"]
     t0 = time.time(); gw.report(90); t_report = time.time() - t0
     t0 = time.time(); gw.optimizer.run(apply=False); t_opt = time.time() - t0
     mb_before = gw.store.size_mb()
     t0 = time.time(); res = gw.store.compact(); t_compact = time.time() - t0
-    after_cost = gw.store.query("SELECT SUM(cost_usd) c FROM usage_all")[0]["c"]
+    after_tok = gw.store.query("SELECT SUM(prompt_tokens+completion_tokens) c FROM usage_all")[0]["c"]
     t0 = time.time(); gw.report(90); t_report2 = time.time() - t0
     return {"rows": rows, "learner_refresh_s": round(t_learn, 2), "chat_with_cold_learner_s": round(t_chat, 2),
             "report_s": round(t_report, 2), "optimizer_s": round(t_opt, 2), "compact_s": round(t_compact, 2),
             "db_mb": [round(mb_before, 1), round(gw.store.size_mb(), 1)], "raw_rows_after": res.get("raw_rows"),
             "report_after_compact_s": round(t_report2, 2),
-            "cost_preserved": abs((before_cost or 0) - (after_cost or 0)) < 1e-6,
-            "status": "pass" if abs((before_cost or 0) - (after_cost or 0)) < 1e-6 else "FAIL"}
+            "tokens_preserved": (before_tok or 0) == (after_tok or 0),
+            "status": "pass" if (before_tok or 0) == (after_tok or 0) else "FAIL"}
 
 
 @test("Router throughput (planning only)")
@@ -219,20 +195,20 @@ def plan_speed(quick: bool):
     msgs = [{"role": "user", "content": "write python code to sort a list"}]
     t0 = time.time()
     for _ in range(n):
-        gw.plan(msgs, "balanced", "code", None, 0.5)
+        gw.plan(msgs, "balanced", "code", None)
     return {"plans": n, "us_per_plan": round((time.time() - t0) / n * 1e6, 1)}
 
 
-@test("Cache: repeated prompt costs nothing")
+@test("Cache: repeated prompt is answered instantly")
 def cache(quick: bool):
     gw = fresh("cache")
     a = gw.chat("What's the capital of France?")
     b = gw.chat("What's the capital of France?")
-    return {"first_cost": a.cost_usd, "second_cost": b.cost_usd, "second_cached": b.cached,
-            "status": "pass" if b.cached and b.cost_usd == 0 else "FAIL"}
+    return {"first_ms": a.latency_ms, "second_ms": b.latency_ms, "second_cached": b.cached,
+            "status": "pass" if b.cached and b.latency_ms == 0 else "FAIL"}
 
 
-@test("Learning converges: router finds a cheaper tier that is good enough")
+@test("Learning converges: router finds a lighter tier that is good enough")
 def learning(quick: bool):
     gw = fresh("learn", auto_improve_every_n_requests=50)
     before = gw.task_policy()
@@ -248,7 +224,7 @@ def learning(quick: bool):
     rep = gw.report(1)
     changed = {k: f"{before[k]}->{after[k]}" for k in after if before.get(k) != after[k]}
     ok = after["creative"] == "economy" and after["code"] != "economy" and after["reasoning"] != "economy"
-    return {"status": "pass" if ok else "FAIL", "tier_changes": changed, "savings_pct": rep["totals"]["savings_pct"],
+    return {"status": "pass" if ok else "FAIL", "tier_changes": changed, "tokens": rep["totals"]["prompt_tokens"] + rep["totals"]["completion_tokens"],
             "avg_quality": rep["totals"]["avg_quality"],
             "improvements": len(rep["recent_improvements"])}
 

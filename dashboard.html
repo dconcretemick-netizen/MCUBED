@@ -86,7 +86,51 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .skel{background:linear-gradient(90deg,var(--surface-2),var(--border),var(--surface-2));background-size:200% 100%;animation:sk 1.2s infinite;border-radius:8px;height:18px}
 @keyframes sk{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:10px}
+.seg button{border:0;background:none;min-height:36px;padding:0 16px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:600}
+.seg button[aria-selected=true]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.addr{display:flex;gap:8px;align-items:center;margin-bottom:10px}.addr input{flex:1;min-width:0}
+.web-actions{margin-bottom:10px}.web-actions .btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--text)}
+.reader{line-height:1.6;overflow-wrap:anywhere}.reader h1{font-size:20px;margin:0 0 4px}.reader .src{color:var(--muted);font-size:13px;margin-bottom:12px;word-break:break-all}
+.reader p{margin:0 0 10px}.reader h3{font-size:16px;margin:16px 0 6px}
+.reader .links{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
+.reader .links button{background:none;border:0;padding:4px 0;color:var(--accent);cursor:pointer;text-align:left;font-size:15px}
+.reader .links small{display:block;color:var(--faint);font-size:12px;word-break:break-all}
+.web-empty p{color:var(--muted);margin:0 0 12px}
+.msg.page{align-self:flex-end;background:var(--surface-2);border:1px dashed var(--border);border-radius:12px;padding:8px 12px;font-size:13px;color:var(--muted)}
+.chat{display:flex;flex-direction:column;min-height:calc(100dvh - 61px - 60px - 28px - env(safe-area-inset-bottom))}
+.chat-top{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.chat-top select{flex:1;min-width:0;max-width:340px}
+.chat-top .btn{min-height:40px;padding:0 12px}
+.api-info{margin-bottom:10px}.api-info p{margin:0 0 10px;color:var(--muted);font-size:14px}
+.kv{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0;font-size:14px}.kv>span:first-child{color:var(--muted);width:68px}
+.kv code{flex:1;min-width:0}
+.kv code,.msg code{font-family:var(--mono);font-size:13px;background:var(--surface-2);padding:2px 6px;border-radius:6px;word-break:break-all}
+.kv .hint{color:var(--faint);font-size:12px}.btn.sm{min-height:30px;padding:0 10px;font-size:13px}
+.msgs{flex:1;display:flex;flex-direction:column;gap:14px;padding:6px 0 14px}
+.empty-chat{margin:auto;text-align:center;max-width:520px;padding:20px 6px}
+.empty-chat h1{font-size:24px;margin:12px 0 4px}.empty-chat p{color:var(--muted);margin:0 0 16px}
+.sugg{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip-btn{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:9px 14px;cursor:pointer;font-size:14px;text-align:left}
+.chip-btn:hover{border-color:var(--accent)}
+.msg{max-width:min(760px,92%);line-height:1.55;word-wrap:break-word;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:10px 14px;border-radius:16px 16px 4px 16px;white-space:pre-wrap}
+.msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--border);padding:10px 14px;border-radius:16px 16px 16px 4px}
+.msg.bot p{margin:0 0 8px}.msg.bot p:last-child{margin:0}
+.msg.bot pre{background:var(--surface-2);border-radius:10px;padding:10px;overflow:auto;font:13px/1.5 var(--mono);margin:8px 0}
+.msg.bot pre code{background:none;padding:0}
+.msg.err{border-color:var(--bad);color:var(--bad)}
+.msg .mfoot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px;color:var(--muted)}
+.msg .mfoot button{border:1px solid var(--border);background:none;border-radius:8px;min-height:28px;padding:0 8px;cursor:pointer;font-size:12px;color:var(--muted)}
+.msg .mfoot button.on{color:var(--accent);border-color:var(--accent)}
+.typing span{display:inline-block;width:7px;height:7px;margin:0 2px;border-radius:50%;background:var(--muted);animation:bl 1s infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.composer{position:sticky;bottom:calc(68px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:8px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.composer textarea{min-height:44px;max-height:180px;resize:none;border:0;background:transparent;padding:10px 6px;outline:none}
+.composer .send{width:44px;padding:0;display:grid;place-items:center;border-radius:12px;flex:none}
 @media (min-width:720px){
+  .composer{bottom:14px}.chat{min-height:calc(100dvh - 61px - 56px - 28px)}
   .kpis{grid-template-columns:repeat(3,1fr)}
   .charts{grid-template-columns:2fr 1fr}
   .two{grid-template-columns:1fr 1fr}
@@ -117,26 +161,27 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 </header>
 
 <nav class="tabs" role="tablist">
-  <button role="tab" data-v="overview" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Overview</button>
+  <button role="tab" data-v="playground" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</button>
+  <button role="tab" data-v="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Overview</button>
   <button role="tab" data-v="models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>Models</button>
   <button role="tab" data-v="learning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>Learning</button>
-  <button role="tab" data-v="playground"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Try it</button>
   <button role="tab" data-v="storage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Storage</button>
-  <button role="tab" data-v="doom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3 4 9l4 2M18 3l2 6-4 2"/><circle cx="12" cy="14" r="7"/><path d="M9 13h.01M15 13h.01M9.5 17h5"/></svg>Doom</button>
+  <button role="tab" data-v="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg>Games</button>
+  <button role="tab" data-v="web"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>Web</button>
 </nav>
 
 <main>
   <div id="static-banner" class="banner" hidden>Static snapshot. Run <code>python gateway.py gui</code> for live data and actions.</div>
 
-  <section class="view active" id="v-overview">
+  <section class="view" id="v-overview">
     <div class="grid kpis" id="kpis">
       <div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div>
       <div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div><div class="card"><div class="skel"></div></div>
     </div>
     <div class="grid charts">
-      <div class="card"><h2>Daily spend vs premium baseline</h2><div id="ch-daily"></div>
-        <div class="legend"><span><i style="background:var(--c1)"></i>Actual spend</span><span><i style="background:var(--c3)"></i>All-premium baseline</span></div></div>
-      <div class="card"><h2>Spend by provider</h2><div id="ch-provider"></div></div>
+      <div class="card"><h2>Daily requests and errors</h2><div id="ch-daily"></div>
+        <div class="legend"><span><i style="background:var(--c1)"></i>Requests</span><span><i style="background:var(--c3)"></i>Failed attempts</span></div></div>
+      <div class="card"><h2>Tokens by provider</h2><div id="ch-provider"></div></div>
     </div>
     <div class="grid charts two">
       <div class="card"><h2>Quality by task <span class="chip">policy tier</span></h2><div id="ch-task"></div></div>
@@ -157,28 +202,44 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
     <div class="card" style="margin-top:var(--gap)"><h2>Learned scores <span class="chip">model × task</span></h2><div class="tbl-wrap"><table id="t-learned"></table></div></div>
   </section>
 
-  <section class="view" id="v-playground">
-    <div class="card">
-      <h2>Send a request</h2>
-      <textarea id="prompt" placeholder="Ask anything. The gateway picks the model."></textarea>
-      <div class="row" style="margin-top:10px">
-        <select id="strategy" class="ctl" aria-label="Strategy"><option value="balanced">Balanced</option><option value="cost">Cheapest</option><option value="quality">Best quality</option></select>
-        <select id="tier" class="ctl" aria-label="Tier"><option value="">Auto tier</option><option>economy</option><option>standard</option><option>premium</option></select>
-        <button class="btn primary" id="send" style="margin-left:auto">Send</button>
+  <section class="view active" id="v-playground">
+    <div class="chat">
+      <div class="chat-top">
+        <select id="model" class="ctl" aria-label="Model"><option value="mcubed">MCUBED (auto)</option><option value="mcubed-efficient">MCUBED fast</option><option value="mcubed-quality">MCUBED best quality</option></select>
+        <button class="btn" id="btn-api" aria-expanded="false" aria-controls="api-info">API</button>
+        <button class="btn" id="btn-newchat">New chat</button>
       </div>
-      <div id="answer" hidden>
-        <pre class="out" id="out" style="margin-top:12px"></pre>
-        <div class="meta num" id="meta"></div>
-        <div class="row" style="margin-top:10px"><span style="color:var(--muted);font-size:13px">Rate answer</span>
-          <button class="btn" data-score="1">Good</button><button class="btn" data-score="0.5">Okay</button><button class="btn" data-score="0">Bad</button></div>
+      <div class="card api-info" id="api-info" hidden>
+        <h2>Use MCUBED as an OpenAI model</h2>
+        <p>Any app or SDK that talks to OpenAI can use MCUBED. Point it at this base URL and pick model <code>mcubed</code>. The router chooses the best available model for each request.</p>
+        <div class="kv"><span>Base URL</span><code id="api-base"></code><button class="btn sm" data-copy="api-base">Copy</button></div>
+        <div class="kv"><span>Model</span><code>mcubed</code><span class="hint">also mcubed-efficient, mcubed-quality, or any pool alias</span></div>
+        <div class="kv"><span>API key</span><code id="api-key">your gateway token (any text if none is set)</code></div>
+        <pre class="out" id="api-snippet"></pre>
       </div>
+      <div class="msgs" id="msgs" aria-live="polite">
+        <div class="empty-chat" id="chat-empty">
+          <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
+          <h1>How can I help?</h1>
+          <p>MCUBED routes every message to the best AI model that has a key.</p>
+          <div class="sugg">
+            <button class="chip-btn">Explain the CAP theorem in two lines</button>
+            <button class="chip-btn">Write a Python function that dedupes a list</button>
+            <button class="chip-btn">Summarize the pros and cons of SQLite</button>
+          </div>
+        </div>
+      </div>
+      <form class="composer" id="composer">
+        <textarea id="prompt" rows="1" placeholder="Message MCUBED" aria-label="Message"></textarea>
+        <button class="btn primary send" id="send" type="submit" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      </form>
     </div>
   </section>
 
   <section class="view" id="v-storage">
     <div class="grid kpis" id="storage-kpis"></div>
     <div class="card" style="margin-top:var(--gap)"><h2>Self compression</h2>
-      <p style="color:var(--muted);margin:0 0 12px;font-size:14px">Old rows roll up into daily totals when the database passes its size or row limit. Costs and tokens stay exact.</p>
+      <p style="color:var(--muted);margin:0 0 12px;font-size:14px">Old rows roll up into daily totals when the database passes its size or row limit. Request and token totals stay exact.</p>
       <button class="btn primary" id="btn-compact">Compact now</button>
       <pre class="out" id="compact-out" hidden style="margin-top:12px"></pre>
     </div>
@@ -189,7 +250,21 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
     </div>
   </section>
 
-  <section class="view" id="v-doom">
+  <section class="view" id="v-games">
+    <div class="seg" role="tablist" aria-label="Game">
+      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="doom" aria-selected="false">Doom</button>
+    </div>
+    <div class="game-pane" id="g-solitaire">
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="sol-frame" title="Solitaire" data-src="solitaire.html"
+        style="display:block;width:100%;height:min(76vh,720px);border:0;background:#0c2622"></iframe>
+    </div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span style="color:var(--muted);font-size:13px">Klondike. Tap a card to auto-move it, or drag. Progress is saved.</span>
+      <a class="btn" href="solitaire.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
+    </div>
+  </div>
+    <div class="game-pane" id="g-doom" hidden>
     <div class="card" style="padding:0;overflow:hidden">
       <iframe id="doom-frame" title="Gateway Doom" data-src="game.html" allow="fullscreen; autoplay"
         style="display:block;width:100%;height:min(72vh,640px);border:0;background:#000"></iframe>
@@ -197,6 +272,23 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">Demons are your real error types from the last 30 days.</span>
       <a class="btn" href="game.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
+    </div>
+  </div>
+  </section>
+
+  <section class="view" id="v-web">
+    <form class="addr" id="web-form">
+      <button class="icon-btn" type="button" id="web-back" aria-label="Back" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
+      <input id="web-url" class="ctl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search or enter address" aria-label="Address">
+      <button class="btn primary" type="submit">Go</button>
+    </form>
+    <div class="row web-actions" id="web-actions" hidden>
+      <a class="btn" id="web-open" target="_blank" rel="noopener">Open page</a>
+      <button class="btn" id="web-ask">Ask MCUBED about this page</button>
+    </div>
+    <div class="card reader" id="web-reader">
+      <div class="web-empty"><h2>Web browser</h2><p>Search the web or type an address. Pages open in a fast reader view; use Open page for the full site. Ask MCUBED sends the page into the chat.</p>
+        <div class="sugg" id="web-recent"></div></div>
     </div>
   </section>
 </main>
@@ -206,7 +298,6 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 const STATIC = window.__REPORT__ || null;
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const usd = v => v == null ? "–" : v > 0 && v < 0.0001 ? "<$0.0001" : "$" + (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(4));
 const nf = v => v == null ? "–" : Intl.NumberFormat("en", {notation: v >= 1e5 ? "compact" : "standard", maximumFractionDigits: 1}).format(v);
 const pct = v => v == null ? "–" : (v * 100).toFixed(1) + "%";
 let R = null, lastReq = null;
@@ -218,29 +309,29 @@ async function api(path, opts){
 }
 
 /* ---------- tiny SVG charts (no dependencies: fast + offline on Android) ---------- */
-function lineChart(el, labels, series){
+function lineChart(el, labels, series, fmt=nf){
   const W=600,H=220,P={l:44,r:8,t:10,b:24};
   if(!labels.length){el.innerHTML='<div class="empty">No traffic in this range</div>';return}
   const max=Math.max(1e-9,...series.flatMap(s=>s.values));
   const x=i=>P.l+(labels.length===1?(W-P.l-P.r)/2:i*(W-P.l-P.r)/(labels.length-1));
   const y=v=>P.t+(H-P.t-P.b)*(1-v/max);
   let g="";
-  for(let k=0;k<=3;k++){const v=max*k/3;g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)"/><text x="${P.l-6}" y="${y(v)+4}" text-anchor="end">${usd(v)}</text>`}
+  for(let k=0;k<=3;k++){const v=max*k/3;g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)"/><text x="${P.l-6}" y="${y(v)+4}" text-anchor="end">${fmt(v)}</text>`}
   const step=Math.ceil(labels.length/6);
   labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)g+=`<text x="${labels.length<=3?P.l+(W-P.l-P.r)/labels.length*(i+.5):x(i)}" y="${H-6}" text-anchor="middle">${esc(l.slice(5))}</text>`});
   if(labels.length<=3){                       // too few points for a line: grouped columns
     const gw=(W-P.l-P.r)/labels.length, bw=Math.min(46,gw/(series.length+1));
     series.forEach((s,si)=>s.values.forEach((v,i)=>{const bx=P.l+gw*i+gw/2-(series.length*bw)/2+si*bw;
-      g+=`<rect x="${bx}" y="${y(v)}" width="${bw-4}" height="${y(0)-y(v)}" rx="4" fill="${s.color}"><title>${esc(labels[i])}: ${usd(v)}</title></rect>`}));
-    el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spend chart">${g}</svg>`; return;
+      g+=`<rect x="${bx}" y="${y(v)}" width="${bw-4}" height="${y(0)-y(v)}" rx="4" fill="${s.color}"><title>${esc(labels[i])}: ${fmt(v)}</title></rect>`}));
+    el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily requests chart">${g}</svg>`; return;
   }
   series.forEach(s=>{
     const pts=s.values.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
     if(s.fill)g+=`<polygon points="${x(0)},${y(0)} ${pts} ${x(s.values.length-1)},${y(0)}" fill="${s.color}" opacity=".14"/>`;
     g+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" ${s.dash?'stroke-dasharray="5 4"':''}/>`;
-    s.values.forEach((v,i)=>g+=`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${s.color}"><title>${esc(labels[i])}: ${usd(v)}</title></circle>`);
+    s.values.forEach((v,i)=>g+=`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${s.color}"><title>${esc(labels[i])}: ${fmt(v)}</title></circle>`);
   });
-  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spend chart">${g}</svg>`;
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily requests chart">${g}</svg>`;
 }
 function hbars(el, rows, fmt, colorFn){
   if(!rows.length){el.innerHTML='<div class="empty">No data yet</div>';return}
@@ -255,30 +346,29 @@ function kpi(label, value, delta, cls=""){return `<div class="card kpi"><div cla
 function render(){
   const t=R.totals;
   $("#sub").textContent=`${R.mode} · updated ${new Date(R.generated_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;
-  const budgetPct = R.daily_budget_usd ? R.spent_today_usd / R.daily_budget_usd : 0;
   $("#kpis").innerHTML =
     kpi("Requests", nf(t.requests), `${nf(t.cache_hits)} cache hits`) +
-    kpi("Spend", usd(t.cost_usd), `today ${usd(R.spent_today_usd)} of ${usd(R.daily_budget_usd)}`, budgetPct>.9?"bad":budgetPct>.7?"warn":"") +
-    kpi("Saved vs premium", usd(t.savings_vs_premium_usd), `${t.savings_pct}% lower`, "good") +
+    kpi("Models online", nf(R.models.filter(m=>m.routes.some(r=>r.available)).length), `of ${nf(R.models.length)} in the pool`) +
+    kpi("Compressed", nf(t.compressed_requests), "requests shrunk to fit") +
     kpi("Success rate", pct(t.success_rate), `${nf(t.errors)} failed attempts`, t.success_rate!=null&&t.success_rate<.9?"warn":"") +
     kpi("Avg quality", t.avg_quality==null?"–":t.avg_quality.toFixed(2), "feedback, judge or auto-eval") +
     kpi("Tokens", nf((t.prompt_tokens||0)+(t.completion_tokens||0)), `${nf(t.tokens_saved_by_compression)} saved by compression`);
 
   lineChart($("#ch-daily"), R.daily.map(d=>d.day), [
-    {values:R.daily.map(d=>d.baseline||0), color:"var(--c3)", dash:true},
-    {values:R.daily.map(d=>d.cost||0), color:"var(--c1)", fill:true}]);
+    {values:R.daily.map(d=>d.errors||0), color:"var(--c3)", dash:true},
+    {values:R.daily.map(d=>d.requests||0), color:"var(--c1)", fill:true}]);
   const pc={openai:"var(--c1)",anthropic:"var(--c3)",vertex_ai:"var(--c5)",deepseek:"var(--c2)"};
-  hbars($("#ch-provider"), R.by_provider.map(p=>({label:esc(p.provider), value:p.cost||0, p:p.provider})), usd, r=>pc[r.p]||"var(--c4)");
+  hbars($("#ch-provider"), R.by_provider.map(p=>({label:esc(p.provider), value:p.tokens||0, p:p.provider})), nf, r=>pc[r.p]||"var(--c4)");
   hbars($("#ch-task"), R.by_task.map(r=>({label:`${esc(r.task_type)} <span class="chip ${r.tier_policy}">${r.tier_policy}</span>`, value:r.quality||0})),
         v=>v.toFixed(2), r=>r.value>=.8?"var(--good)":r.value>=.65?"var(--warn)":"var(--bad)");
   hbars($("#ch-errors"), R.errors.map(e=>({label:esc(e.error_type), value:e.n})), nf, ()=>"var(--bad)");
 
-  $("#t-models").innerHTML = `<thead><tr><th>Model</th><th>Via</th><th>Tier</th><th class="r">Attempts</th><th>Success</th><th class="r">Tokens</th><th class="r">Cost</th><th class="r">Avg ms</th></tr></thead><tbody>` +
+  $("#t-models").innerHTML = `<thead><tr><th>Model</th><th>Via</th><th>Tier</th><th class="r">Attempts</th><th>Success</th><th class="r">Tokens</th><th class="r">Avg ms</th></tr></thead><tbody>` +
     (R.by_model.length ? R.by_model.map(m=>{const sr=m.attempts?m.ok/m.attempts:0;return `<tr class="num"><td>${esc(m.alias)}</td><td>${esc(m.via)}</td><td><span class="chip ${m.tier}">${m.tier}</span></td><td class="r">${nf(m.attempts)}</td>
       <td><div class="row" style="flex-wrap:nowrap"><div class="bar" style="flex:1"><span style="width:${sr*100}%;background:${sr>.9?'var(--good)':sr>.7?'var(--warn)':'var(--bad)'}"></span></div>${pct(sr)}</div></td>
-      <td class="r">${nf((m.p_tok||0)+(m.c_tok||0))}</td><td class="r">${usd(m.cost)}</td><td class="r">${nf(m.avg_ms)}</td></tr>`}).join("") : `<tr><td colspan="8" class="empty">No requests yet</td></tr>`) + "</tbody>";
-  $("#t-pool").innerHTML = `<thead><tr><th>Alias</th><th>Provider</th><th>Tier</th><th class="r">$/1M in</th><th class="r">$/1M out</th><th>Routes</th></tr></thead><tbody>` +
-    R.models.map(m=>`<tr class="num"><td>${esc(m.alias)}</td><td>${esc(m.provider)}</td><td><span class="chip ${m.tier}">${m.tier}</span></td><td class="r">${m.price_in_per_m}</td><td class="r">${m.price_out_per_m}</td>
+      <td class="r">${nf((m.p_tok||0)+(m.c_tok||0))}</td><td class="r">${nf(m.avg_ms)}</td></tr>`}).join("") : `<tr><td colspan="7" class="empty">No requests yet</td></tr>`) + "</tbody>";
+  $("#t-pool").innerHTML = `<thead><tr><th>Alias</th><th>Provider</th><th>Tier</th><th class="r">Quality</th><th class="r">Effort</th><th>Routes</th></tr></thead><tbody>` +
+    R.models.map(m=>`<tr class="num"><td>${esc(m.alias)}</td><td>${esc(m.provider)}</td><td><span class="chip ${m.tier}">${m.tier}</span></td><td class="r">${m.quality}</td><td class="r">${m.effort}×</td>
       <td>${m.routes.map(r=>`<span class="chip" title="${esc(r.model)}" style="margin-right:4px">${r.available?"●":"○"} ${esc(r.via)}</span>`).join("")}</td></tr>`).join("") + "</tbody>";
 
   const p=R.policy;
@@ -308,7 +398,7 @@ function renderImps(list, preview){
 async function load(){
   try{
     R = STATIC || await api(`/api/report?days=${$("#days").value}`);
-    render();
+    render(); fillModels();
   }catch(e){ $("#sub").textContent="Offline"; toast("Could not load report: "+e.message) }
 }
 
@@ -316,8 +406,7 @@ async function load(){
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
   document.querySelectorAll("section.view").forEach(v=>v.classList.toggle("active", v.id==="v-"+b.dataset.v));
-  const f=$("#doom-frame");  // lazy-load the game; unload it when leaving the tab to save battery
-  if(b.dataset.v==="doom"){ if(!f.src) f.src=f.dataset.src } else if(f.src){ f.removeAttribute("src") }
+  syncGames(b.dataset.v==="games");
   window.scrollTo({top:0});
 }));
 $("#days").addEventListener("change", load);
@@ -349,23 +438,113 @@ $("#btn-repos").addEventListener("click",async()=>{
   catch(e){toast(e.message)} finally{b.textContent="Sync now"; loadRepos()}
 });
 loadRepos();
-$("#send").addEventListener("click",async()=>{
-  const prompt=$("#prompt").value.trim(); if(!prompt){toast("Type a prompt first");return}
-  const b=$("#send"); b.disabled=true; b.textContent="Routing…";
+/* ---------- games: Solitaire and Doom share one tab ---------- */
+let game=localStorage.getItem("mcubed.game")||"solitaire";
+function syncGames(visible){
+  document.querySelectorAll(".seg [data-g]").forEach(x=>x.setAttribute("aria-selected",String(x.dataset.g===game)));
+  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-doom").hidden=game!=="doom";
+  const sf=$("#sol-frame"), df=$("#doom-frame");
+  if(visible&&game==="solitaire"&&!sf.src) sf.src=sf.dataset.src;          // Solitaire stays loaded and keeps its state
+  if(visible&&game==="doom"){ if(!df.src) df.src=df.dataset.src } else if(df.src) df.removeAttribute("src");  // Doom unloads to save battery
+}
+document.querySelectorAll(".seg [data-g]").forEach(x=>x.addEventListener("click",()=>{game=x.dataset.g;localStorage.setItem("mcubed.game",game);syncGames(true)}));
+syncGames(false);
+
+/* ---------- web browser (reader mode + full page) ---------- */
+let page=null, webHist=[], recent=[]; try{recent=JSON.parse(localStorage.getItem("mcubed.web")||"[]")}catch(e){}
+function renderRecent(){ $("#web-recent").innerHTML=recent.slice(0,6).map(r=>`<button class="chip-btn" data-u="${esc(r.url)}">${esc(r.title.slice(0,60))}</button>`).join("");
+  $("#web-recent").querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>openWeb(b.dataset.u)) }
+async function openWeb(u,push=true){
+  u=(u||"").trim(); if(!u) return;
+  if(STATIC){ toast("Run python gateway.py gui to browse"); return }
+  const box=$("#web-reader"); box.innerHTML='<div class="skel"></div><div class="skel" style="margin-top:8px"></div>';
+  try{
+    const r=await api("/api/fetch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});
+    if(push&&page) webHist.push(page.url); page=r; $("#web-url").value=r.url; $("#web-back").disabled=!webHist.length;
+    $("#web-actions").hidden=false; $("#web-open").href=r.url;
+    const paras=r.text.split(/\n{2,}|\n/).filter(x=>x.trim()).slice(0,400).map(x=>x.startsWith("## ")?`<h3>${esc(x.slice(3))}</h3>`:`<p>${esc(x.replace(/^- /,"• "))}</p>`).join("");
+    box.innerHTML=`<h1>${esc(r.title)}</h1><div class="src">${esc(r.url)}</div>${paras||'<p class="empty">This page has no readable text. Try Open page.</p>'}`+
+      (r.links.length?`<h3>Links</h3><ul class="links">${r.links.slice(0,80).map((l,i)=>`<li><button data-i="${i}">${esc(l.text)}</button><small>${esc(l.url)}</small></li>`).join("")}</ul>`:"");
+    box.querySelectorAll(".links [data-i]").forEach(b=>b.onclick=()=>openWeb(r.links[+b.dataset.i].url));
+    recent=[{url:r.url,title:r.title},...recent.filter(x=>x.url!==r.url)].slice(0,12); localStorage.setItem("mcubed.web",JSON.stringify(recent));
+    window.scrollTo({top:0});
+  }catch(e){ box.innerHTML=`<p class="empty">${esc(e.message)}</p>` }
+}
+$("#web-form").addEventListener("submit",e=>{e.preventDefault(); openWeb($("#web-url").value)});
+$("#web-back").addEventListener("click",()=>{ const u=webHist.pop(); if(u) openWeb(u,false); $("#web-back").disabled=!webHist.length });
+$("#web-ask").addEventListener("click",()=>{ if(!page) return;
+  convo.push({role:"user",page:true,title:page.title,content:`Here is a web page for context.\nTitle: ${page.title}\nURL: ${page.url}\n\n${page.text.slice(0,24000)}`});
+  saveConvo(); document.querySelector('nav.tabs button[data-v="playground"]').click(); renderChat();
+  $("#prompt").value="Summarize this page and list the key points"; growPrompt(); $("#prompt").focus(); toast("Page attached to the chat") });
+renderRecent();
+
+/* ---------- main chat (OpenAI-style) ---------- */
+let convo=[]; try{convo=JSON.parse(localStorage.getItem("mcubed.chat")||"[]")}catch(e){convo=[]}
+const saveConvo=()=>{try{localStorage.setItem("mcubed.chat",JSON.stringify(convo.slice(-80)))}catch(e){}};
+function md(t){  // tiny safe markdown: code blocks, inline code, bold, paragraphs
+  const parts=String(t).split(/```/); let h="";
+  parts.forEach((p,i)=>{ if(i%2){ const nl=p.indexOf("\n"); h+=`<pre><code>${esc(nl>=0&&nl<20?p.slice(nl+1):p)}</code></pre>` }
+    else h+=p.split(/\n{2,}/).filter(x=>x.trim()).map(x=>"<p>"+esc(x).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>")+"</p>").join("") });
+  return h||"<p></p>";
+}
+function msgEl(m,i){
+  const d=document.createElement("div");
+  if(m.page){ d.className="msg page"; d.textContent="Page attached: "+m.title; return d }
+  if(m.role==="user"){ d.className="msg user"; d.textContent=m.content; return d }
+  d.className="msg bot"+(m.error?" err":"");
+  d.innerHTML=m.error?esc(m.content):md(m.content);
+  if(m.meta){ const f=document.createElement("div"); f.className="mfoot num";
+    f.innerHTML=`<span>${esc(m.meta.model_alias)} · ${esc(m.meta.via)} · ${nf(m.meta.latency_ms)} ms${m.meta.cached?" · cached":""}</span>
+      <button data-r="1" class="${m.rated===1?"on":""}" aria-label="Good answer">Good</button><button data-r="0" class="${m.rated===0?"on":""}" aria-label="Bad answer">Bad</button>
+      <button data-copy-msg aria-label="Copy answer">Copy</button>`;
+    f.querySelectorAll("[data-r]").forEach(b=>b.onclick=async()=>{ try{ await api("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:m.meta.request_id,score:+b.dataset.r})});
+      m.rated=+b.dataset.r; saveConvo(); renderChat(); toast("Thanks, the router learned from that") }catch(e){toast(e.message)} });
+    f.querySelector("[data-copy-msg]").onclick=()=>navigator.clipboard?.writeText(m.content).then(()=>toast("Copied"),()=>toast("Copy failed"));
+    d.appendChild(f) }
+  return d;
+}
+function renderChat(pending){
+  const box=$("#msgs"); box.querySelectorAll(".msg").forEach(e=>e.remove());
+  $("#chat-empty").hidden=convo.length>0||!!pending;
+  convo.forEach((m,i)=>box.appendChild(msgEl(m,i)));
+  if(pending){ const t=document.createElement("div"); t.className="msg bot typing"; t.setAttribute("aria-label","MCUBED is thinking"); t.innerHTML="<span></span><span></span><span></span>"; box.appendChild(t) }
+  const last=box.lastElementChild; if(last&&convo.length) last.scrollIntoView({block:"end",behavior:pending?"smooth":"auto"});
+}
+let sending=false;
+async function sendChat(text){
+  text=(text||"").trim(); if(!text||sending) return;
+  if(STATIC){ toast("Run python gateway.py gui to chat"); return }
+  sending=true; $("#send").disabled=true; $("#prompt").value=""; growPrompt();
+  convo.push({role:"user",content:text}); saveConvo(); renderChat(true);
+  const sel=$("#model").value, strat={mcubed:"balanced","mcubed-efficient":"efficient","mcubed-quality":"quality"}[sel];
   try{
     const r=await api("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({prompt,strategy:$("#strategy").value,tier:$("#tier").value||null})});
-    lastReq=r.request_id; $("#answer").hidden=false; $("#out").textContent=r.text;
-    const m=[["Model",r.model_alias],["Via",r.via],["Task",r.task_type],["Tier",r.tier_policy],["Tokens",`${r.prompt_tokens}+${r.completion_tokens}`],
-      ["Cost",usd(r.cost_usd)],["Saved",usd(r.savings_usd)],["Latency",`${r.latency_ms} ms`],["Attempts",r.attempts],["Cached",r.cached?"yes":"no"],
-      ["Compressed",r.compression?`${r.compression.original_tokens}→${r.compression.compressed_tokens}`:"no"],["Explore",r.exploratory?"yes":"no"]];
-    $("#meta").innerHTML=m.map(([k,v])=>`<div><span>${k}</span><br>${esc(v)}</div>`).join("");
-  }catch(e){toast(e.message)} finally{b.disabled=false;b.textContent="Send"}
-});
-document.querySelectorAll("[data-score]").forEach(b=>b.addEventListener("click",async()=>{
-  if(!lastReq)return;
-  try{await api("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:lastReq,score:+b.dataset.score})});toast("Thanks, the router learned from that")}catch(e){toast(e.message)}
-}));
+      body:JSON.stringify({messages:convo.filter(m=>!m.error).map(m=>({role:m.role,content:m.content})),strategy:strat||null,model:strat?null:sel})});
+    lastReq=r.request_id; convo.push({role:"assistant",content:r.text,meta:r});
+  }catch(e){ convo.push({role:"assistant",content:"Could not get an answer: "+e.message+". Add a key in AI keys (or .env), or pick another model.",error:true}) }
+  finally{ sending=false; $("#send").disabled=false; saveConvo(); renderChat(); $("#prompt").focus() }
+}
+function growPrompt(){const t=$("#prompt"); t.style.height="auto"; t.style.height=Math.min(180,t.scrollHeight)+"px"}
+$("#prompt").addEventListener("input",growPrompt);
+$("#prompt").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); sendChat($("#prompt").value) } });
+$("#composer").addEventListener("submit",e=>{ e.preventDefault(); sendChat($("#prompt").value) });
+document.querySelectorAll(".chip-btn").forEach(b=>b.addEventListener("click",()=>sendChat(b.textContent)));
+$("#btn-newchat").addEventListener("click",()=>{ convo=[]; saveConvo(); renderChat(); $("#prompt").focus() });
+$("#model").value=localStorage.getItem("mcubed.model")||"mcubed";
+$("#model").addEventListener("change",()=>localStorage.setItem("mcubed.model",$("#model").value));
+function fillModels(){  // add every pool model that has a working key
+  if(!R||!R.models) return; const sel=$("#model"), cur=localStorage.getItem("mcubed.model")||sel.value;
+  sel.querySelectorAll("optgroup").forEach(g=>g.remove());
+  const g=document.createElement("optgroup"); g.label="Specific model";
+  R.models.filter(m=>m.routes.some(r=>r.available)).forEach(m=>{const o=document.createElement("option"); o.value=m.alias; o.textContent=`${m.alias} (${m.tier})`; g.appendChild(o)});
+  if(g.children.length) sel.appendChild(g);
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:"mcubed";
+}
+$("#btn-api").addEventListener("click",()=>{ const box=$("#api-info"); box.hidden=!box.hidden; $("#btn-api").setAttribute("aria-expanded",String(!box.hidden));
+  const base=location.origin+"/v1"; $("#api-base").textContent=base;
+  $("#api-snippet").textContent=`from openai import OpenAI\nclient = OpenAI(base_url="${base}", api_key="YOUR_GATEWAY_TOKEN")\nr = client.chat.completions.create(model="mcubed",\n    messages=[{"role": "user", "content": "Hello"}])\nprint(r.choices[0].message.content)\n\ncurl ${base}/chat/completions -H "Authorization: Bearer YOUR_GATEWAY_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"mcubed","messages":[{"role":"user","content":"Hello"}]}'`; });
+document.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",()=>navigator.clipboard?.writeText($("#"+b.dataset.copy).textContent).then(()=>toast("Copied"),()=>toast("Copy failed"))));
+renderChat();
 
 if(STATIC){
   $("#static-banner").hidden=false;

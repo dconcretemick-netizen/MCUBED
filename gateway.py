@@ -13,12 +13,11 @@ Features
                                  OpenRouter), retries with backoff for transient
                                  errors, circuit breakers, quarantine.
 * Token usage tracking         - every attempt is written to a SQLite ledger
-                                 (tokens, cost, latency, status, errors).
-* Cost optimization            - per-request cost estimation, per-request and
-                                 daily budgets, task-aware tier selection,
-                                 response cache, savings-vs-premium reporting.
+                                 (tokens, latency, status, errors).
+* Efficiency                   - task-aware tier selection (lighter models for
+                                 simple work), response cache, compression.
 * Balanced self-learning       - Thompson-sampling router that learns each
-                                 model's quality, reliability, latency and cost
+                                 model's quality, reliability, latency and effort
                                  per task type, balancing exploitation with a
                                  controlled amount of exploration.
 * Automated process improvement- an optimizer that periodically reviews the
@@ -29,7 +28,7 @@ Features
 
 Usage
 -----
-    python gateway.py chat "Explain CAP theorem" [--strategy balanced|cost|quality]
+    python gateway.py chat "Explain CAP theorem" [--strategy balanced|efficient|quality]
     python gateway.py feedback <request_id> 0.9
     python gateway.py improve [--dry-run]
     python gateway.py report [--days 7]
@@ -90,7 +89,7 @@ if LITE:
               "InternalServerError", "AuthenticationError", "NotFoundError", "ContextWindowExceededError",
               "ContentPolicyViolationError", "BadRequestError", "PermissionDeniedError"]
     litellm = types.SimpleNamespace(**{n: type(n, (_LLMError,), {}) for n in _names})  # type: ignore
-    litellm.model_cost = {}
+    litellm.model_cost = {}  # context-window lookups only
 
     class _Obj(dict):
         __getattr__ = dict.get
@@ -152,10 +151,7 @@ if LITE:
             raise litellm.APIConnectionError(str(e), provider, model) from None
         if "error" in data:
             raise litellm.ServiceUnavailableError(str(data["error"])[:500], provider, model)
-        resp = _wrap(data)
-        cost = (data.get("usage") or {}).get("cost")
-        resp["_hidden_params"] = {"response_cost": cost} if cost else {}
-        return resp
+        return _wrap(data)
 
     litellm.ModelResponse = _model_response
     litellm.token_counter = _token_counter
@@ -163,6 +159,7 @@ if LITE:
 
 TIERS = ["economy", "standard", "premium"]
 TIER_RANK = {t: i for i, t in enumerate(TIERS)}
+TIER_EFFORT = {"economy": 1.0, "standard": 3.0, "premium": 8.0}  # relative compute weight, not money
 TASK_TYPES = ["simple", "extraction", "summarization", "creative", "code", "reasoning"]
 
 PROVIDER_ENV = {
@@ -198,10 +195,6 @@ class GatewayError(Exception):
     pass
 
 
-class BudgetExceeded(GatewayError):
-    pass
-
-
 class AllRoutesFailed(GatewayError):
     def __init__(self, attempts: list[dict]):
         self.attempts = attempts
@@ -213,8 +206,6 @@ class AllRoutesFailed(GatewayError):
 class Route:
     model: str  # LiteLLM model id
     via: str  # "direct" | "openrouter"
-    price_in: float  # USD per token
-    price_out: float  # USD per token
     max_input_tokens: int
 
     @property
@@ -230,9 +221,10 @@ class ModelSpec:
     quality: int
     routes: list[Route]
 
-    def price(self) -> tuple[float, float]:
-        r = self.routes[0]
-        return r.price_in, r.price_out
+    @property
+    def effort(self) -> float:
+        """Relative compute weight per token (unitless): lighter tiers do the same work with less."""
+        return TIER_EFFORT[self.tier]
 
 
 @dataclass
@@ -246,8 +238,6 @@ class GatewayResponse:
     tier_policy: str
     prompt_tokens: int
     completion_tokens: int
-    cost_usd: float
-    baseline_cost_usd: float
     latency_ms: int
     attempts: int
     cached: bool = False
@@ -257,45 +247,28 @@ class GatewayResponse:
     compression: Optional[dict] = None
     raw: Any = field(default=None, repr=False)
 
-    @property
-    def savings_usd(self) -> float:
-        return max(0.0, self.baseline_cost_usd - self.cost_usd)
-
     def summary(self) -> dict:
-        d = {k: v for k, v in self.__dict__.items() if k not in ("raw", "text")}
-        d["savings_usd"] = round(self.savings_usd, 6)
-        return d
+        return {k: v for k, v in self.__dict__.items() if k not in ("raw", "text")}
 
 
 # --------------------------------------------------------------------------- #
-# Pricing helpers
+# Route helpers
 # --------------------------------------------------------------------------- #
-def _lookup_price(model: str) -> Optional[dict]:
-    """Find a model in LiteLLM's price map (tries with and without provider prefix)."""
-    candidates = [model]
-    if "/" in model:
-        candidates.append(model.split("/", 1)[1])
-    for key in candidates:
-        info = litellm.model_cost.get(key)
-        if info and info.get("input_cost_per_token") is not None:
-            return info
+def _context_window(model: str) -> Optional[int]:
+    """Max input tokens from LiteLLM's model map (tries with and without provider prefix)."""
+    table = getattr(litellm, "model_cost", {}) or {}
+    for key in (model, model.split("/", 1)[-1]):
+        info = table.get(key) or {}
+        if info.get("max_input_tokens"):
+            return int(info["max_input_tokens"])
     return None
 
 
 def build_route(cfg: dict) -> Route:
-    info = _lookup_price(cfg["model"]) or {}
-    p_in = info.get("input_cost_per_token")
-    p_out = info.get("output_cost_per_token")
-    if p_in is None:
-        p_in = cfg.get("price_in", 0.0) / 1e6
-    if p_out is None:
-        p_out = cfg.get("price_out", 0.0) / 1e6
     return Route(
         model=cfg["model"],
         via=cfg.get("via", "direct"),
-        price_in=float(p_in),
-        price_out=float(p_out),
-        max_input_tokens=int(cfg.get("max_input_tokens") or info.get("max_input_tokens") or 128_000),
+        max_input_tokens=int(cfg.get("max_input_tokens") or _context_window(cfg["model"]) or 128_000),
     )
 
 
@@ -416,7 +389,6 @@ class Store:
         self.conn.commit()
         self._policy_cache: dict[str, Any] = {}
         self._policy_ts = 0.0
-        self._spent: tuple[str, float, float] = ("", 0.0, 0.0)  # (day, value, fetched_at)
 
     # -- self data compression (storage) ------------------------------------ #
     def size_mb(self) -> float:
@@ -500,18 +472,6 @@ class Store:
         row.setdefault("day", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
         cols = ",".join(row)
         self.execute(f"INSERT INTO attempts ({cols}) VALUES ({','.join('?' * len(row))})", tuple(row.values()))
-        day, val, at = self._spent
-        if day == row["day"]:
-            self._spent = (day, val + float(row.get("cost_usd") or 0), at)
-
-    def spent_today(self) -> float:
-        day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        cday, val, at = self._spent
-        if cday == day and time.time() - at < 2.0:  # local increments keep it exact in-process
-            return val
-        r = self.query("SELECT COALESCE(SUM(cost_usd),0) s FROM usage_all WHERE day=?", (day,))
-        self._spent = (day, float(r[0]["s"]), time.time())
-        return self._spent[1]
 
     def get_policy(self, key: str, default: Any = None) -> Any:
         # cached for 3s: policy changes rarely, and other processes (GUI/CLI) pick changes up quickly
@@ -556,7 +516,7 @@ class Learner:
       reliability ~ Beta(1 + ok, 1 + fail)
       latency, output tokens -> recency-windowed means
     The 'balanced' strategy draws Thompson samples and maximises
-      utility = w_q * quality * reliability - w_c * cost_norm - w_l * latency_norm
+      utility = w_q * quality * reliability - w_e * effort_norm - w_l * latency_norm
     which naturally balances exploitation and exploration; an extra
     explore_rate lets the router probe one tier below the current policy so the
     optimizer has evidence for safe downgrades.
@@ -622,13 +582,14 @@ class Learner:
         prior = spec.quality / 10.0
         return (prior * k + s.q_sum) / (k + s.n)
 
-    def sample_utility(self, spec: ModelSpec, task_type: str, est_cost: float,
-                       max_cost: float, max_latency: float, target_quality: float = 0.72) -> float:
+    def sample_utility(self, spec: ModelSpec, task_type: str, est_effort: float,
+                       max_effort: float, max_latency: float, target_quality: float = 0.72) -> float:
         """
-        Value-based utility in dollars:
-            value_usd * w_q * q_eff * reliability  -  est_cost  -  latency penalty
+        Unitless utility:
+            w_q * q_eff * reliability  -  w_e * effort_norm  -  w_l * latency_norm
+        effort is tokens x tier weight (lighter tiers do the same work with less compute).
         q_eff counts quality fully up to the 'good enough' target and at 25% above it,
-        so the router pays for quality where it matters and saves money where it does not.
+        so the router uses heavy models where quality matters and light ones where it does not.
         q and reliability are Thompson samples, so uncertain models still get explored.
         """
         s = self.stats(spec.alias, task_type)
@@ -639,12 +600,12 @@ class Learner:
         q = self.rng.betavariate(a, b)
         rel = self.rng.betavariate(1 + s.ok + 3, 1 + s.fail)  # optimistic prior
         w = self.cfg.get("weights", {})
-        value = float(self.cfg.get("quality_value_usd", 0.02))
         q_eff = min(q, target_quality) + 0.25 * max(0.0, q - target_quality)
         lat_norm = (s.latency_ms / max_latency) if max_latency > 0 and s.latency_ms else 0.3
-        return (value * w.get("quality", 1.0) * q_eff * rel
-                - w.get("cost", 1.0) * est_cost
-                - value * w.get("latency", 0.15) * lat_norm)
+        eff_norm = est_effort / max_effort if max_effort > 0 else 0.0
+        return (w.get("quality", 1.0) * q_eff * rel
+                - w.get("effort", 0.35) * eff_norm
+                - w.get("latency", 0.15) * lat_norm)
 
 
 # --------------------------------------------------------------------------- #
@@ -653,8 +614,8 @@ class Learner:
 class Compressor:
     """
     Shrinks a conversation only when needed: when it would overflow every
-    eligible model's context window, exceed the per-request cost cap, or pass
-    the learned trigger threshold. Stages run cheapest-first and stop as soon
+    eligible model's context window or pass
+    the learned trigger threshold. Stages run lightest-first and stop as soon
     as the target is met:
 
       1. normalize  - collapse whitespace, blank-line runs, duplicate lines
@@ -707,7 +668,7 @@ class Compressor:
                                                "decisions, names, numbers, code identifiers and open questions. "
                                                "Be terse."},
                  {"role": "user", "content": transcript}],
-                tier="economy", strategy="cost", use_cache=False, task_type="summarization",
+                tier="economy", strategy="efficient", use_cache=False, task_type="summarization",
                 _allow_compress=False, max_tokens=int(self.cfg.get("summary_max_tokens", 800)))
             return r.text
         except Exception as e:  # noqa: BLE001
@@ -734,7 +695,7 @@ class Compressor:
                 older, recent = convo[:-keep], convo[-keep:]
                 summary = self._summarize(older)
                 note = (f"Summary of {len(older)} earlier messages:\n{summary}" if summary
-                        else f"[{len(older)} earlier messages omitted by gateway to fit context/budget]")
+                        else f"[{len(older)} earlier messages omitted by gateway to fit context]")
                 msgs = system + [{"role": "system", "content": note}] + recent
                 stages.append("summarize" if summary else "drop_older")
 
@@ -743,12 +704,12 @@ class Compressor:
             idx = max(range(len(msgs)), key=lambda i: len(str(msgs[i].get("content", ""))))
             content = str(msgs[idx].get("content", ""))
             others = self.tokens(msgs) - len(content) // 4
-            budget_chars = max(4000, (target_tokens - others) * 4)
-            if len(content) > budget_chars:
+            char_limit = max(4000, (target_tokens - others) * 4)
+            if len(content) > char_limit:
                 chunk_chars = int(self.cfg.get("map_chunk_tokens", 60_000)) * 4
                 chunks = [content[i:i + chunk_chars] for i in range(0, len(content), chunk_chars)]
                 max_chunks = int(self.cfg.get("map_max_chunks", 24))
-                if len(chunks) > max_chunks:  # sample evenly so cost stays bounded
+                if len(chunks) > max_chunks:  # sample evenly so work stays bounded
                     step = len(chunks) / max_chunks
                     chunks = [chunks[int(i * step)] for i in range(max_chunks)]
                 parts = []
@@ -822,12 +783,12 @@ class Optimizer:
     and roll them back automatically if quality dropped.
 
     Rules (all require min_samples of evidence and move one step at a time):
-      1. tier_policy      lower a task's tier when the cheaper tier meets the
+      1. tier_policy      lower a task's tier when the lighter tier meets the
                           quality target; raise it when the current tier misses.
       2. route_order      put OpenRouter first for a model when it is clearly
                           more reliable than the direct provider.
       3. output_tokens    calibrate expected output tokens per task (p75) so
-                          cost estimates and budget checks are accurate.
+                          token estimates and compression checks are accurate.
       4. retries          cut per-route retries when retries rarely succeed.
       5. quarantine       temporarily pull models whose reliability collapsed.
       6. rollback         revert active changes whose follow-up quality fell.
@@ -840,7 +801,8 @@ class Optimizer:
 
     # -- metrics helpers ---------------------------------------------------- #
     def _task_metrics(self, task_type: str, since: float = 0.0, tier: Optional[str] = None) -> tuple[float, float, int]:
-        sql = """SELECT COALESCE(f.score, a.auto_quality) q, a.cost_usd c FROM attempts a
+        """(avg quality, avg tokens per response, n)"""
+        sql = """SELECT COALESCE(f.score, a.auto_quality) q, a.prompt_tokens + a.completion_tokens c FROM attempts a
                  LEFT JOIN feedback f ON f.request_id=a.request_id
                  WHERE a.status='ok' AND a.cached=0 AND a.task_type=? AND a.ts>=?"""
         params: list = [task_type, since]
@@ -894,7 +856,7 @@ class Optimizer:
                 if n_low >= min_n and q_low >= target and (n_cur == 0 or q_low >= q_cur - 0.05):
                     new = dict(policy, **{task: lower})
                     reason = (f"{lower} tier quality {q_low:.2f} (n={n_low}) meets target {target}; "
-                              f"avg cost {c_low:.5f} vs {c_cur:.5f}")
+                              f"avg tokens {c_low:.0f} vs {c_cur:.0f}")
                     self._record("tier_policy", task, cur, lower, reason, task, apply, changes)
                     if apply:
                         self.store.set_policy("task_policy", new)
@@ -977,7 +939,7 @@ class Optimizer:
                 why = f"compressed quality {q_c:.2f} < uncompressed {q_u:.2f} (n={n_c}); compress less"
             elif q_c >= q_u - 0.03:
                 new_t, new_k = max(8_000, int(trig * 0.85)), keep
-                why = f"compressed quality {q_c:.2f} ~ uncompressed {q_u:.2f} (n={n_c}); compress earlier to save cost"
+                why = f"compressed quality {q_c:.2f} ~ uncompressed {q_u:.2f} (n={n_c}); compress earlier to save tokens"
             else:
                 new_t, new_k = trig, keep
                 why = ""
@@ -1028,7 +990,7 @@ class Optimizer:
                 self.store.execute("UPDATE improvements SET status='kept' WHERE id=?", (imp["id"],))
                 changes.append({"kind": "confirm", "target": task, "old": None, "new": None,
                                 "reason": f"kept: quality {q_after:.2f} vs baseline {imp['baseline_quality']:.2f}, "
-                                          f"cost {c_after:.5f} vs {imp['baseline_cost']:.5f}"})
+                                          f"tokens {c_after:.0f} vs {imp['baseline_cost']:.0f}"})
 
 
 # --------------------------------------------------------------------------- #
@@ -1046,12 +1008,6 @@ class Gateway:
                 alias=m["alias"], provider=m["provider"], tier=m["tier"], quality=int(m.get("quality", 5)),
                 routes=[build_route(r) for r in m["routes"]],
             )
-            # routes with unknown prices inherit from a priced sibling (same model, other transport)
-            spec = self.models[m["alias"]]
-            priced = [r for r in spec.routes if r.price_in or r.price_out]
-            for r in spec.routes:
-                if not (r.price_in or r.price_out) and priced:
-                    r.price_in, r.price_out = priced[0].price_in, priced[0].price_out
         self.mock = bool(int(os.getenv("GATEWAY_MOCK", "0"))) if mock is None else mock
         self.mock_fail: set[str] = set(filter(None, os.getenv("GATEWAY_MOCK_FAIL", "").split(",")))
         self.mock_hook = None  # optional callable(route, messages) -> (text, finish_reason) for simulations
@@ -1063,7 +1019,6 @@ class Gateway:
         self.optimizer = Optimizer(self)
         self.compressor = Compressor(self)
         self._cache: dict[str, tuple[float, GatewayResponse]] = {}
-        self._baseline_spec = max(self.models.values(), key=lambda s: s.price()[0] + s.price()[1])
 
     # -- policy accessors (learned values override config) ------------------ #
     def task_policy(self) -> dict:
@@ -1081,7 +1036,7 @@ class Gateway:
         return int(self.store.get_policy("compression_keep_turns",
                                          self.defaults.get("compression", {}).get("keep_last_turns", 6)))
 
-    def _compression_target(self, p_tok: int, task_type: str, tier: Optional[str], max_cost: float,
+    def _compression_target(self, p_tok: int, task_type: str, tier: Optional[str],
                             models: Optional[list[str]]) -> Optional[int]:
         """Return a token target if compression is needed for this request, else None."""
         if not self.defaults.get("compression", {}).get("enabled", True):
@@ -1099,9 +1054,6 @@ class Gateway:
         max_ctx = max(r.max_input_tokens for _, r in routes)
         if p_tok + out_tok > max_ctx * 0.95:
             targets.append(int(max_ctx * 0.9) - out_tok)
-        cheapest = min(routes, key=lambda sr: sr[1].price_in)[1]
-        if self._cost(cheapest, p_tok, out_tok) > max_cost and cheapest.price_in > 0:
-            targets.append(int((max_cost - out_tok * cheapest.price_out) / cheapest.price_in * 0.95))
         targets = [t for t in targets if t > 0]
         return min(targets) if targets else None
 
@@ -1121,7 +1073,7 @@ class Gateway:
         first = self.store.get_policy("route_order", {}).get(spec.alias, "direct")
         return sorted(spec.routes, key=lambda r: 0 if r.via == first else 1)
 
-    # -- cost estimation ---------------------------------------------------- #
+    # -- token / effort estimation ---------------------------------------------------- #
     @staticmethod
     def _count_tokens(messages: list[dict]) -> int:
         try:
@@ -1130,12 +1082,13 @@ class Gateway:
             return sum(len(str(m.get("content", ""))) for m in messages) // 4 + 4 * len(messages)
 
     @staticmethod
-    def _cost(route: Route, p_tok: int, c_tok: int) -> float:
-        return p_tok * route.price_in + c_tok * route.price_out
+    def _effort(spec: ModelSpec, p_tok: int, c_tok: int) -> float:
+        """Unitless compute effort: tokens weighted by model tier."""
+        return (p_tok + c_tok) * spec.effort
 
     # -- candidate selection ------------------------------------------------ #
     def plan(self, messages: list[dict], strategy: str, task_type: str, tier: Optional[str],
-             max_cost: float, models: Optional[list[str]] = None) -> tuple[list[tuple[ModelSpec, Route, bool]], str, int, int]:
+             models: Optional[list[str]] = None) -> tuple[list[tuple[ModelSpec, Route, bool]], str, int, int]:
         p_tok = self._count_tokens(messages)
         out_tok = self.expected_output_tokens(task_type)
         policy_tier = tier or self.task_policy().get(task_type, "standard")
@@ -1159,25 +1112,23 @@ class Gateway:
             routes = [r for r in spec.routes if self._route_available(spec, r) and p_tok < r.max_input_tokens]
             if not routes:
                 continue
-            est = min(self._cost(r, p_tok, out_tok) for r in routes)
-            if est > max_cost:
-                continue
+            est = self._effort(spec, p_tok, out_tok)
             pool.append((spec, est, exploratory))
 
         if not pool:
             raise GatewayError(
-                f"No eligible models (tier>={policy_tier}, est. cost<={max_cost}). "
-                "Check API keys, budgets, or pass --tier / --max-cost.")
+                f"No eligible models (tier>={policy_tier}). "
+                "Check API keys in the AI keys menu or .env, or pass --tier / --models.")
 
-        if strategy == "cost":
+        if strategy in ("efficient", "cost"):  # "cost" kept as a legacy alias
             pool.sort(key=lambda x: (x[1], -self.learner.expected_quality(x[0], task_type)))
         elif strategy == "quality":
             pool.sort(key=lambda x: (-self.learner.expected_quality(x[0], task_type), x[1]))
-        else:  # balanced: Thompson sampling over learned quality, reliability, cost, latency
-            max_c = max(e for _, e, _ in pool) or 1e-9
+        else:  # balanced: Thompson sampling over learned quality, reliability, effort, latency
+            max_e = max(e for _, e, _ in pool) or 1e-9
             max_l = max((self.learner.stats(s.alias, task_type).latency_ms for s, _, _ in pool), default=0) or 1.0
             tq = float(self.defaults.get("improvement", {}).get("target_quality", 0.72))
-            scored = [(self.learner.sample_utility(s, task_type, e, max_c, max_l, tq), s, e, x) for s, e, x in pool]
+            scored = [(self.learner.sample_utility(s, task_type, e, max_e, max_l, tq), s, e, x) for s, e, x in pool]
             scored.sort(key=lambda t: -t[0])
             # an exploratory probe goes first so it actually gets traffic
             if explore_down:
@@ -1215,17 +1166,16 @@ class Gateway:
 
     # -- public API --------------------------------------------------------- #
     def chat(self, messages: list[dict] | str, *, strategy: Optional[str] = None, tier: Optional[str] = None,
-             models: Optional[list[str]] = None, max_cost: Optional[float] = None,
+             models: Optional[list[str]] = None,
              use_cache: bool = True, task_type: Optional[str] = None, _allow_compress: bool = True,
              **completion_kwargs) -> GatewayResponse:
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
         strategy = strategy or self.defaults.get("strategy", "balanced")
         task_type = task_type or classify_task(messages)
-        max_cost = float(max_cost if max_cost is not None else self.defaults.get("max_cost_per_request_usd", 0.5))
         wants_json = (completion_kwargs.get("response_format") or {}).get("type") == "json_object"
 
-        # cache (cost optimization: identical prompts are free)
+        # cache: identical prompts are answered instantly
         key = hashlib.sha256(json.dumps([messages, tier, models, completion_kwargs], sort_keys=True,
                                         default=str).encode()).hexdigest()
         ttl = float(self.defaults.get("cache_ttl_s", 900))
@@ -1234,21 +1184,13 @@ class Gateway:
             rid = uuid.uuid4().hex[:12]
             self.store.log_attempt(request_id=rid, alias=cached.model_alias, provider=self.models[cached.model_alias].provider,
                                    tier=self.models[cached.model_alias].tier, model=cached.model, via=cached.via,
-                                   task_type=task_type, status="ok", cached=1, baseline_cost_usd=cached.baseline_cost_usd)
-            return GatewayResponse(**{**cached.__dict__, "request_id": rid, "cost_usd": 0.0, "cached": True, "latency_ms": 0})
+                                   task_type=task_type, status="ok", cached=1)
+            return GatewayResponse(**{**cached.__dict__, "request_id": rid, "cached": True, "latency_ms": 0})
 
-        # budget
-        daily = float(self.defaults.get("daily_budget_usd", 10.0))
-        remaining = daily - self.store.spent_today()
-        if remaining <= 0:
-            raise BudgetExceeded(f"Daily budget ${daily:.2f} exhausted")
-        requested_cap = max_cost
-        max_cost = min(max_cost, remaining)
-
-        # self data compression: only when the request would not fit context/budget/trigger
+        # self data compression: only when the request would not fit context/trigger
         comp_info: Optional[dict] = None
         if _allow_compress:
-            target = self._compression_target(self._count_tokens(messages), task_type, tier, max_cost, models)
+            target = self._compression_target(self._count_tokens(messages), task_type, tier, models)
             if target:
                 messages, comp_info = self.compressor.compress(messages, target)
                 log.info("compressed request %s -> %s tokens (%s)", comp_info["original_tokens"],
@@ -1256,24 +1198,22 @@ class Gateway:
         orig_tok = comp_info["original_tokens"] if comp_info else 0
 
         try:
-            chain, policy_tier, p_est, out_est = self.plan(messages, strategy, task_type, tier, max_cost, models)
+            chain, policy_tier, p_est, out_est = self.plan(messages, strategy, task_type, tier, models)
         except GatewayError:
-            # budget-aware degradation: step down tiers rather than fail, unless a tier was forced
+            # availability-aware degradation: step down tiers rather than fail, unless a tier was forced
             chain = None
             if tier is None:
                 start = TIER_RANK[self.task_policy().get(task_type, "standard")]
                 for lower in reversed(TIERS[:start]):
                     try:
                         chain, policy_tier, p_est, out_est = self.plan(messages, strategy, task_type, lower,
-                                                                       max_cost, models)
-                        log.info("degraded %s request to %s tier to fit cost cap $%.4f", task_type, lower, max_cost)
+                                                                       models)
+                        log.info("degraded %s request to %s tier (no %s model available)", task_type, lower,
+                                 policy_tier if tier else "higher-tier")
                         break
                     except GatewayError:
                         continue
             if chain is None:
-                if remaining < requested_cap:
-                    raise BudgetExceeded(f"Only ${remaining:.4f} left of the ${daily:.2f} daily budget; "
-                                         "no model fits this request") from None
                 raise
         rid = uuid.uuid4().hex[:12]
         attempts: list[dict] = []
@@ -1324,25 +1264,19 @@ class Gateway:
                 usage = getattr(resp, "usage", None)
                 p_tok = int(getattr(usage, "prompt_tokens", 0) or p_est)
                 c_tok = int(getattr(usage, "completion_tokens", 0) or 0)
-                cost = self._cost(route, p_tok, c_tok)
-                hidden = getattr(resp, "_hidden_params", {}) or {}
-                if not self.mock and hidden.get("response_cost"):
-                    cost = float(hidden["response_cost"])
-                baseline = self._cost(self._baseline_spec.routes[0], p_tok, c_tok)
                 text = resp.choices[0].message.content or ""
                 finish = resp.choices[0].finish_reason or ""
                 aq = auto_evaluate(text, finish, task_type, wants_json)
                 self.breaker.success(bkey)
                 self.store.log_attempt(request_id=rid, alias=spec.alias, provider=spec.provider, tier=spec.tier,
                                        model=route.model, via=route.via, task_type=task_type, status="ok",
-                                       prompt_tokens=p_tok, completion_tokens=c_tok, cost_usd=cost,
-                                       baseline_cost_usd=baseline, latency_ms=ms, retry_index=i,
+                                       prompt_tokens=p_tok, completion_tokens=c_tok, latency_ms=ms, retry_index=i,
                                        exploratory=int(exploratory), auto_quality=aq, finish_reason=finish,
                                        original_tokens=orig_tok, compressed=int(bool(comp_info)))
                 out = GatewayResponse(
                     request_id=rid, text=text, model_alias=spec.alias, model=route.model, via=route.via,
                     task_type=task_type, tier_policy=policy_tier, prompt_tokens=p_tok, completion_tokens=c_tok,
-                    cost_usd=cost, baseline_cost_usd=baseline, latency_ms=ms, attempts=len(attempts) + 1,
+                    latency_ms=ms, attempts=len(attempts) + 1,
                     exploratory=exploratory, auto_quality=aq, finish_reason=finish, compression=comp_info, raw=resp)
                 if use_cache:
                     self._cache[key] = (time.time(), out)
@@ -1373,7 +1307,7 @@ class Gateway:
                                             "Reply with only the number."},
               {"role": "user", "content": f"QUESTION:\n{str(prompt)[:4000]}\n\nANSWER:\n{resp.text[:6000]}"}]
         try:
-            r = self.chat(jm, models=[judge], use_cache=False, task_type="judge", strategy="cost")
+            r = self.chat(jm, models=[judge], use_cache=False, task_type="judge", strategy="efficient")
             m = re.search(r"\d+(\.\d+)?", r.text)
             if m:
                 self.feedback(resp.request_id, float(m.group()) / 10, source="judge")
@@ -1401,8 +1335,6 @@ class Gateway:
         totals = dict(q("""SELECT SUM(CASE WHEN status='ok' THEN n END) requests, SUM(CASE WHEN status='ok' THEN n END) ok,
                       SUM(CASE WHEN status='error' THEN n END) errors, SUM(cached_n) cache_hits,
                       SUM(prompt_tokens) prompt_tokens, SUM(completion_tokens) completion_tokens,
-                      ROUND(SUM(cost_usd),6) cost_usd,
-                      ROUND(SUM(CASE WHEN status='ok' THEN baseline_cost_usd END),6) baseline_usd,
                       SUM(compressed_n) compressed_requests,
                       SUM(CASE WHEN compressed_n>0 THEN original_tokens - prompt_tokens END) tokens_saved_by_compression
                       FROM usage_all WHERE ts>=?""", (since,))[0])
@@ -1410,27 +1342,23 @@ class Gateway:
             totals[k] = totals[k] or 0
         attempts_total = totals["ok"] + totals["errors"]
         totals["success_rate"] = round(totals["ok"] / attempts_total, 4) if attempts_total else None
-        totals["savings_vs_premium_usd"] = round(totals["baseline_usd"] - totals["cost_usd"], 6)
-        totals["savings_pct"] = round(100 * totals["savings_vs_premium_usd"] / totals["baseline_usd"], 1) \
-            if totals["baseline_usd"] else 0.0
         qrow = q("""SELECT AVG(COALESCE(f.score,a.auto_quality)) q FROM attempts a LEFT JOIN feedback f
                     ON f.request_id=a.request_id WHERE a.ts>=? AND a.status='ok' AND a.cached=0""", (since,))[0]
         totals["avg_quality"] = round(qrow["q"], 3) if qrow["q"] is not None else None
 
-        daily = q("""SELECT day, SUM(CASE WHEN status='ok' THEN n END) requests, ROUND(SUM(cost_usd),6) cost,
-                     ROUND(SUM(CASE WHEN status='ok' THEN baseline_cost_usd END),6) baseline,
+        daily = q("""SELECT day, SUM(CASE WHEN status='ok' THEN n END) requests,
                      SUM(prompt_tokens) p_tok, SUM(completion_tokens) c_tok,
                      SUM(CASE WHEN status='error' THEN n END) errors
                      FROM usage_all WHERE ts>=? GROUP BY day ORDER BY day""", (since,))
-        by_provider = q("""SELECT provider, ROUND(SUM(cost_usd),6) cost, SUM(prompt_tokens+completion_tokens) tokens,
+        by_provider = q("""SELECT provider, SUM(prompt_tokens+completion_tokens) tokens,
                            SUM(CASE WHEN status='ok' THEN n END) ok FROM usage_all WHERE ts>=? AND cached_n=0
-                           GROUP BY provider ORDER BY cost DESC""", (since,))
+                           GROUP BY provider ORDER BY tokens DESC""", (since,))
         by_model = q("""SELECT alias, via, tier, SUM(n) attempts, SUM(CASE WHEN status='ok' THEN n ELSE 0 END) ok,
-                        SUM(prompt_tokens) p_tok, SUM(completion_tokens) c_tok, ROUND(SUM(cost_usd),6) cost,
+                        SUM(prompt_tokens) p_tok, SUM(completion_tokens) c_tok,
                         CAST(SUM(latency_sum)/SUM(n) AS INT) avg_ms
-                        FROM usage_all WHERE ts>=? AND cached_n=0 GROUP BY alias, via ORDER BY cost DESC""", (since,))
+                        FROM usage_all WHERE ts>=? AND cached_n=0 GROUP BY alias, via ORDER BY attempts DESC""", (since,))
         by_task = q("""SELECT a.task_type, COUNT(*) n, ROUND(AVG(COALESCE(f.score,a.auto_quality)),3) quality,
-                       ROUND(AVG(a.cost_usd),6) avg_cost FROM attempts a LEFT JOIN feedback f ON f.request_id=a.request_id
+                       CAST(AVG(a.prompt_tokens+a.completion_tokens) AS INT) avg_tokens FROM attempts a LEFT JOIN feedback f ON f.request_id=a.request_id
                        WHERE a.ts>=? AND a.status='ok' AND a.cached=0 GROUP BY a.task_type""", (since,))
         policy = self.task_policy()
         by_task = [dict(r, tier_policy=policy.get(r["task_type"], "-")) for r in by_task]
@@ -1466,12 +1394,9 @@ class Gateway:
                        "quarantine": {k: v for k, v in self.store.get_policy("quarantine", {}).items()
                                       if v > time.time()}},
             "storage": self.store.storage_stats(),
-            "spent_today_usd": round(self.store.spent_today(), 6),
-            "daily_budget_usd": float(self.defaults.get("daily_budget_usd", 10.0)),
             "recent_improvements": [dict(r) for r in imps],
             "models": [{"alias": m.alias, "provider": m.provider, "tier": m.tier, "quality": m.quality,
-                        "price_in_per_m": round(m.routes[0].price_in * 1e6, 3),
-                        "price_out_per_m": round(m.routes[0].price_out * 1e6, 3),
+                        "effort": m.effort,
                         "routes": [{"via": r.via, "model": r.model, "available": self._route_available(m, r)}
                                    for r in m.routes]} for m in self.models.values()],
         }
@@ -1584,8 +1509,8 @@ ICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect w
             'stroke-width="5" stroke-linejoin="round"/></svg>')
 # network-first service worker: works offline with the last report, never serves stale data when online
 SERVICE_WORKER = """
-const C='mcubed-v1';
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/manifest.webmanifest','/icon.svg'])))});
+const C='mcubed-v2';
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/manifest.webmanifest','/icon.svg'])))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
   e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r})
@@ -1745,6 +1670,230 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
         time.sleep(poll_s)
 
 
+# --------------------------------------------------------------------------- #
+# Web browser (reader mode): fetch a page and return readable text + links
+# --------------------------------------------------------------------------- #
+WEB_UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36 MCUBED"
+
+
+def _public_host(host: str) -> bool:
+    """True when every address the host resolves to is public (blocks localhost/LAN fetches)."""
+    import ipaddress
+    import socket
+    if os.getenv("GATEWAY_ALLOW_PRIVATE_FETCH") == "1":
+        return True
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            return False
+    return True
+
+
+def normalize_web_input(q: str) -> str:
+    """URL as typed, or a web search when it does not look like an address."""
+    from urllib.parse import quote_plus
+    q = q.strip()
+    if re.match(r"^https?://", q, re.I):
+        return q
+    if " " not in q and re.match(r"^[\w.-]+\.[a-z]{2,}(:\d+)?(/.*)?$", q, re.I):
+        return "https://" + q
+    return "https://html.duckduckgo.com/html/?q=" + quote_plus(q)
+
+
+def fetch_page(url: str, max_bytes: int = 3_000_000) -> dict:
+    import urllib.request
+    from html.parser import HTMLParser
+    from urllib.parse import parse_qs as _pq, urljoin, urlparse as _up
+
+    def check(u: str) -> None:
+        pu = _up(u)
+        if pu.scheme not in ("http", "https") or not pu.hostname:
+            raise ValueError("only http and https addresses can be opened")
+        if not _public_host(pu.hostname):
+            raise ValueError("that address points to a private or local network and is blocked")
+
+    class Guard(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+            check(newurl)  # a public page must not redirect us into the LAN
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    url = normalize_web_input(url)
+    check(url)
+    opener = urllib.request.build_opener(Guard)
+    req = urllib.request.Request(url, headers={"User-Agent": WEB_UA, "Accept": "text/html,text/plain;q=0.9,*/*;q=0.5",
+                                               "Accept-Language": "en-US,en;q=0.8"})
+    with opener.open(req, timeout=15) as resp:
+        final = resp.geturl()
+        ctype = resp.headers.get("Content-Type", "")
+        raw = resp.read(max_bytes + 1)[:max_bytes]
+        charset = resp.headers.get_content_charset() or "utf-8"
+    body = raw.decode(charset, errors="replace")
+    if "html" not in ctype and not body.lstrip()[:200].lower().startswith(("<!doctype", "<html")):
+        return {"url": final, "title": final, "text": body[:100_000], "links": [], "content_type": ctype}
+
+    class Reader(HTMLParser):
+        SKIP = {"script", "style", "noscript", "svg", "template", "head", "iframe", "form", "button", "select",
+                "nav", "aside", "footer"}  # menus and chrome are not content
+        BLOCK = {"p", "div", "section", "article", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6",
+                 "header", "footer", "pre", "blockquote", "table", "ul", "ol", "dd", "dt"}
+
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=True)
+            self.skip = 0
+            self.title = ""
+            self.in_title = False
+            self.out: list[str] = []
+            self.links: list[dict] = []
+            self.href: Optional[str] = None
+            self.atext: list[str] = []
+            self.main_depth = 0
+            self.main: list[str] = []  # text inside <main>/<article>: preferred when substantial
+
+        def emit(self, t: str) -> None:
+            self.out.append(t)
+            if self.main_depth:
+                self.main.append(t)
+
+        def handle_starttag(self, tag, attrs):  # noqa: ANN001
+            if tag == "title":
+                self.in_title = True
+            if tag in self.SKIP:
+                self.skip += 1
+            if tag in ("main", "article"):
+                self.main_depth += 1
+            if tag in self.BLOCK:
+                self.emit("\n")
+            if tag in ("h1", "h2", "h3"):
+                self.emit("## ")
+            if tag == "li":
+                self.emit("- ")
+            if tag == "a":
+                self.href, self.atext = dict(attrs).get("href"), []
+
+        def handle_endtag(self, tag):  # noqa: ANN001
+            if tag == "title":
+                self.in_title = False
+            if tag in self.SKIP and self.skip:
+                self.skip -= 1
+            if tag in ("main", "article") and self.main_depth:
+                self.main_depth -= 1
+            if tag in self.BLOCK:
+                self.emit("\n")
+            if tag == "a" and self.href:
+                href = urljoin(final, self.href)
+                pu = _up(href)
+                if "duckduckgo.com" in pu.netloc and pu.path.startswith("/l/"):
+                    href = (_pq(pu.query).get("uddg") or [href])[0]  # unwrap search-result redirects
+                text = " ".join("".join(self.atext).split())
+                if text and href.startswith("http") and len(self.links) < 400:
+                    self.links.append({"text": text[:160], "url": href})
+                self.href = None
+
+        def handle_data(self, data):  # noqa: ANN001
+            if self.in_title:
+                self.title += data
+            if self.skip:
+                return
+            self.emit(data)
+            if self.href is not None:
+                self.atext.append(data)
+
+    rd = Reader()
+    try:
+        rd.feed(body)
+    except Exception:  # noqa: BLE001  - broken markup still yields what was parsed
+        pass
+    main_text = "".join(rd.main)
+    chosen = main_text if len(main_text.strip()) > 600 else "".join(rd.out)
+    lines = [" ".join(ln.split()) for ln in chosen.split("\n")]
+    text, blank = [], 0
+    for ln in lines:
+        if not ln or ln in ("##", "-"):
+            blank += 1
+            continue
+        if blank and text:
+            text.append("")
+        blank = 0
+        text.append(ln)
+    seen, links = set(), []
+    for lk in rd.links:
+        if lk["url"] not in seen and "duckduckgo.com" not in _up(lk["url"]).netloc:
+            seen.add(lk["url"])
+            links.append(lk)
+    return {"url": final, "title": " ".join(rd.title.split()) or final, "text": "\n".join(text)[:100_000],
+            "links": links[:200], "content_type": ctype}
+
+
+# --------------------------------------------------------------------------- #
+# OpenAI-compatible API: MCUBED itself behaves like an AI model
+# --------------------------------------------------------------------------- #
+OPENAI_PASSTHROUGH = ("temperature", "top_p", "max_tokens", "max_completion_tokens", "stop", "seed",
+                      "response_format", "presence_penalty", "frequency_penalty")
+MCUBED_MODELS = {"mcubed": "balanced", "mcubed-auto": "balanced", "mcubed-efficient": "efficient",
+                 "mcubed-quality": "quality"}
+
+
+def openai_models(gw: "Gateway") -> dict:
+    now = int(time.time())
+    ids = list(MCUBED_MODELS) + [a for a, s in gw.models.items()
+                                 if any(gw._route_available(s, r) for r in s.routes)]
+    return {"object": "list", "data": [{"id": i, "object": "model", "created": now, "owned_by": "mcubed"} for i in ids]}
+
+
+def openai_chat(gw: "Gateway", body: dict) -> dict:
+    """Serve an OpenAI /v1/chat/completions request through the gateway router.
+
+    model "mcubed" (or mcubed-efficient / mcubed-quality) lets the router choose; any pool alias pins that model.
+    """
+    msgs = body.get("messages")
+    if not isinstance(msgs, list) or not msgs:
+        raise ValueError("messages must be a non-empty list")
+    clean = []
+    for m in msgs:
+        if not isinstance(m, dict) or m.get("role") not in ("system", "developer", "user", "assistant", "tool"):
+            raise ValueError("each message needs a role of system, developer, user, assistant or tool")
+        content = m.get("content")
+        if isinstance(content, list):  # text parts only; other part types are dropped
+            content = "\n".join(str(p.get("text", "")) for p in content if isinstance(p, dict) and p.get("type") == "text")
+        clean.append({"role": "system" if m["role"] == "developer" else ("user" if m["role"] == "tool" else m["role"]),
+                      "content": "" if content is None else str(content)})
+    model = str(body.get("model") or "mcubed")
+    strategy, pinned = MCUBED_MODELS.get(model), None
+    if strategy is None:
+        if model not in gw.models:
+            raise KeyError(f"unknown model '{model}'. Use 'mcubed' or one of GET /v1/models")
+        pinned = [model]
+    kw = {k: body[k] for k in OPENAI_PASSTHROUGH if body.get(k) is not None}
+    if "max_completion_tokens" in kw:
+        kw["max_tokens"] = kw.pop("max_completion_tokens")
+    r = gw.chat(clean, strategy=strategy, models=pinned, use_cache=not body.get("temperature"), **kw)
+    return {
+        "id": f"chatcmpl-{r.request_id}", "object": "chat.completion", "created": int(time.time()),
+        "model": model, "system_fingerprint": f"mcubed:{r.model_alias}",
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": r.text},
+                     "finish_reason": r.finish_reason or "stop"}],
+        "usage": {"prompt_tokens": r.prompt_tokens, "completion_tokens": r.completion_tokens,
+                  "total_tokens": r.prompt_tokens + r.completion_tokens},
+        "mcubed": {k: v for k, v in r.summary().items() if k in (
+            "request_id", "model_alias", "model", "via", "task_type", "tier_policy", "latency_ms", "attempts", "cached")},
+    }
+
+
+def openai_stream_chunks(resp: dict) -> list[bytes]:
+    """Server-sent events for stream=true: role, content, then finish (the answer is produced in one piece)."""
+    base = {k: resp[k] for k in ("id", "created", "model", "system_fingerprint")}
+    base["object"] = "chat.completion.chunk"
+    ch = resp["choices"][0]
+    events = [dict(base, choices=[{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": None}]),
+              dict(base, choices=[{"index": 0, "delta": {"content": ch["message"]["content"]}, "finish_reason": None}]),
+              dict(base, choices=[{"index": 0, "delta": {}, "finish_reason": ch["finish_reason"]}], usage=resp["usage"])]
+    return [f"data: {json.dumps(e)}\n\n".encode() for e in events] + [b"data: [DONE]\n\n"]
+
+
 def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None) -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from urllib.parse import parse_qs, urlparse
@@ -1776,10 +1925,42 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
         def _authorized(self, q: dict) -> bool:
             if not token:
                 return True
-            got = self.headers.get("X-Gateway-Token") or (q.get("token") or [""])[0] or \
+            auth = self.headers.get("Authorization") or ""
+            bearer = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+            got = self.headers.get("X-Gateway-Token") or bearer or (q.get("token") or [""])[0] or \
                 (self.headers.get("Cookie") or "").partition("mcubed_token=")[2].split(";")[0]
             import hmac
             return bool(got) and hmac.compare_digest(got, token)
+
+        def _openai(self) -> None:
+            def err(code: int, msg: str, typ: str) -> None:
+                self._send(code, {"error": {"message": msg, "type": typ, "code": None}})
+            try:
+                body = self._body()
+                with lock:
+                    resp = openai_chat(gw, body)
+            except KeyError as e:
+                return err(404, str(e).strip("'\""), "invalid_request_error")
+            except (ValueError, json.JSONDecodeError) as e:
+                return err(400, str(e), "invalid_request_error")
+            except AllRoutesFailed as e:
+                return err(502, str(e), "upstream_error")
+            except GatewayError as e:
+                return err(503, str(e), "service_unavailable")
+            except Exception as e:  # noqa: BLE001
+                log.exception("openai api error")
+                return err(500, f"{type(e).__name__}: {e}", "server_error")
+            if not body.get("stream"):
+                return self._send(200, resp)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            for chunk in openai_stream_chunks(resp):
+                self.wfile.write(chunk)
+                self.wfile.flush()
+            self.close_connection = True
 
         def _body(self) -> dict:
             n = int(self.headers.get("Content-Length") or 0)
@@ -1796,7 +1977,12 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             if u.path in static:
                 return self._send(200, *static[u.path])
             if not self._authorized(q):
+                if u.path.startswith("/v1/"):
+                    return self._send(401, {"error": {"message": "invalid API key: use the gateway token",
+                                                      "type": "invalid_request_error", "code": "invalid_api_key"}})
                 return self._send(401, {"error": "token required: open /?token=..."})
+            if u.path == "/v1/models":
+                return self._send(200, openai_models(gw))
             if u.path in ("/", "/index.html"):
                 body = (HERE / "dashboard.html").read_bytes()
                 self.send_response(200)
@@ -1807,8 +1993,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            if u.path == "/game.html" and (HERE / "game.html").exists():
-                return self._send(200, (HERE / "game.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path in ("/game.html", "/solitaire.html") and (HERE / u.path[1:]).exists():
+                return self._send(200, (HERE / u.path[1:]).read_bytes(), "text/html; charset=utf-8")
             if u.path == "/api/repos":
                 return self._send(200, dict(load_repos(gw.repo_registry),
                                              github_token=bool(_github_token() or __import__("shutil").which("gh"))))
@@ -1822,16 +2008,38 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             u = urlparse(self.path)
             q = parse_qs(u.query)
             if not self._authorized(q):
+                if u.path.startswith("/v1/"):
+                    return self._send(401, {"error": {"message": "invalid API key: use the gateway token",
+                                                      "type": "invalid_request_error", "code": "invalid_api_key"}})
                 return self._send(401, {"error": "unauthorized"})
             origin = self.headers.get("Origin")  # CSRF guard: reject cross-site browser POSTs
             if origin and origin != "null" and urlparse(origin).netloc != self.headers.get("Host"):
                 return self._send(403, {"error": "cross-origin request blocked"})
+            if u.path == "/v1/chat/completions":
+                return self._openai()
             try:
                 with lock:
                     if u.path == "/api/chat":
                         b = self._body()
-                        r = gw.chat(str(b.get("prompt", ""))[:200_000], strategy=b.get("strategy"), tier=b.get("tier"))
+                        msgs = b.get("messages")
+                        if isinstance(msgs, list) and msgs:  # multi-turn from the main chat screen
+                            msgs = [{"role": m["role"] if m.get("role") in ("system", "user", "assistant") else "user",
+                                     "content": str(m.get("content", ""))[:200_000]} for m in msgs[-60:]]
+                        else:
+                            msgs = str(b.get("prompt", ""))[:200_000]
+                        model = b.get("model")
+                        pinned = [model] if model and model in gw.models else None
+                        r = gw.chat(msgs, strategy=b.get("strategy"), tier=b.get("tier") if not pinned else None,
+                                    models=pinned)
                         return self._send(200, {**r.summary(), "text": r.text})
+                    if u.path == "/api/fetch":
+                        b = self._body()
+                        try:
+                            return self._send(200, fetch_page(str(b.get("url", ""))[:4000]))
+                        except ValueError:
+                            raise
+                        except Exception as e:  # noqa: BLE001  - network errors are user-facing, not 500s
+                            return self._send(502, {"error": f"could not open the page ({type(e).__name__}: {str(e)[:160]})"})
                     if u.path == "/api/feedback":
                         b = self._body()
                         gw.feedback(str(b["request_id"]), float(b["score"]), source="gui")
@@ -1878,10 +2086,9 @@ def main() -> None:
     c = sub.add_parser("chat", help="send a prompt through the gateway")
     c.add_argument("prompt")
     c.add_argument("--system")
-    c.add_argument("--strategy", choices=["balanced", "cost", "quality"])
+    c.add_argument("--strategy", choices=["balanced", "efficient", "quality"])
     c.add_argument("--tier", choices=TIERS)
     c.add_argument("--models", help="comma-separated aliases to restrict routing")
-    c.add_argument("--max-cost", type=float)
     c.add_argument("--max-tokens", type=int)
     c.add_argument("--no-cache", action="store_true")
 
@@ -1893,7 +2100,7 @@ def main() -> None:
     i = sub.add_parser("improve", help="run the automated process-improvement optimizer")
     i.add_argument("--dry-run", action="store_true")
 
-    r = sub.add_parser("report", help="usage, cost, savings, learned policy")
+    r = sub.add_parser("report", help="usage, tokens, quality, learned policy")
     r.add_argument("--days", type=int, default=7)
     r.add_argument("--html", metavar="FILE", help="export a self-contained GUI report instead of JSON")
 
@@ -1904,7 +2111,7 @@ def main() -> None:
 
     sub.add_parser("compact", help="force storage compaction (roll old rows into daily totals)")
 
-    sub.add_parser("models", help="list model pool, prices, availability")
+    sub.add_parser("models", help="list model pool and availability")
 
     rp = sub.add_parser("repos", help="auto-add every GitHub repository your token can access")
     rp.add_argument("--clone", metavar="DIR", help="also clone new repos and fast-forward existing ones into DIR")
@@ -1932,7 +2139,7 @@ def _run(args: argparse.Namespace) -> None:
         msgs = ([{"role": "system", "content": args.system}] if args.system else []) + \
                [{"role": "user", "content": args.prompt}]
         kw = {"max_tokens": args.max_tokens} if args.max_tokens else {}
-        resp = gw.chat(msgs, strategy=args.strategy, tier=args.tier, max_cost=args.max_cost,
+        resp = gw.chat(msgs, strategy=args.strategy, tier=args.tier,
                        models=args.models.split(",") if args.models else None, use_cache=not args.no_cache, **kw)
         print(resp.text)
         print("\n---", json.dumps(resp.summary(), indent=2))
@@ -1972,8 +2179,7 @@ def _run(args: argparse.Namespace) -> None:
         for s_ in gw.models.values():
             for rt in s_.routes:
                 print(f"{s_.alias:22} {s_.provider:10} {s_.tier:9} q={s_.quality:<3} {rt.via:10} "
-                      f"${rt.price_in * 1e6:6.2f}/${rt.price_out * 1e6:6.2f} per 1M  "
-                      f"{'available' if gw._route_available(s_, rt) else 'no key'}  {rt.model}")
+                                            f"{'available' if gw._route_available(s_, rt) else 'no key'}  {rt.model}")
     elif args.cmd == "simulate":
         before = gw.task_policy()
         simulate(gw, args.n)

@@ -1,9 +1,7 @@
 {
-  "_comment": "Model pool for the gateway. Each model has an ordered list of routes: the direct provider first, then OpenRouter as a fallback. Prices are USD per 1M tokens and are only used when LiteLLM's built-in price map does not know the model. Tiers: economy < standard < premium. Quality is a 1-10 relative score used by the 'quality' and 'balanced' strategies. auto_improve_every_hours runs the optimizer on a timer while the GUI or Android app is running (0 disables).",
+  "_comment": "Model pool for the gateway. Each model has an ordered list of routes: the direct provider first, then OpenRouter as a fallback. Tiers: economy < standard < premium; lighter tiers count as less compute effort (1/3/8 per token), so the router uses them when they are good enough. Quality is a 1-10 relative score used by the 'quality' and 'balanced' strategies. auto_improve_every_hours runs the optimizer on a timer while the GUI or Android app is running (0 disables).",
   "defaults": {
     "expected_output_tokens": 600,
-    "daily_budget_usd": 10.0,
-    "max_cost_per_request_usd": 0.5,
     "request_timeout_s": 60,
     "max_retries_per_route": 2,
     "circuit_breaker_failures": 3,
@@ -19,12 +17,11 @@
       "recency_window": 200,
       "weights": {
         "quality": 1.0,
-        "cost": 1.0,
+        "effort": 0.35,
         "latency": 0.15
       },
       "judge_sample_rate": 0.0,
-      "judge_model": "deepseek-v4-flash",
-      "quality_value_usd": 0.02
+      "judge_model": "deepseek-v4-flash"
     },
     "improvement": {
       "min_samples": 20,
@@ -60,15 +57,11 @@
       "routes": [
         {
           "model": "gpt-6-astra",
-          "via": "direct",
-          "price_in": 10.0,
-          "price_out": 50.0
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-6-astra",
-          "via": "openrouter",
-          "price_in": 10.0,
-          "price_out": 50.0
+          "via": "openrouter"
         }
       ]
     },
@@ -80,15 +73,11 @@
       "routes": [
         {
           "model": "gpt-6.1-sol",
-          "via": "direct",
-          "price_in": 2.0,
-          "price_out": 10.0
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-6.1-sol",
-          "via": "openrouter",
-          "price_in": 2.0,
-          "price_out": 10.0
+          "via": "openrouter"
         }
       ]
     },
@@ -100,15 +89,11 @@
       "routes": [
         {
           "model": "gpt-6.1-terra",
-          "via": "direct",
-          "price_in": 1.0,
-          "price_out": 5.0
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-6.1-terra",
-          "via": "openrouter",
-          "price_in": 1.0,
-          "price_out": 5.0
+          "via": "openrouter"
         }
       ]
     },
@@ -120,15 +105,11 @@
       "routes": [
         {
           "model": "gpt-6-luna",
-          "via": "direct",
-          "price_in": 0.1,
-          "price_out": 0.5
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-6-luna",
-          "via": "openrouter",
-          "price_in": 0.1,
-          "price_out": 0.5
+          "via": "openrouter"
         }
       ]
     },
@@ -140,15 +121,11 @@
       "routes": [
         {
           "model": "gpt-5.6-sol",
-          "via": "direct",
-          "price_in": 4.0,
-          "price_out": 20.0
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-5.6-sol",
-          "via": "openrouter",
-          "price_in": 4.0,
-          "price_out": 20.0
+          "via": "openrouter"
         }
       ]
     },
@@ -160,15 +137,11 @@
       "routes": [
         {
           "model": "gpt-5.6-terra",
-          "via": "direct",
-          "price_in": 2.0,
-          "price_out": 12.0
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-5.6-terra",
-          "via": "openrouter",
-          "price_in": 2.0,
-          "price_out": 12.0
+          "via": "openrouter"
         }
       ]
     },
@@ -180,15 +153,11 @@
       "routes": [
         {
           "model": "gpt-5.6-luna",
-          "via": "direct",
-          "price_in": 0.2,
-          "price_out": 1.2
+          "via": "direct"
         },
         {
           "model": "openrouter/openai/gpt-5.6-luna",
-          "via": "openrouter",
-          "price_in": 0.2,
-          "price_out": 1.2
+          "via": "openrouter"
         }
       ]
     },
@@ -204,9 +173,7 @@
         },
         {
           "model": "openrouter/openai/gpt-5.5",
-          "via": "openrouter",
-          "price_in": 5.0,
-          "price_out": 30.0
+          "via": "openrouter"
         }
       ]
     },
@@ -222,9 +189,7 @@
         },
         {
           "model": "openrouter/openai/gpt-5.4-mini",
-          "via": "openrouter",
-          "price_in": 0.75,
-          "price_out": 4.5
+          "via": "openrouter"
         }
       ]
     },
@@ -240,9 +205,7 @@
         },
         {
           "model": "openrouter/openai/gpt-5.4-nano",
-          "via": "openrouter",
-          "price_in": 0.2,
-          "price_out": 1.25
+          "via": "openrouter"
         }
       ]
     },
@@ -258,9 +221,7 @@
         },
         {
           "model": "openrouter/anthropic/claude-opus-5.5",
-          "via": "openrouter",
-          "price_in": 4.0,
-          "price_out": 20.0
+          "via": "openrouter"
         }
       ]
     },
@@ -276,9 +237,7 @@
         },
         {
           "model": "openrouter/anthropic/claude-sonnet-5.5",
-          "via": "openrouter",
-          "price_in": 2.0,
-          "price_out": 10.0
+          "via": "openrouter"
         }
       ]
     },
@@ -294,9 +253,7 @@
         },
         {
           "model": "openrouter/anthropic/claude-haiku-5.5",
-          "via": "openrouter",
-          "price_in": 0.1,
-          "price_out": 0.5
+          "via": "openrouter"
         }
       ]
     },
@@ -312,9 +269,7 @@
         },
         {
           "model": "openrouter/google/gemini-3.1-pro-preview",
-          "via": "openrouter",
-          "price_in": 2.0,
-          "price_out": 12.0
+          "via": "openrouter"
         }
       ]
     },
@@ -330,9 +285,7 @@
         },
         {
           "model": "openrouter/google/gemini-3.5-flash",
-          "via": "openrouter",
-          "price_in": 1.5,
-          "price_out": 9.0
+          "via": "openrouter"
         }
       ]
     },
@@ -348,9 +301,7 @@
         },
         {
           "model": "openrouter/google/gemini-3.5-flash-lite",
-          "via": "openrouter",
-          "price_in": 0.3,
-          "price_out": 2.5
+          "via": "openrouter"
         }
       ]
     },
@@ -366,9 +317,7 @@
         },
         {
           "model": "openrouter/deepseek/deepseek-v4-pro",
-          "via": "openrouter",
-          "price_in": 1.32,
-          "price_out": 3.96
+          "via": "openrouter"
         }
       ]
     },
@@ -384,9 +333,7 @@
         },
         {
           "model": "openrouter/deepseek/deepseek-v4-flash",
-          "via": "openrouter",
-          "price_in": 0.3,
-          "price_out": 1.2
+          "via": "openrouter"
         }
       ]
     }
