@@ -49,6 +49,10 @@ python gateway.py discover-openai          # preview
 python gateway.py discover-openai --write  # add to models.json
 ```
 
+## Repositories
+
+With `GITHUB_TOKEN` set, MCUBED finds every repository you own, collaborate on, or reach through an organization, and records it in `repos.json`. New repositories are added automatically every 6 hours while the dashboard or app runs (`repo_sync_every_hours` in `models.json`), and the Storage tab has a "Sync now" button. Run `python gateway.py repos --clone repos` to also clone them and fast-forward existing copies; the token is sent per command and never written into `.git/config`. Archived repositories are skipped unless you pass `--include-archived`. Use a fine-grained token with read-only access.
+
 ## Android app (native APK)
 
 The `android/` project packages the gateway as a real Android app. It embeds Python with [Chaquopy](https://chaquo.com/chaquopy/), runs the gateway on `127.0.0.1` inside the app, and shows the dashboard (including the Doom tab) full screen.
@@ -82,6 +86,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 | `compact` | Force storage compaction |
 | `models` | Model pool, prices and key availability |
 | `discover-openai [--write]` | Find OpenAI chat models your key can use |
+| `repos [--clone DIR] [--list]` | Auto-add every GitHub repository your token can access; optionally clone/update them |
 | `gui [--host --port --token]` | Serve the web dashboard and Doom game |
 | `simulate [--n 300]` | Offline demo with synthetic traffic |
 

@@ -12,6 +12,7 @@
     "strategy": "balanced",
     "auto_improve_every_n_requests": 50,
     "auto_improve_every_hours": 6,
+    "repo_sync_every_hours": 6,
     "learning": {
       "explore_rate": 0.1,
       "prior_strength": 4,

@@ -1054,6 +1054,7 @@ class Gateway:
         self.mock_fail: set[str] = set(filter(None, os.getenv("GATEWAY_MOCK_FAIL", "").split(",")))
         self.mock_hook = None  # optional callable(route, messages) -> (text, finish_reason) for simulations
         self.store = Store(db_path, self.defaults.get("storage", {}))
+        self.repo_registry = str(Path(db_path).resolve().parent / "repos.json")
         self.learner = Learner(self.store, self.defaults.get("learning", {}))
         self.breaker = CircuitBreaker(int(self.defaults.get("circuit_breaker_failures", 3)),
                                       float(self.defaults.get("circuit_breaker_cooldown_s", 120)))
@@ -1599,6 +1600,82 @@ def export_html(gw: "Gateway", path: str, days: int = 7) -> str:
     return path
 
 
+# --------------------------------------------------------------------------- #
+# Repository registry: auto-add every GitHub repository your token can reach
+# --------------------------------------------------------------------------- #
+def _github_token() -> Optional[str]:
+    return os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+
+
+def discover_repos(token: Optional[str] = None) -> list[dict]:
+    """All repositories the token can access: owned, collaborator and organization repos."""
+    import urllib.error
+    import urllib.request
+    token = token or _github_token()
+    if not token:
+        raise GatewayError("GITHUB_TOKEN is not set")
+    repos, page = [], 1
+    while True:
+        req = urllib.request.Request(
+            f"https://api.github.com/user/repos?per_page=100&page={page}"
+            "&affiliation=owner,collaborator,organization_member&sort=updated",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                     "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "MCUBED"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                batch = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            raise GatewayError(f"GitHub rejected the request (HTTP {e.code}); check GITHUB_TOKEN") from None
+        except (urllib.error.URLError, OSError) as e:
+            raise GatewayError(f"could not reach GitHub: {e}") from None
+        repos += [{"full_name": x["full_name"], "private": x["private"], "fork": x["fork"],
+                   "archived": x.get("archived", False), "default_branch": x.get("default_branch"),
+                   "clone_url": x["clone_url"], "html_url": x["html_url"],
+                   "description": x.get("description") or "", "updated_at": x.get("updated_at")} for x in batch]
+        if len(batch) < 100:
+            return repos
+        page += 1
+
+
+def sync_repos(registry_path: str = "repos.json", clone_dir: Optional[str] = None,
+               include_archived: bool = False) -> dict:
+    """Refresh the registry, adding new repositories automatically; optionally clone or update them."""
+    import subprocess
+    path = Path(registry_path)
+    old = {r["full_name"]: r for r in json.loads(path.read_text()).get("repos", [])} if path.exists() else {}
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    found = [r for r in discover_repos() if include_archived or not r["archived"]]
+    added = [r["full_name"] for r in found if r["full_name"] not in old]
+    removed = sorted(set(old) - {r["full_name"] for r in found})
+    for r in found:
+        r["added_at"] = old.get(r["full_name"], {}).get("added_at", now)
+    cloned, updated, failed = [], [], []
+    if clone_dir:
+        token = _github_token()
+        # token goes in a per-command header, never into the remote URL or .git/config
+        auth = ["-c", f"http.extraHeader=Authorization: Basic "
+                f"{__import__('base64').b64encode(f'x-access-token:{token}'.encode()).decode()}"]
+        for r in found:
+            dest = Path(clone_dir) / r["full_name"]
+            cmd = (["git", *auth, "-C", str(dest), "pull", "--ff-only", "-q"] if (dest / ".git").exists()
+                   else ["git", *auth, "clone", "-q", r["clone_url"], str(dest)])
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+                (updated if "pull" in cmd else cloned).append(r["full_name"])
+                r["local_path"] = str(dest)
+            except (subprocess.SubprocessError, OSError) as e:
+                failed.append({"repo": r["full_name"], "error": str(getattr(e, "stderr", b"") or e)[:300]})
+    path.write_text(json.dumps({"synced_at": now, "repos": found}, indent=2) + "\n")
+    return {"synced_at": now, "total": len(found), "added": added, "removed": removed,
+            "cloned": cloned, "updated": updated, "failed": failed}
+
+
+def load_repos(registry_path: str = "repos.json") -> dict:
+    p = Path(registry_path)
+    return json.loads(p.read_text()) if p.exists() else {"synced_at": None, "repos": []}
+
+
 def run_scheduled_improvement(gw: "Gateway", force: bool = False) -> Optional[list]:
     """Time-based process improvement: compact storage and tune the policy when it is due.
 
@@ -1627,6 +1704,16 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
                 run_scheduled_improvement(gw)
         except Exception:  # noqa: BLE001
             log.exception("scheduled improvement failed")
+        try:  # auto-add new repositories (registry only; cloning stays manual)
+            hours = float(os.getenv("GATEWAY_REPO_SYNC_HOURS") or gw.defaults.get("repo_sync_every_hours", 6))
+            last = float(gw.store.get_policy("last_repo_sync_ts", 0) or 0)
+            if _github_token() and hours > 0 and time.time() - last >= hours * 3600:
+                res = sync_repos(gw.repo_registry)
+                gw.store.set_policy("last_repo_sync_ts", time.time())
+                if res["added"]:
+                    log.info("auto-added repositories: %s", ", ".join(res["added"]))
+        except Exception:  # noqa: BLE001
+            log.exception("repository sync failed")
         time.sleep(poll_s)
 
 
@@ -1694,6 +1781,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 return
             if u.path == "/game.html" and (HERE / "game.html").exists():
                 return self._send(200, (HERE / "game.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/repos":
+                return self._send(200, dict(load_repos(gw.repo_registry), github_token=bool(_github_token())))
             if u.path == "/api/report":
                 days = int((q.get("days") or ["7"])[0])
                 with lock:
@@ -1723,6 +1812,10 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                         return self._send(200, {"changes": gw.optimizer.run(apply=apply)})
                     if u.path == "/api/compact":
                         return self._send(200, gw.store.compact(force=True))
+                    if u.path == "/api/repos/sync":
+                        res = sync_repos(gw.repo_registry)
+                        gw.store.set_policy("last_repo_sync_ts", time.time())
+                        return self._send(200, res)
             except (GatewayError, KeyError, ValueError) as e:
                 return self._send(400, {"error": str(e)})
             except Exception as e:  # noqa: BLE001
@@ -1784,6 +1877,11 @@ def main() -> None:
 
     sub.add_parser("models", help="list model pool, prices, availability")
 
+    rp = sub.add_parser("repos", help="auto-add every GitHub repository your token can access")
+    rp.add_argument("--clone", metavar="DIR", help="also clone new repos and fast-forward existing ones into DIR")
+    rp.add_argument("--include-archived", action="store_true")
+    rp.add_argument("--list", action="store_true", help="show the registry without syncing")
+
     d = sub.add_parser("discover-openai", help="find every OpenAI chat model your key can use")
     d.add_argument("--write", action="store_true", help="add the new models to models.json")
 
@@ -1827,6 +1925,15 @@ def _run(args: argparse.Namespace) -> None:
         serve_gui(gw, args.host, args.port, args.token)
     elif args.cmd == "compact":
         print(json.dumps(gw.store.compact(force=True), indent=2))
+    elif args.cmd == "repos":
+        if args.list:
+            reg = load_repos(gw.repo_registry)
+        else:
+            res = sync_repos(gw.repo_registry, args.clone, args.include_archived)
+            print(json.dumps({k: v for k, v in res.items() if v or k == "total"}, indent=2))
+            reg = load_repos(gw.repo_registry)
+        for r in reg["repos"]:
+            print(f"{'private' if r['private'] else 'public ':7}  {r['full_name']:40} {r.get('local_path', '')}")
     elif args.cmd == "discover-openai":
         added = discover_openai(args.config, write=args.write)
         for m in added:

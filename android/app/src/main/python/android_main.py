@@ -12,7 +12,7 @@ import threading
 import time
 from os.path import dirname, join
 
-KEY_NAMES = ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY")
+KEY_NAMES = ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "GITHUB_TOKEN")
 _state: dict = {}
 
 
@@ -25,7 +25,7 @@ def _apply_keys(keys_json: str) -> bool:
             os.environ[name] = value
         else:
             os.environ.pop(name, None)
-    return any(os.getenv(n) for n in KEY_NAMES)
+    return any(os.getenv(n) for n in KEY_NAMES if n != "GITHUB_TOKEN")
 
 
 def start(data_dir: str, keys_json: str = "{}") -> str:

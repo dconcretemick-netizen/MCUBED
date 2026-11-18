@@ -33,6 +33,7 @@ public class MainActivity extends Activity {
             {"OPENROUTER_API_KEY", "OpenRouter (reaches every model)"},
             {"OPENAI_API_KEY", "OpenAI (direct)"},
             {"DEEPSEEK_API_KEY", "DeepSeek (direct)"},
+            {"GITHUB_TOKEN", "GitHub token (auto-add repositories)"},
     };
     private static final int MENU_KEY = 1, MENU_RELOAD = 2;
 
