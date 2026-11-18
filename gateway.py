@@ -1509,7 +1509,7 @@ ICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect w
             'stroke-width="5" stroke-linejoin="round"/></svg>')
 # network-first service worker: works offline with the last report, never serves stale data when online
 SERVICE_WORKER = """
-const C='mcubed-v2';
+const C='mcubed-v3';
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/manifest.webmanifest','/icon.svg'])))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
@@ -1829,6 +1829,289 @@ def fetch_page(url: str, max_bytes: int = 3_000_000) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# News: many outlets across the spectrum, grouped by story, with coverage balance
+# --------------------------------------------------------------------------- #
+NEWS_LEANS = ["Left", "Lean Left", "Center", "Lean Right", "Right", "Unrated"]
+NEWS_SIDE = {"Left": "left", "Lean Left": "left", "Center": "center", "Lean Right": "right", "Right": "right"}
+_NEWS_STOP = set("""a an and are as at be been but by for from has have he her his how in into is it its new news
+not of on or our over says said she than that the their them they this to up us was were what when who why will with
+you after about more amid could would should may can just out off against first two year years live latest update
+watch video report reports here man woman people""".split())
+# common words in political headlines: they count half when deciding two headlines describe the same event
+_NEWS_GENERIC = set("""trump biden white house president administration democrat democratic republican gop senate
+congress house state government court official officials country world nation federal leader minister police""".split())
+_news_cache: dict = {}
+_news_lock = threading.Lock()
+
+NEWS_BRIEF_SYSTEM = (
+    "You are a strictly neutral news analyst. You will receive headlines and summaries about one story from several "
+    "outlets, each labeled with its outlet name and AllSides bias rating. Write a balanced brief. Rules: use only the "
+    "material provided; attribute every claim to the outlet(s) that reported it; never take a side or use loaded "
+    "words; separate facts from opinion; say plainly when something is unverified or when sources conflict. "
+    "Format exactly:\n"
+    "Summary: two or three neutral sentences.\n"
+    "Agreed facts: bullet points reported consistently across outlets with differing ratings.\n"
+    "Disputed or unverified: bullet points where outlets differ, with who says what.\n"
+    "Emphasis by perspective: one line each for left-leaning, center and right-leaning outlets on what they emphasize "
+    "or leave out (write 'no coverage in this set' when a group is missing).\n"
+    "Missing context: what a reader should check next.")
+
+
+def news_config(path: Optional[str] = None) -> dict:
+    p = Path(path or os.getenv("GATEWAY_NEWS", "") or HERE / "news.json")
+    if not p.exists():
+        return {"feeds": [], "cache_seconds": 600, "max_age_hours": 48}
+    cfg = json.loads(p.read_text())
+    for f in cfg.get("feeds", []):
+        if f.get("lean") not in NEWS_LEANS:
+            f["lean"] = "Unrated"
+    return cfg
+
+
+def _strip_html(s: str) -> str:
+    import html as _html
+    return re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+
+
+def parse_feed(raw: bytes) -> list[dict]:
+    """RSS 2.0, RSS 1.0 (RDF) and Atom -> [{title, link, summary, published(epoch|None)}]."""
+    import xml.etree.ElementTree as ET
+    from email.utils import parsedate_to_datetime
+    root = ET.fromstring(raw)
+    out = []
+
+    def local(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1].lower()
+
+    for el in root.iter():
+        if local(el.tag) not in ("item", "entry"):
+            continue
+        d: dict = {"title": "", "link": "", "summary": "", "published": None}
+        for c in el:
+            t, txt = local(c.tag), (c.text or "").strip()
+            if t == "title":
+                d["title"] = _strip_html(txt)
+            elif t == "link":
+                href = c.get("href")
+                if href and c.get("rel", "alternate") == "alternate":
+                    d["link"] = href
+                elif txt and not d["link"]:
+                    d["link"] = txt
+            elif t in ("description", "summary", "content", "encoded") and not d["summary"]:
+                d["summary"] = _strip_html(txt)[:400]
+            elif t in ("pubdate", "published", "updated", "date") and d["published"] is None and txt:
+                try:
+                    d["published"] = parsedate_to_datetime(txt).timestamp()
+                except (TypeError, ValueError, IndexError):
+                    try:
+                        d["published"] = datetime.fromisoformat(txt.replace("Z", "+00:00")).timestamp()
+                    except ValueError:
+                        pass
+        if d["title"] and d["link"].startswith(("http://", "https://")):
+            out.append(d)
+    return out
+
+
+def _news_tokens(text: str) -> set[str]:
+    toks = set()
+    for w in re.findall(r"[a-z0-9][a-z0-9'-]+", text.lower()):
+        w = w.strip("'-").removesuffix("'s")
+        if len(w) < 3 or w in _NEWS_STOP or w.isdigit():
+            continue
+        if len(w) > 4 and w.endswith("s") and not w.endswith("ss"):
+            w = w[:-1]
+        toks.add(w)
+    return toks
+
+
+def cluster_news(items: list[dict]) -> list[dict]:
+    """Group headlines about the same event.
+
+    An item joins a story only if it closely matches one member (shared headline words) and also shares a
+    headline word with at least half of the members, so stories cannot chain into unrelated topics."""
+    def weight(toks: set[str]) -> float:
+        return sum(0.5 if t in _NEWS_GENERIC else 1.0 for t in toks)
+
+    def match(a: dict, b: dict) -> float:
+        st = weight(a["_tt"] & b["_tt"])
+        sk = weight(a["_tk"] & b["_tk"])
+        if st >= 2.5 or (st >= 2 and sk >= 5):
+            return st + sk / 10
+        return 0.0
+
+    clusters: list[dict] = []
+    for it in sorted(items, key=lambda x: -(x.get("published") or 0)):
+        it = dict(it)
+        it["_tt"] = _news_tokens(it["title"])
+        it["_tk"] = it["_tt"] | _news_tokens(it["summary"][:300])
+        best, best_s = None, 0.0
+        for c in clusters:
+            s_ = max(match(it, m) for m in c["items"])
+            if s_ <= best_s:
+                continue
+            overlap = sum(1 for m in c["items"] if it["_tt"] & m["_tt"])
+            if overlap * 2 >= len(c["items"]):
+                best, best_s = c, s_
+        if best is not None and any(i["source"] == it["source"] for i in best["items"]):
+            continue  # same outlet, same story (a follow-up): one item per outlet keeps coverage counts honest
+        if best is None:
+            best = {"items": []}
+            clusters.append(best)
+        best["items"].append(it)
+    for c in clusters:
+        for i in c["items"]:
+            i.pop("_tt", None)
+            i.pop("_tk", None)
+    out = []
+    for c in clusters:
+        its = c["items"]
+        counts = {k: 0 for k in NEWS_LEANS}
+        for i in its:
+            counts[i["lean"]] += 1
+        sides = {"left": 0, "center": 0, "right": 0}
+        for i in its:
+            if i["lean"] in NEWS_SIDE:
+                sides[NEWS_SIDE[i["lean"]]] += 1
+        rated = sum(sides.values())
+        if rated >= 2 and sides["left"] and not sides["right"]:
+            note = "Covered here only by left-leaning and center outlets" if sides["center"] else "Covered here only by left-leaning outlets"
+        elif rated >= 2 and sides["right"] and not sides["left"]:
+            note = "Covered here only by right-leaning and center outlets" if sides["center"] else "Covered here only by right-leaning outlets"
+        elif sides["left"] and sides["right"]:
+            note = "Covered across the spectrum"
+        else:
+            note = ""
+        # headline shown first: the wording most shared with the other outlets (the common core of the story),
+        # so no single outlet's framing leads; ties go to a Center outlet
+        toks = [_news_tokens(i["title"]) for i in its]
+        rep = its[max(range(len(its)), key=lambda k: (sum(len(toks[k] & t) for j, t in enumerate(toks) if j != k),
+                                                      its[k]["lean"] == "Center", -len(its[k]["title"])))]
+        key = hashlib.sha1("|".join(sorted(i["link"] for i in its)).encode()).hexdigest()[:10]
+        out.append({"id": key, "title": rep["title"], "summary": rep["summary"], "n_sources": len(its),
+                    "leans": counts, "sides": sides, "balance_note": note,
+                    "published": max((i.get("published") or 0) for i in its) or None,
+                    "items": sorted(its, key=lambda i: NEWS_LEANS.index(i["lean"]))})
+    out.sort(key=lambda c: (-c["n_sources"], -(sum(1 for v in c["sides"].values() if v)), -(c["published"] or 0)))
+    return out
+
+
+def fetch_news(force: bool = False, config: Optional[str] = None, include: Optional[list[str]] = None,
+               fetcher=None) -> dict:
+    import concurrent.futures as cf
+    import urllib.request
+    from urllib.parse import urlparse as _up
+    cfg = news_config(config)
+    feeds = [f for f in cfg.get("feeds", []) if (f["name"] in include if include else f.get("enabled", True))]
+    ttl = float(cfg.get("cache_seconds", 600))
+    ck = json.dumps(sorted(f["name"] for f in feeds))
+    with _news_lock:
+        hit = _news_cache.get(ck)
+        if hit and not force and time.time() - hit["generated_at"] < ttl:
+            return hit
+
+    def get(f: dict) -> tuple[dict, list[dict], str]:
+        try:
+            if fetcher:
+                raw = fetcher(f["url"])
+            else:
+                host = _up(f["url"]).hostname or ""
+                if not _public_host(host):
+                    raise ValueError("private address blocked")
+                req = urllib.request.Request(f["url"], headers={"User-Agent": WEB_UA, "Accept": "application/rss+xml, application/xml, text/xml, */*"})
+                with urllib.request.urlopen(req, timeout=12) as r:
+                    raw = r.read(5_000_000)
+            return f, parse_feed(raw), ""
+        except Exception as e:  # noqa: BLE001 - one bad feed must not break the page
+            return f, [], f"{type(e).__name__}: {str(e)[:120]}"
+
+    cutoff = time.time() - float(cfg.get("max_age_hours", 48)) * 3600
+    items, status = [], []
+    with cf.ThreadPoolExecutor(max_workers=12) as ex:
+        for f, its, err in ex.map(get, feeds):
+            fresh = [i for i in its if not i["published"] or i["published"] >= cutoff][:40]
+            status.append({"name": f["name"], "lean": f["lean"], "rating_url": f.get("rating_url", ""),
+                           "ok": not err, "items": len(fresh), "error": err})
+            for i in fresh:
+                items.append({**i, "source": f["name"], "lean": f["lean"], "rating_url": f.get("rating_url", "")})
+    res = {"generated_at": time.time(), "clusters": cluster_news(items), "sources": status,
+           "available": [{"name": f["name"], "lean": f["lean"], "enabled": f.get("enabled", True)} for f in cfg.get("feeds", [])],
+           "ratings": "Bias ratings from AllSides (allsides.com/media-bias/ratings). Ratings change, and a Center "
+                      "rating does not mean more accurate. Edit news.json to change sources or labels."}
+    with _news_lock:
+        _news_cache[ck] = res
+    return res
+
+
+def news_brief_messages(cluster: dict) -> list[dict]:
+    lines = []
+    for i in cluster.get("items", [])[:16]:
+        lines.append(f"- {i.get('source')} [{i.get('lean')}]: {i.get('title')}\n  {str(i.get('summary', ''))[:400]}")
+    return [{"role": "system", "content": NEWS_BRIEF_SYSTEM},
+            {"role": "user", "content": "Story coverage:\n" + "\n".join(lines)}]
+
+
+# --------------------------------------------------------------------------- #
+# Wine: run Windows programs where Wine (or Box64 + Wine on ARM) is installed
+# --------------------------------------------------------------------------- #
+WINE_HINTS = {
+    "debian": "sudo apt install wine", "ubuntu": "sudo apt install wine", "fedora": "sudo dnf install wine",
+    "arch": "sudo pacman -S wine", "macos": "brew install --cask wine-stable",
+    "termux": "Termux cannot run Wine directly. Install Winlator (https://winlator.org) for Windows x86_64 apps on Android 9+.",
+    "android": "Install Winlator (https://winlator.org): Wine + Box64 for Windows apps on Android 9+, no root needed.",
+    "windows": "You are on Windows: .exe files run natively.",
+}
+
+
+def wine_status() -> dict:
+    import platform
+    import shutil
+    import subprocess
+    system = platform.system().lower()
+    is_android = "ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", "")
+    found = {b: shutil.which(b) for b in ("wine", "wine64", "box64", "box86", "winetricks")}
+    wine = found["wine64"] or found["wine"]
+    version = ""
+    if wine:
+        try:
+            version = subprocess.run([wine, "--version"], capture_output=True, text=True, timeout=10).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+    distro = "macos" if system == "darwin" else "windows" if system == "windows" else "linux"
+    if is_android:
+        distro = "termux" if "com.termux" in os.environ.get("PREFIX", "") else "android"
+    elif distro == "linux" and Path("/etc/os-release").exists():
+        osr = Path("/etc/os-release").read_text().lower()
+        distro = next((d for d in ("ubuntu", "debian", "fedora", "arch") if d in osr), "linux")
+    arm = platform.machine().lower() in ("aarch64", "arm64", "armv7l")
+    return {"available": bool(wine) or system == "windows", "wine": wine, "version": version,
+            "box64": found["box64"], "winetricks": found["winetricks"], "platform": distro, "arch": platform.machine(),
+            "needs_box64": arm and not found["box64"] and distro not in ("macos", "windows"),
+            "install_hint": WINE_HINTS.get(distro, "Install Wine from your distribution's package manager (see winehq.org).")}
+
+
+def wine_run(exe: str, args: Optional[list[str]] = None, wait: bool = False) -> dict:
+    import subprocess
+    st = wine_status()
+    p = Path(exe).expanduser()
+    if not p.exists():
+        raise ValueError(f"file not found: {exe}")
+    if p.suffix.lower() not in (".exe", ".msi", ".bat", ".com"):
+        raise ValueError("expected a Windows program (.exe, .msi, .bat or .com)")
+    if st["platform"] == "windows":
+        cmd = [str(p)] + list(args or [])
+    elif not st["wine"]:
+        raise GatewayError("Wine is not installed. " + st["install_hint"])
+    else:
+        cmd = ([st["wine"], "msiexec", "/i", str(p)] if p.suffix.lower() == ".msi" else [st["wine"], str(p)]) + list(args or [])
+        if st["box64"] and st["arch"].lower() in ("aarch64", "arm64"):  # x86_64 Wine on ARM runs under Box64
+            cmd = [st["box64"]] + cmd
+    if wait:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        return {"cmd": cmd, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    return {"cmd": cmd, "pid": proc.pid}
+
+# --------------------------------------------------------------------------- #
 # OpenAI-compatible API: MCUBED itself behaves like an AI model
 # --------------------------------------------------------------------------- #
 OPENAI_PASSTHROUGH = ("temperature", "top_p", "max_tokens", "max_completion_tokens", "stop", "seed",
@@ -1998,6 +2281,14 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             if u.path == "/api/repos":
                 return self._send(200, dict(load_repos(gw.repo_registry),
                                              github_token=bool(_github_token() or __import__("shutil").which("gh"))))
+            if u.path == "/api/news":
+                inc = [x for x in (q.get("sources") or [""])[0].split(",") if x] or None
+                try:
+                    return self._send(200, fetch_news(force=(q.get("refresh") or ["0"])[0] == "1", include=inc))
+                except Exception as e:  # noqa: BLE001
+                    return self._send(502, {"error": f"news unavailable ({type(e).__name__}: {str(e)[:160]})"})
+            if u.path == "/api/wine":
+                return self._send(200, wine_status())
             if u.path == "/api/report":
                 days = int((q.get("days") or ["7"])[0])
                 with lock:
@@ -2040,6 +2331,13 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                             raise
                         except Exception as e:  # noqa: BLE001  - network errors are user-facing, not 500s
                             return self._send(502, {"error": f"could not open the page ({type(e).__name__}: {str(e)[:160]})"})
+                    if u.path == "/api/news/brief":
+                        b = self._body()
+                        cl = b.get("cluster") or {}
+                        if not isinstance(cl, dict) or not cl.get("items"):
+                            raise ValueError("cluster with items required")
+                        r = gw.chat(news_brief_messages(cl), strategy="quality")
+                        return self._send(200, {**r.summary(), "text": r.text})
                     if u.path == "/api/feedback":
                         b = self._body()
                         gw.feedback(str(b["request_id"]), float(b["score"]), source="gui")
@@ -2121,6 +2419,17 @@ def main() -> None:
     d = sub.add_parser("discover-openai", help="find every OpenAI chat model your key can use")
     d.add_argument("--write", action="store_true", help="add the new models to models.json")
 
+    nw = sub.add_parser("news", help="headlines grouped by story across outlets rated left to right (AllSides)")
+    nw.add_argument("--limit", type=int, default=15)
+    nw.add_argument("--brief", type=int, metavar="N", help="AI balanced brief of story N (1-based)")
+    nw.add_argument("--sources", action="store_true", help="show source status and bias ratings")
+
+    wn = sub.add_parser("wine", help="run Windows programs through Wine (Box64 on ARM, Winlator on Android)")
+    wn.add_argument("action", choices=["status", "run"])
+    wn.add_argument("file", nargs="?")
+    wn.add_argument("args", nargs=argparse.REMAINDER)
+    wn.add_argument("--wait", action="store_true")
+
     s = sub.add_parser("simulate", help="offline learning demo with synthetic traffic")
     s.add_argument("--n", type=int, default=300)
 
@@ -2180,6 +2489,33 @@ def _run(args: argparse.Namespace) -> None:
             for rt in s_.routes:
                 print(f"{s_.alias:22} {s_.provider:10} {s_.tier:9} q={s_.quality:<3} {rt.via:10} "
                                             f"{'available' if gw._route_available(s_, rt) else 'no key'}  {rt.model}")
+    elif args.cmd == "news":
+        res = fetch_news()
+        if args.sources:
+            for st in res["sources"]:
+                print(f"{st['lean']:11} {st['name']:28} {'ok ' + str(st['items']) if st['ok'] else 'error ' + st['error']}")
+            print(res["ratings"])
+            return
+        cl = res["clusters"]
+        if args.brief:
+            c = cl[args.brief - 1]
+            print(c["title"], "\n")
+            print(gw.chat(news_brief_messages(c), strategy="quality").text)
+            return
+        for n, c in enumerate(cl[:args.limit], 1):
+            sd = c["sides"]
+            print(f"{n:2}. {c['title']}\n    {c['n_sources']} sources  left {sd['left']} / center {sd['center']} / right {sd['right']}"
+                  + (f"  ({c['balance_note']})" if c["balance_note"] else ""))
+            for i in c["items"]:
+                print(f"      {i['lean']:10} {i['source']:24} {i['title'][:80]}")
+        print("\n" + res["ratings"])
+    elif args.cmd == "wine":
+        if args.action == "status":
+            print(json.dumps(wine_status(), indent=2))
+        else:
+            if not args.file:
+                raise SystemExit("usage: gateway.py wine run FILE.exe [args...]")
+            print(json.dumps(wine_run(args.file, args.args, wait=args.wait), indent=2))
     elif args.cmd == "simulate":
         before = gw.task_policy()
         simulate(gw, args.n)

@@ -20,6 +20,7 @@ android/app/src/main/python/models.json
 android/app/src/main/python/dashboard.html
 android/app/src/main/python/game.html
 android/app/src/main/python/solitaire.html
+android/app/src/main/python/news.json
 *.log
 repos.json
 repos/

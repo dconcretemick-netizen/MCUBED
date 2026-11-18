@@ -1,0 +1,33 @@
+{
+  "_about": "News sources for the MCUBED News tab. 'lean' uses AllSides Media Bias Ratings (https://www.allsides.com/media-bias/ratings), checked November 2026. Ratings change over time and a Center rating does not mean more accurate; edit this file to add, remove or relabel sources. Set enabled=false to keep a source available but off by default. The default set is balanced: 1 Left, 4 Lean Left, 4 Center, 4 Lean Right, 1 Right, plus 1 unrated international source.",
+  "cache_seconds": 600,
+  "max_age_hours": 48,
+  "feeds": [
+    {"name": "The Guardian", "lean": "Left", "url": "https://www.theguardian.com/world/rss", "rating_url": "https://www.allsides.com/news-source/guardian-media-bias"},
+    {"name": "NPR", "lean": "Lean Left", "url": "https://feeds.npr.org/1001/rss.xml", "rating_url": "https://www.allsides.com/news-source/npr-media-bias"},
+    {"name": "New York Times", "lean": "Lean Left", "url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "rating_url": "https://www.allsides.com/news-source/new-york-times"},
+    {"name": "CNN", "lean": "Lean Left", "url": "http://rss.cnn.com/rss/cnn_topstories.rss", "rating_url": "https://www.allsides.com/news-source/cnn-media-bias"},
+    {"name": "ABC News", "lean": "Lean Left", "url": "https://feeds.abcnews.com/abcnews/topstories", "rating_url": "https://www.allsides.com/news-source/abc-news-media-bias"},
+    {"name": "BBC News", "lean": "Center", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "rating_url": "https://www.allsides.com/news-source/bbc-news-media-bias"},
+    {"name": "Newsweek", "lean": "Center", "url": "https://www.newsweek.com/rss", "rating_url": "https://www.allsides.com/news-source/newsweek-media-bias"},
+    {"name": "The Hill", "lean": "Center", "url": "https://thehill.com/feed/", "rating_url": "https://www.allsides.com/news-source/hill-media-bias"},
+    {"name": "Christian Science Monitor", "lean": "Center", "url": "https://rss.csmonitor.com/feeds/all", "rating_url": "https://www.allsides.com/news-source/christian-science-monitor-media-bias"},
+    {"name": "Washington Examiner", "lean": "Lean Right", "url": "https://www.washingtonexaminer.com/feed", "rating_url": "https://www.allsides.com/news-source/washington-examiner-media-bias"},
+    {"name": "National Review", "lean": "Lean Right", "url": "https://www.nationalreview.com/feed/", "rating_url": "https://www.allsides.com/news-source/national-review-media-bias"},
+    {"name": "Washington Times", "lean": "Lean Right", "url": "https://www.washingtontimes.com/rss/headlines/news/", "rating_url": "https://www.allsides.com/news-source/washington-times-media-bias"},
+    {"name": "The Dispatch", "lean": "Lean Right", "url": "https://thedispatch.com/feed/", "rating_url": "https://www.allsides.com/news-source/dispatch-media-bias"},
+    {"name": "Fox News", "lean": "Right", "url": "https://moxie.foxnews.com/google-publisher/latest.xml", "rating_url": "https://www.allsides.com/news-source/fox-news-media-bias"},
+    {"name": "DW", "lean": "Unrated", "url": "https://rss.dw.com/rdf/rss-en-all", "rating_url": ""},
+
+    {"name": "PBS NewsHour", "lean": "Lean Left", "enabled": false, "url": "https://www.pbs.org/newshour/feeds/rss/headlines", "rating_url": "https://www.allsides.com/news-source/pbs-newshour-media-bias"},
+    {"name": "CBS News", "lean": "Lean Left", "enabled": false, "url": "https://www.cbsnews.com/latest/rss/main", "rating_url": "https://www.allsides.com/news-source/cbs-news-media-bias"},
+    {"name": "Axios", "lean": "Lean Left", "enabled": false, "url": "https://api.axios.com/feed/", "rating_url": "https://www.allsides.com/news-source/axios-media-bias"},
+    {"name": "Politico", "lean": "Lean Left", "enabled": false, "url": "https://rss.politico.com/politics-news.xml", "rating_url": "https://www.allsides.com/news-source/politico-media-bias"},
+    {"name": "Al Jazeera", "lean": "Lean Left", "enabled": false, "url": "https://www.aljazeera.com/xml/rss/all.xml", "rating_url": "https://www.allsides.com/news-source/al-jazeera-media-bias"},
+    {"name": "Reason", "lean": "Center", "enabled": false, "url": "https://reason.com/feed/", "rating_url": "https://www.allsides.com/news-source/reason-media-bias"},
+    {"name": "RealClearPolitics", "lean": "Lean Right", "enabled": false, "url": "https://www.realclearpolitics.com/index.xml", "rating_url": "https://www.allsides.com/news-source/realclearpolitics-media-bias"},
+    {"name": "New York Post", "lean": "Right", "enabled": false, "url": "https://nypost.com/feed/", "rating_url": "https://www.allsides.com/news-source/new-york-post"},
+    {"name": "The Federalist", "lean": "Right", "enabled": false, "url": "https://thefederalist.com/feed/", "rating_url": "https://www.allsides.com/news-source/federalist-media-bias"},
+    {"name": "Daily Wire", "lean": "Right", "enabled": false, "url": "https://www.dailywire.com/feeds/rss.xml", "rating_url": "https://www.allsides.com/news-source/daily-wire-media-bias"}
+  ]
+}

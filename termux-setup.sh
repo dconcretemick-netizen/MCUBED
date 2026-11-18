@@ -31,4 +31,6 @@ Done. Next:
   python gateway.py gui            # then open http://localhost:8765 in Chrome
                                    # Chrome menu > Add to Home screen installs it as an app
 Keep it running in the background:  termux-wake-lock && python gateway.py gui
+News across the spectrum:           python gateway.py news
+Windows apps on Android:            install Winlator (https://winlator.org); Termux cannot run Wine directly
 EOF

@@ -13,7 +13,9 @@ A multi-model AI gateway with a phone-friendly web dashboard. One entry point fo
 - OpenAI-style chat as the main screen: multi-turn conversations, model picker (MCUBED auto, fast, best quality, or any model with a key), ratings that teach the router
 - OpenAI-compatible API: MCUBED acts as a model named `mcubed` at `/v1/chat/completions` and `/v1/models`, including streaming
 - Web browser tab: search or open any address in a reader view, follow links, open the full page, or send the page to the chat
-- Installable web dashboard (chat, overview, models, learning, storage, games, web)
+- News tab built for fairness: 15 outlets rated from left to right, stories grouped so you can compare how each outlet covers the same event, blindspot flags, and an AI balanced brief
+- Windows apps through Wine (Box64 on ARM, Winlator on Android)
+- Installable web dashboard (chat, news, web, games, stats)
 - Gateway Doom: a touch-friendly game where the demons are your real error types
 - Solitaire (Klondike): tap or drag, undo, hints, draw 1 or 3, saved progress
 - Native Android APK built automatically by GitHub Actions
@@ -92,6 +94,8 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 | `discover-openai [--write]` | Find OpenAI chat models your key can use |
 | `repos [--clone DIR] [--list]` | Auto-add every GitHub repository your token can access; optionally clone/update them |
 | `gui [--host --port --token]` | Serve the web dashboard and Doom game |
+| `news [--limit 15] [--brief N] [--sources]` | Headlines grouped by story with left/center/right coverage; `--brief N` writes a balanced brief of story N |
+| `wine status` / `wine run FILE.exe [args]` | Check for Wine and run Windows programs |
 | `simulate [--n 300]` | Offline demo with synthetic traffic |
 
 ## Security
@@ -119,6 +123,28 @@ print(r.choices[0].message.content)
 ## Web browser
 
 The Web tab searches the web or opens an address through the gateway (`POST /api/fetch`) and shows a clean reader view with the page's links. "Open page" shows the full site; on Android it opens an in-app browser screen. "Ask MCUBED" attaches the page to the chat. Requests to localhost or private network addresses are blocked, including through redirects.
+
+## News
+
+The News tab (`GET /api/news`, CLI `news`) reads RSS feeds from a balanced set of outlets: 1 Left, 4 Lean Left, 4 Center, 4 Lean Right and 1 Right, plus DW as an unrated international source. Labels are [AllSides Media Bias Ratings](https://www.allsides.com/media-bias/ratings), checked November 2026. Ratings change over time, and a Center rating does not mean more accurate.
+
+- Stories are grouped across outlets with one item per outlet, so counts are not inflated. The headline shown first is the wording most shared across outlets, so no single outlet's framing leads.
+- A spectrum bar shows how many left-leaning, center and right-leaning outlets cover each story. Blindspots lists stories that only one side is covering.
+- Compare coverage lists every outlet's headline and summary side by side. Tapping a headline opens it in the Web reader, and each item links to the original.
+- Balanced brief (`POST /api/news/brief`) asks the AI for a neutral summary built only from the provided coverage: agreed facts, disputed or unverified claims with attribution, what each perspective emphasizes, and missing context.
+- Edit `news.json` to add, remove or relabel sources. More rated outlets are included but turned off (`"enabled": false`). Results are cached for 10 minutes.
+
+## Windows apps (Wine)
+
+`python gateway.py wine status` finds Wine (and Box64 on ARM) and prints the right install command for your system. `python gateway.py wine run Setup.exe` launches a program (`.msi` files go through `msiexec`). The Stats > System tab shows the same status.
+
+| System | Install |
+|---|---|
+| Debian / Ubuntu | `sudo apt install wine` |
+| Fedora | `sudo dnf install wine` |
+| Arch | `sudo pacman -S wine` |
+| macOS | `brew install --cask wine-stable` |
+| Android | [Winlator](https://winlator.org), which runs Windows x86_64 apps with Wine and Box64 on Android 9 and newer, no root needed |
 
 ## How a request flows
 
