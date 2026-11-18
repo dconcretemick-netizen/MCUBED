@@ -61,7 +61,16 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 Uri u = req.getUrl();
                 if ("127.0.0.1".equals(u.getHost())) return false;
-                startActivity(new Intent(Intent.ACTION_VIEW, u)); // external links open in the browser
+                String scheme = u.getScheme();
+                if ("http".equals(scheme) || "https".equals(scheme)) { // web pages open in the in-app browser
+                    startActivity(new Intent(MainActivity.this, BrowserActivity.class)
+                            .putExtra(BrowserActivity.EXTRA_URL, u.toString()));
+                } else {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, u));
+                    } catch (Exception ignored) {
+                    }
+                }
                 return true;
             }
         });
