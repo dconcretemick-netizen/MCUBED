@@ -72,7 +72,8 @@ The `android/` project packages the gateway as a real Android app. It embeds Pyt
 
 - Get the APK from the [MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest) release (see [INSTALL.md](INSTALL.md)). Pushing a tag like `v0.1.0` also attaches the APK to a versioned GitHub Release.
 - First launch asks for OpenRouter, OpenAI and DeepSeek keys (any or all), stored only on the device. Choose "Demo mode" to try it with simulated replies. Change keys later from the "AI keys" menu. On Android, OpenAI and DeepSeek are called directly; Claude and Gemini go through OpenRouter.
-- Requires Android 8.0+ on a 64-bit device. Release builds are signed with a debug key; configure your own keystore before publishing to the Play Store.
+- Requires Android 8.0+ on a 64-bit device. Release builds are signed with the permanent MCUBED key (certificate SHA-256 `53b57eb8…dccccc`).
+- Register the package with Android developer verification, using the free Limited distribution account: see [REGISTER.md](REGISTER.md).
 - Build locally: `cd android && gradle assembleRelease` (JDK 17, Android SDK, Python 3.13 on PATH).
 
 ## Android (Termux)

@@ -40,9 +40,12 @@ jobs:
       - name: Build info and signing key
         env:
           KS_B64: ${{ secrets.MCUBED_KEYSTORE_B64 }}
+          ADI_REGISTRATION: ${{ vars.ADI_REGISTRATION }}
         run: |
           printf '{"commit": "%s", "built_at": "%s", "run": %s, "ref": "%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_RUN_NUMBER" "$GITHUB_REF_NAME" > build_info.json
           if [ -n "$KS_B64" ] && [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/mcubed.p12"; echo "MCUBED_KEYSTORE_FILE=$RUNNER_TEMP/mcubed.p12" >> "$GITHUB_ENV"; fi
+          # Android developer verification: the ownership snippet from the Android Developer Console (repo variable ADI_REGISTRATION).
+          if [ -n "$ADI_REGISTRATION" ]; then mkdir -p android/app/src/main/assets; printf '%s\n' "$ADI_REGISTRATION" > android/app/src/main/assets/adi-registration.properties; echo "added adi-registration.properties"; fi
 
       - name: Build APK
         working-directory: android
