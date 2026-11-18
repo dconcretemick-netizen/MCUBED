@@ -98,6 +98,7 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .reader .links{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
 .reader .links button{background:none;border:0;padding:4px 0;color:var(--accent);cursor:pointer;text-align:left;font-size:15px}
 .reader .links small{display:block;color:var(--faint);font-size:12px;word-break:break-all}
+#v-games .seg{display:flex;max-width:100%;overflow-x:auto}#v-games .seg button{padding:0 12px;white-space:nowrap}
 .stats-seg[hidden]{display:none}.stats-seg{display:flex;width:fit-content;max-width:100%;overflow-x:auto}.stats-seg button{padding:0 12px;white-space:nowrap}
 .news-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.news-head .row{flex-wrap:nowrap}.news-head .btn{min-height:40px;padding:0 12px}
 .news-head .seg{margin-bottom:0}.news-head .seg button{padding:0 12px}
@@ -292,7 +293,7 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 
   <section class="view" id="v-games">
     <div class="seg" role="tablist" aria-label="Game">
-      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="tetris" aria-selected="false">Tetris</button><button role="tab" data-g="doom" aria-selected="false">Doom</button>
+      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="tetris" aria-selected="false">Tetris</button><button role="tab" data-g="pip" aria-selected="false">Pip's Leap</button><button role="tab" data-g="doom" aria-selected="false">Doom</button>
     </div>
     <div class="game-pane" id="g-solitaire">
     <div class="card" style="padding:0;overflow:hidden">
@@ -312,6 +313,16 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">Swipe to move, tap to rotate, flick down to drop. Pauses when you leave.</span>
       <a class="btn" href="tetris.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
+    </div>
+  </div>
+    <div class="game-pane" id="g-pip" hidden>
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="pip-frame" title="Pip's Leap" data-src="platformer.html" allow="fullscreen; autoplay"
+        style="display:block;width:100%;height:min(78vh,760px);border:0;background:#000"></iframe>
+    </div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span style="color:var(--muted);font-size:13px">A platformer in three worlds. Turn your phone sideways for the widest view.</span>
+      <a class="btn" href="platformer.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
     </div>
   </div>
     <div class="game-pane" id="g-doom" hidden>
@@ -539,11 +550,13 @@ loadRepos();
 let game=localStorage.getItem("mcubed.game")||"solitaire";
 function syncGames(visible){
   document.querySelectorAll(".seg [data-g]").forEach(x=>x.setAttribute("aria-selected",String(x.dataset.g===game)));
-  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-tetris").hidden=game!=="tetris"; $("#g-doom").hidden=game!=="doom";
+  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-tetris").hidden=game!=="tetris"; $("#g-pip").hidden=game!=="pip"; $("#g-doom").hidden=game!=="doom";
   const sf=$("#sol-frame"), tf=$("#tet-frame"), df=$("#doom-frame");
   if(visible&&game==="solitaire"&&!sf.src) sf.src=sf.dataset.src;          // Solitaire stays loaded and keeps its state
   if(visible&&game==="tetris"&&!tf.src) tf.src=tf.dataset.src;             // Tetris pauses itself when hidden
   if((!visible||game!=="tetris")&&tf.src) tf.contentWindow?.postMessage("mcubed:pause","*");
+  const pf=$("#pip-frame"); if(visible&&game==="pip"&&!pf.src) pf.src=pf.dataset.src;
+  if((!visible||game!=="pip")&&pf.src) pf.contentWindow?.postMessage("mcubed:pause","*");
   if(visible&&game==="doom"){ if(!df.src) df.src=df.dataset.src } else if(df.src) df.removeAttribute("src");  // Doom unloads to save battery
 }
 document.querySelectorAll(".seg [data-g]").forEach(x=>x.addEventListener("click",()=>{game=x.dataset.g;localStorage.setItem("mcubed.game",game);syncGames(true)}));

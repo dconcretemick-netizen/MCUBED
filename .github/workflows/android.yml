@@ -67,11 +67,40 @@ jobs:
         with:
           files: MCUBED-*.apk
 
-      - name: Publish rolling "latest" build (main only)
+      - name: Publish "MCUBED install" release (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --cleanup-tag -y -R "$GITHUB_REPOSITORY" || true
-          gh release create latest MCUBED-*.apk -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
-            --title "Latest build (${GITHUB_SHA::7})" --notes "Newest MCUBED from main, built automatically. The in-app Update tab installs this."
+          # Stable file names so the install links never change.
+          cp MCUBED-*.apk MCUBED.apk
+          git archive --format=zip --prefix=MCUBED/ -o MCUBED-desktop.zip HEAD
+          SHORT=${GITHUB_SHA::7}
+          REPO_URL="https://github.com/$GITHUB_REPOSITORY"
+          cat > notes.md <<NOTES
+          ## Android
+          1. On your phone, open [MCUBED.apk]($REPO_URL/releases/download/latest/MCUBED.apk) while signed in to GitHub.
+          2. Allow your browser to install apps when Android asks, then tap Install.
+          3. Later updates install from the app's Update tab.
+
+          ## Windows, Mac or Linux
+          1. Install Python 3.10 or newer.
+          2. Download [MCUBED-desktop.zip]($REPO_URL/releases/download/latest/MCUBED-desktop.zip) and unzip it.
+          3. In the MCUBED folder run \`python gateway.py gui\` and open http://localhost:8765.
+
+          Build $SHORT, run $GITHUB_RUN_NUMBER, $(date -u '+%Y-%m-%d %H:%M UTC'). This release is refreshed automatically on every update to main.
+          NOTES
+          sed -i 's/^          //' notes.md
+          if gh release view latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Move the tag to this commit and replace the files in place, so the links keep working during the update.
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" -f sha="$GITHUB_SHA" -F force=true >/dev/null \
+              || gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/latest -f sha="$GITHUB_SHA" >/dev/null
+            gh release upload latest MCUBED.apk MCUBED-desktop.zip --clobber -R "$GITHUB_REPOSITORY"
+            for a in $(gh release view latest -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name'); do
+              case "$a" in MCUBED.apk|MCUBED-desktop.zip) ;; *) gh release delete-asset latest "$a" -y -R "$GITHUB_REPOSITORY" ;; esac
+            done
+            gh release edit latest -R "$GITHUB_REPOSITORY" --title "MCUBED install" --notes-file notes.md --prerelease=false --latest
+          else
+            gh release create latest MCUBED.apk MCUBED-desktop.zip -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "MCUBED install" --notes-file notes.md --latest
+          fi

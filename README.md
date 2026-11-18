@@ -1,5 +1,7 @@
 # MCUBED
 
+**[MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest)**: [Android APK](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED.apk) · [Desktop zip](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED-desktop.zip) · [How to install](INSTALL.md). Always the newest build.
+
 A multi-model AI gateway with a phone-friendly web dashboard. One entry point for OpenAI, Anthropic, Google and DeepSeek models, with OpenRouter as a fallback route for every model.
 
 ## Features
@@ -19,6 +21,7 @@ A multi-model AI gateway with a phone-friendly web dashboard. One entry point fo
 - Gateway Doom: a touch-friendly game where the demons are your real error types
 - Solitaire (Klondike): tap or drag, undo, hints, draw 1 or 3, saved progress
 - Tetris: swipe and tap controls, hold, next queue, ghost piece, wall kicks, saved game and best score
+- Pip's Leap: an original side-scrolling platformer in three worlds (Meadow, Caves, Sky) with large multitouch buttons, forgiving jumps, checkpoints and saved progress
 - Update tab: installs the newest MCUBED from GitHub with integrity checks, a backup and one-tap rollback; the Android app downloads and installs the newest APK
 - Native Android APK built automatically by GitHub Actions
 
@@ -65,7 +68,7 @@ With `GITHUB_TOKEN` set (or the GitHub CLI signed in via `gh auth login`), MCUBE
 
 The `android/` project packages the gateway as a real Android app. It embeds Python with [Chaquopy](https://chaquo.com/chaquopy/), runs the gateway on `127.0.0.1` inside the app, and shows the dashboard (including the Doom tab) full screen.
 
-- Get the APK: open the repo's Actions tab, choose the latest "Build Android APK" run, and download `MCUBED-apk`. Pushing a tag like `v0.1.0` also attaches the APK to a GitHub Release.
+- Get the APK from the [MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest) release (see [INSTALL.md](INSTALL.md)). Pushing a tag like `v0.1.0` also attaches the APK to a versioned GitHub Release.
 - First launch asks for OpenRouter, OpenAI and DeepSeek keys (any or all), stored only on the device. Choose "Demo mode" to try it with simulated replies. Change keys later from the "AI keys" menu. On Android, OpenAI and DeepSeek are called directly; Claude and Gemini go through OpenRouter.
 - Requires Android 8.0+ on a 64-bit device. Release builds are signed with a debug key; configure your own keystore before publishing to the Play Store.
 - Build locally: `cd android && gradle assembleRelease` (JDK 17, Android SDK, Python 3.13 on PATH).
@@ -155,7 +158,7 @@ The Update tab (CLI `update`) compares your version with the newest commit on Gi
 
 - **Git checkout:** runs `git pull --ff-only` and restarts.
 - **Plain copy (zip or Termux):** downloads each program file, checks it against GitHub's hash, confirms the new `gateway.py` compiles, backs up the old files to `.mcubed_backup/`, then restarts. If you edited `models.json` or `news.json`, your copy is kept and the new one is saved as `*.new`. Roll back restores the last backup.
-- **Android app:** every push to `main` publishes a rolling `latest` release. The app downloads that APK (a GitHub token in AI keys is needed while the repository is private) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
+- **Android app:** every push to `main` refreshes the "MCUBED install" release (tag `latest`). The app downloads that APK (a GitHub token in AI keys is needed while the repository is private) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
 
 ## How a request flows
 
