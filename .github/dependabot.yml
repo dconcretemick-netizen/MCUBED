@@ -1,0 +1,20 @@
+# Security updates only. Dependabot opens a pull request when a dependency has a known
+# vulnerability; nothing merges until the owner reviews it. Routine version bumps are off
+# (open-pull-requests-limit: 0 applies to version updates, not security updates).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: daily }
+    open-pull-requests-limit: 0
+    labels: [security]
+  - package-ecosystem: gradle
+    directory: /android
+    schedule: { interval: daily }
+    open-pull-requests-limit: 0
+    labels: [security]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: daily }
+    open-pull-requests-limit: 0
+    labels: [security]

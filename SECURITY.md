@@ -6,7 +6,8 @@ MCUBED has one source code editor: the repository owner, [@dconcretemick-netizen
 
 | Layer | Protection |
 | --- | --- |
-| Repository | Private, single collaborator, no deploy keys or webhooks. Dependabot security alerts and automatic security fixes are on. |
+| Repository | Private, single collaborator, no deploy keys or webhooks. |
+| Security updates | Dependabot alerts and security updates are on for Python packages, the Android Gradle build and GitHub Actions (`.github/dependabot.yml`). A fix arrives as a pull request labeled `security`, and nothing merges until the owner approves it. |
 | Build | GitHub Actions runs only GitHub-owned actions plus `gradle/actions/setup-gradle` and `softprops/action-gh-release`, each pinned to a full commit SHA (pinning is enforced by a repository setting). The signing key is never given to pull request builds. |
 | Signing | Every APK is signed with one permanent MCUBED key (v1, v2 and v3 signatures). The key lives only in GitHub Actions secrets and an offline backup. CI fails if an APK is signed by any other key. |
 | Android install | Android refuses to install an update signed by a different key, so nobody else can replace the app. |
