@@ -8,7 +8,7 @@ plugins {
 val repoRoot = rootDir.parentFile
 val pyDir = file("src/main/python")
 copy {
-    from(repoRoot) { include("gateway.py", "models.json", "dashboard.html", "game.html", "solitaire.html", "tetris.html", "platformer.html", "news.json", "build_info.json") }
+    from(repoRoot) { include("gateway.py", "models.json", "dashboard.html", "game.html", "solitaire.html", "tetris.html", "platformer.html", "oregon.html", "news.json", "build_info.json") }
     into(pyDir)
 }
 

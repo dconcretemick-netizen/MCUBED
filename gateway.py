@@ -1920,7 +1920,7 @@ ICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect w
 # network-first service worker: works offline with the last report, never serves stale data when online
 SERVICE_WORKER = """
 const C='mcubed-v5';
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/tetris.html','/platformer.html','/manifest.webmanifest','/icon.svg'])))});
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/tetris.html','/platformer.html','/oregon.html','/manifest.webmanifest','/icon.svg'])))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
   e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r})
@@ -3202,7 +3202,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            if u.path in ("/game.html", "/solitaire.html", "/tetris.html", "/platformer.html") and (HERE / u.path[1:]).exists():
+            if u.path in ("/game.html", "/solitaire.html", "/tetris.html", "/platformer.html", "/oregon.html") and (HERE / u.path[1:]).exists():
                 return self._send(200, (HERE / u.path[1:]).read_bytes(), "text/html; charset=utf-8")
             if u.path == "/api/repos":
                 return self._send(200, dict(load_repos(gw.repo_registry),
