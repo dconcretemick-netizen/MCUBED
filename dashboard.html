@@ -484,11 +484,17 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <div id="bg-list"><div class="skel"></div></div>
     </div>
 
+    <div class="card" style="margin-top:var(--gap)"><h2>Key &amp; provider health</h2>
+      <p class="news-note">The gardener checks every saved key and provider in the background. A key the provider keeps rejecting is removed after 3 failed checks in a row, and a provider that cannot be reached is parked until it answers again. Free AI nodes are adopted automatically — no key needed.</p>
+      <div id="gardener-body"><div class="skel"></div></div>
+    </div>
+
     <div class="card" style="margin-top:var(--gap)"><h2>Tools</h2>
       <div class="row">
         <button class="btn" id="tb-run-nodes">Scan for AI now</button>
         <button class="btn" id="tb-run-repos">Sync repositories now</button>
         <button class="btn" id="tb-run-improve">Improve now</button>
+        <button class="btn" id="tb-run-gardener">Check keys &amp; providers now</button>
         <button class="btn" id="tb-compact">Compact storage</button>
         <button class="btn" id="tb-restart">Restart gateway</button>
       </div>
@@ -1023,7 +1029,17 @@ function renderToolbox(){
     row("auto_improve","Auto-improve in the background", every(bg.auto_improve), bg.auto_improve) +
     row("repo_sync","Sync my GitHub repositories", every(bg.repo_sync), bg.repo_sync) +
     row("node_scan","Look for new AI providers and local models", every(bg.node_scan), bg.node_scan) +
-    row("lan_scan","Also look on my home network", "Off means only this device and cloud providers are checked", bg.lan_scan);
+    row("lan_scan","Also look on my home network", "Off means only this device and cloud providers are checked", bg.lan_scan) +
+    row("gardener","Key & provider gardener", "Checks keys and providers, removes rejected keys, parks dead providers, adopts free AI nodes · " + every(bg.gardener), bg.gardener);
+  const g=d.gardener||{};
+  const keyWord={ok:"working",limited:"working (rate limited)",invalid:"rejected by provider",unreachable:"cannot be reached",removed:"removed — paste the key again to retry"};
+  let gh="";
+  if(g.keys&&g.keys.length) gh+=g.keys.map(k=>`<div class="kv"><span>${esc(k.name)}</span><code>${keyWord[k.status]||k.status||"not checked yet"}${k.checked_at?` · ${fmtWhen(k.checked_at)}`:""}</code></div>`).join("");
+  else gh+='<p class="news-note">No keys checked yet — save a key above, then tap "Check keys &amp; providers now".</p>';
+  (g.cleaned||[]).forEach(c=>{ gh+=`<p class="news-note">Cleaned: removed the ${esc(c.name)} key on ${fmtWhen(c.at)} — ${esc(c.reason)}.</p>` });
+  if(g.providers_down&&g.providers_down.length) gh+=`<p class="news-note">Providers with problems right now: ${g.providers_down.map(esc).join(", ")}${(g.dead_nodes&&g.dead_nodes.length)?` · parked: ${g.dead_nodes.map(esc).join(", ")}`:""}</p>`;
+  gh+=`<p class="news-note">Free AI nodes online: ${g.free_nodes_online||0} · free models available: ${g.free_models||0}</p>`;
+  $("#gardener-body").innerHTML=gh;
 }
 async function loadToolbox(){
   if(STATIC){ $("#tb-chip").textContent="static snapshot"; return }
@@ -1045,6 +1061,7 @@ async function toolboxRun(job,label){
 $("#tb-run-nodes").addEventListener("click",()=>toolboxRun("nodes","Scanning for AI"));
 $("#tb-run-repos").addEventListener("click",()=>toolboxRun("repos","Syncing repositories"));
 $("#tb-run-improve").addEventListener("click",()=>toolboxRun("improve","Improving"));
+$("#tb-run-gardener").addEventListener("click",()=>toolboxRun("gardener","Checking keys and providers"));
 $("#tb-compact").addEventListener("click",async()=>{
   try{ await api("/api/compact",{method:"POST"}); toast("Storage compacted"); $("#tb-msg").textContent="Storage compacted." }catch(e){ toast(e.message) }
 });

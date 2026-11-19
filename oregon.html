@@ -27,9 +27,7 @@ h1{font-size:20px;margin:2px 0 0}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:active:not(:disabled){transform:scale(.97)}
-select.btn{appearance:none}
 .acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.acts .primary{grid-column:span 1}
 label.ctl{display:grid;gap:4px;font-size:12px;color:var(--muted);flex:1;min-width:130px}
 label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:0 10px;font:inherit;font-size:14px;width:100%}
 #log{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px;max-height:300px;overflow:auto}
@@ -38,6 +36,12 @@ label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line)
 .shop{display:grid;gap:8px}
 .shop .item{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .shop .item span{color:var(--muted);font-size:13px}
+.member{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.member:last-child{border-bottom:0}
+.member .nm{width:64px;font-weight:600}
+.member .bar{flex:1;height:10px;background:var(--panel2);border-radius:5px;overflow:hidden}
+.member .bar i{display:block;height:100%;border-radius:5px}
+.member .st{width:86px;text-align:right;font-size:13px;color:var(--muted)}
 .over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,10,.78);z-index:5;padding:16px}
 .over.show{display:flex}
 .over .card{max-width:420px;width:100%;text-align:center}
@@ -48,8 +52,8 @@ label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line)
 <body>
 <div class="wrap">
   <div>
-    <h1>The Oregon Trail</h1>
-    <p class="sub">Independence, Missouri to Oregon City — 2,000 miles. Leave in May, arrive before the snow.</p>
+    <h1>The Oregon Trail <small style="color:var(--muted);font-size:12px">v2</small></h1>
+    <p class="sub">Independence, Missouri to Oregon City — 2,000 miles. Leave in May, arrive before the snow. New in v2: every traveler has their own health, traders flag you down on the trail, and the rivers run high in spring.</p>
   </div>
 
   <div class="card" id="setup">
@@ -60,6 +64,7 @@ label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line)
       <button class="btn" data-prof="carpenter">Carpenter · $800 · score ×2</button>
       <button class="btn" data-prof="farmer">Farmer · $400 · score ×3</button>
     </div>
+    <p class="sub" id="setup-stats" style="margin-top:10px" hidden></p>
     <div class="row" style="margin-top:10px" id="continue-row" hidden>
       <button class="btn primary" id="continue">Continue your journey</button>
       <span class="sub" id="continue-info"></span>
@@ -72,12 +77,17 @@ label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line)
       <div class="stat"><b>Date</b><span id="st-date">May 1</span></div>
       <div class="stat"><b>Distance</b><span id="st-miles">0 <small>/ 2000 mi</small></span></div>
       <div class="stat"><b>Next landmark</b><span id="st-next" style="font-size:14px">Fort Kearny</span></div>
-      <div class="stat"><b>Health</b><span id="st-health">100</span></div>
+      <div class="stat"><b>Party health</b><span id="st-health">100</span></div>
       <div class="stat"><b>Party</b><span id="st-party">4</span></div>
       <div class="stat"><b>Food</b><span id="st-food">0 <small>lb</small></span></div>
       <div class="stat"><b>Oxen</b><span id="st-oxen">4</span></div>
       <div class="stat"><b>Money</b><span id="st-money">$0</span></div>
       <div class="stat"><b>Supplies</b><span id="st-sup" style="font-size:14px">0 parts · 0 meds</span></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:16px">Your party</h2>
+      <div id="members"></div>
     </div>
 
     <div class="card hidden" id="river">
@@ -87,6 +97,15 @@ label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line)
         <button class="btn primary" id="rv-ford">Ford the river</button>
         <button class="btn" id="rv-ferry">Take the ferry · $12 · 1 day</button>
         <button class="btn" id="rv-wait">Wait a day</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="trade">
+      <h2 style="margin:0 0 6px;font-size:16px">A trader flags you down</h2>
+      <p class="sub" id="trade-info" style="margin-bottom:10px"></p>
+      <div class="row">
+        <button class="btn primary" id="tr-accept">Make the trade</button>
+        <button class="btn" id="tr-decline">No thanks</button>
       </div>
     </div>
 
@@ -138,31 +157,46 @@ label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line)
 const $=s=>document.querySelector(s);
 const TOTAL=2000, NAMES=["Mick","Ada","June","Silas"];
 const LANDMARKS=[
-  {m:0,name:"Independence",fort:true},{m:300,name:"Fort Kearny",fort:true},
-  {m:530,name:"Chimney Rock"},{m:640,name:"Fort Laramie",fort:true},
-  {m:850,name:"South Pass"},{m:1010,name:"Fort Bridger",fort:true},
-  {m:1250,name:"Fort Hall",fort:true},{m:1500,name:"Fort Boise",fort:true},
-  {m:1750,name:"Blue Mountains"},{m:2000,name:"Oregon City"}];
+  {m:0,name:"Independence",fort:true,note:"A muddy boomtown packed with wagons. Everyone here is going somewhere."},
+  {m:300,name:"Fort Kearny",fort:true,note:"The first Army post on the Platte. Mail home costs a fortune and takes forever."},
+  {m:530,name:"Chimney Rock",note:"A stone spire visible for days. Halfway across the plains, give or take."},
+  {m:640,name:"Fort Laramie",fort:true,note:"A busy trading post. Prices are already higher than Independence."},
+  {m:850,name:"South Pass",note:"A broad, gentle saddle over the Continental Divide. All downhill from here — in theory."},
+  {m:1010,name:"Fort Bridger",fort:true,note:"Jim Bridger's post. Mountain men swap stories and warn you about the rivers ahead."},
+  {m:1250,name:"Fort Hall",fort:true,note:"On the Snake River plain. The trail turns rougher from here."},
+  {m:1500,name:"Fort Boise",fort:true,note:"The last real outpost. Stock up — the Blue Mountains are no joke."},
+  {m:1750,name:"Blue Mountains",note:"Steep, forested ridges. Snow can close these passes early."},
+  {m:2000,name:"Oregon City",note:"The end of the trail, at the falls of the Willamette."}];
 const RIVERS=[{m:420,name:"Big Blue River"},{m:1150,name:"Snake River"},{m:1850,name:"Columbia River"}];
 const PROFS={banker:{money:1600,mult:1,label:"Banker"},carpenter:{money:800,mult:2,label:"Carpenter"},farmer:{money:400,mult:3,label:"Farmer"}};
 const PACE={steady:[12,18,0],strenuous:[18,26,-2],grueling:[24,34,-5]};
 const RATIONS={filling:[2.5,1],meager:[1.5,-1],bare:[0.75,-4]};
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
+const TRADES=[
+  {text:"30 lb of your food for a spare wagon part", can:()=>S.food>=30, apply:()=>{S.food-=30;S.parts++}},
+  {text:"25 lb of your food for a bottle of medicine", can:()=>S.food>=25, apply:()=>{S.food-=25;S.meds++}},
+  {text:"$10 for 40 lb of salted meat", can:()=>S.money>=10, apply:()=>{S.money-=10;S.food+=40}},
+  {text:"a spare wagon part for 50 lb of food", can:()=>S.parts>=1, apply:()=>{S.parts--;S.food+=50}},
+  {text:"$15 for a fresh ox", can:()=>S.money>=15, apply:()=>{S.money-=15;S.oxen++}}];
 let S=null;
 const rnd=(a,b)=>a+Math.random()*(b-a), ri=(a,b)=>Math.floor(rnd(a,b+1)), pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=v=>Math.max(0,Math.min(100,v));
+const SAVE_KEY="oregon.state.v2";
 
-function dateStr(){ let d=S.day, mo=4, yr=1848; // day 0 = May 1, 1848
+function dateParts(){ let d=S.day, mo=4, yr=1848;
   while(d>=MDAYS[mo]){ d-=MDAYS[mo]; mo++; if(mo>11){mo=0;yr++} }
-  return `${MONTHS[mo]} ${d+1}, ${yr}`; }
-function isWinter(){ let d=S.day, mo=4; while(d>=MDAYS[mo]){ d-=MDAYS[mo]; mo++; if(mo>11) return true } return mo>=11; }
-function save(){ try{ if(S&&!S.over) localStorage.setItem("oregon.state",JSON.stringify(S)); else localStorage.removeItem("oregon.state") }catch(e){} }
+  return {mo, day:d+1, yr}; }
+function dateStr(){ const p=dateParts(); return `${MONTHS[p.mo]} ${p.day}, ${p.yr}` }
+function isWinter(){ return dateParts().mo>=11 || dateParts().yr>1848 }
+function avgHp(){ return S.party.length? S.party.reduce((a,m)=>a+m.hp,0)/S.party.length : 0 }
+function save(){ try{ if(S&&!S.over) localStorage.setItem(SAVE_KEY,JSON.stringify(S)); else localStorage.removeItem(SAVE_KEY) }catch(e){} }
 function price(base){ return Math.max(1, Math.round(base*(1+S.miles/TOTAL))) }
 
 function newGame(prof){
   const p=PROFS[prof];
-  S={prof, money:p.money, miles:0, day:0, health:100, party:NAMES.slice(), food:500, oxen:4,
-     parts:2, meds:2, pace:"steady", rations:"filling", atRiver:null, riverDepth:0, over:false, log:[]};
+  S={prof, money:p.money, miles:0, day:0, party:NAMES.map(n=>({name:n,hp:100})), food:500, oxen:4,
+     parts:2, meds:2, pace:"steady", rations:"filling", atRiver:null, riverDepth:0, trade:null, over:false, log:[]};
   log(`You set out from Independence on May 1, 1848, with 4 oxen, 500 lb of food and $${p.money}. Oregon or bust!`,"good");
   $("#setup").classList.add("hidden"); $("#game").classList.remove("hidden");
   render(); save();
@@ -174,6 +208,7 @@ function log(msg, cls){
 function esc(t){ return String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
 function nextLandmark(){ return LANDMARKS.find(l=>l.m>S.miles) || LANDMARKS[LANDMARKS.length-1] }
 function atFort(){ const l=LANDMARKS.find(l=>l.fort && Math.abs(l.m-S.miles)<1); return l || (S.miles===0?LANDMARKS[0]:null) }
+function statusWord(hp){ return hp>=70?"Healthy":hp>=40?"Tired":hp>=15?"Sick":"Critical" }
 
 function render(){
   if(!S) return;
@@ -181,28 +216,35 @@ function render(){
   $("#st-miles").innerHTML=`${Math.floor(S.miles)} <small>/ ${TOTAL} mi</small>`;
   const nl=nextLandmark();
   $("#st-next").textContent=S.miles>=TOTAL?"—":`${nl.name} (${Math.ceil(nl.m-S.miles)} mi)`;
-  $("#st-health").textContent=Math.max(0,Math.round(S.health));
-  $("#st-health").style.color=S.health<30?"var(--bad)":S.health<60?"var(--warn)":"";
+  const avg=Math.round(avgHp());
+  $("#st-health").textContent=avg;
+  $("#st-health").style.color=avg<30?"var(--bad)":avg<60?"var(--warn)":"";
   $("#st-party").textContent=S.party.length;
   $("#st-food").innerHTML=`${Math.floor(S.food)} <small>lb</small>`;
   $("#st-oxen").textContent=S.oxen;
   $("#st-money").textContent="$"+Math.floor(S.money);
   $("#st-sup").textContent=`${S.parts} parts · ${S.meds} meds`;
   $("#pace").value=S.pace; $("#rations").value=S.rations;
-  // trail map
+  $("#members").innerHTML=S.party.map(m=>`<div class="member"><span class="nm">${esc(m.name)}</span>
+    <span class="bar"><i style="width:${clamp(m.hp)}%;background:${m.hp<25?"var(--bad)":m.hp<55?"var(--warn)":"var(--good)"}"></i></span>
+    <span class="st">${statusWord(m.hp)} · ${Math.round(m.hp)}</span></div>`).join("") || '<p class="sub">No one is left.</p>';
   const t=$("#trail");
   t.innerHTML=LANDMARKS.map(l=>`<span class="dot" style="left:${l.m/TOTAL*100}%"><i>${l.m%500===0||l.fort?esc(l.name):""}</i></span>`).join("")
     +`<span class="wagon" style="left:${Math.min(98, S.miles/TOTAL*100)}%">&#128002;</span>`
     +`<span class="road"></span>`;
-  // river panel
   const rv=$("#river");
   if(S.atRiver){ rv.classList.remove("hidden");
     $("#river-name").textContent=S.atRiver.name;
     $("#river-info").textContent=`The river is about ${S.riverDepth.toFixed(1)} feet deep. Ford it and risk the wagon, pay $12 for the ferry (takes a day), or wait and hope the water drops.`;
   } else rv.classList.add("hidden");
-  // shop at forts / start
+  const tr=$("#trade");
+  if(S.trade!=null){ tr.classList.remove("hidden");
+    $("#trade-info").textContent=`They offer: ${TRADES[S.trade].text}.`;
+    $("#tr-accept").disabled=!TRADES[S.trade].can();
+    if(!TRADES[S.trade].can()) $("#trade-info").textContent+=" You do not have what they ask for.";
+  } else tr.classList.add("hidden");
   const fort=atFort(), shop=$("#shop-card");
-  if(fort && !S.atRiver){ shop.classList.remove("hidden"); $("#shop-name").textContent="Store — "+fort.name;
+  if(fort && !S.atRiver && S.trade==null){ shop.classList.remove("hidden"); $("#shop-name").textContent="Store — "+fort.name;
     const items=[
       ["food","Food, 50 lb",price(13),()=>{S.food+=50}],
       ["ox","Ox",price(40),()=>{S.oxen+=1}],
@@ -215,94 +257,113 @@ function render(){
       S.money-=it[2]; it[3](); log(`Bought: ${it[1]} for $${it[2]}.`); render(); save();
     });
   } else shop.classList.add("hidden");
-  const busy=!!S.atRiver;
+  const busy=!!S.atRiver||S.trade!=null;
   $("#act-travel").disabled=busy; $("#act-hunt").disabled=busy; $("#act-rest").disabled=busy;
   $("#log").innerHTML=S.log.map(l=>`<li class="${l.cls}">${l.msg}</li>`).join("");
 }
 
+function checkDeaths(why){
+  const dead=S.party.filter(m=>m.hp<=0);
+  S.party=S.party.filter(m=>m.hp>0);
+  dead.forEach(m=>{
+    if(why==="dysentery") log(`${m.name} has died of dysentery.`,"bad");
+    else log(`${m.name} has died (${why}).`,"bad");
+  });
+  if(dead.length && !S.party.length && !S.over)
+    endGame(false, "Your whole party has died on the trail. The Oregon Trail claims another wagon.");
+  return dead.length>0;
+}
+function applyAll(delta, why){
+  S.party.forEach(m=>{ m.hp=clamp(m.hp+delta) });
+  if(delta<0) checkDeaths(why||"sickness");
+}
+function hurtRandom(amount, why){
+  if(!S.party.length) return;
+  const m=pick(S.party);
+  m.hp-=amount;
+  if(m.hp>0 && m.hp<=35 && S.meds>0){ S.meds--; m.hp=clamp(m.hp+25); log(`You use a medicine on ${m.name} (${why}). It helps.`,"good"); }
+  if(m.hp<=0) checkDeaths(why);
+  else if(amount>=15) log(`${m.name} is hurt by ${why} and looking rough.`,"warn");
+}
 function eatAndHealth(){
   const per=RATIONS[S.rations][0], need=per*S.party.length;
   if(S.food>=need){ S.food-=need } else {
-    S.food=0; S.health-=8; log("You are out of food! The party is going hungry.","bad");
+    S.food=0; log("You are out of food! The party is going hungry.","bad");
+    S.party.forEach(m=>{ m.hp=clamp(m.hp-8) }); checkDeaths("hunger and sickness");
+    if(S.over) return;
   }
-  S.health+=RATIONS[S.rations][1];
-  if(S.health>100) S.health=100;
-}
-function hurt(amount, why){
-  S.health-=amount;
-  if(S.health<=35 && S.meds>0){ S.meds--; S.health+=12; log(`Used a medicine for ${why}. It helps.`,"good"); }
-  if(S.health<=0){ kill(why) }
-}
-function kill(why){
-  if(!S.party.length) return;
-  const who=S.party.pop();
-  if(why==="dysentery") log(`${who} has died of dysentery.`,"bad");
-  else log(`${who} has died (${why}).`,"bad");
-  S.health=Math.max(45,S.health);
-  if(!S.party.length) endGame(false, "Your whole party has died on the trail. "+(why==="dysentery"?"The Oregon Trail claims another wagon.":""));
+  applyAll(RATIONS[S.rations][1], "sickness");
 }
 function endGame(won, msg){
   S.over=true; save();
-  let score=0;
-  if(won){ score=Math.round((Math.floor(S.money)+Math.round(S.health)*5+Math.floor(S.food)/10+S.party.length*250)*PROFS[S.prof].mult) }
+  let score=0, bestLine="";
+  if(won){ score=Math.round((Math.floor(S.money)+Math.round(avgHp())*5+Math.floor(S.food)/10+S.party.length*250)*PROFS[S.prof].mult);
+    const wins=(+localStorage.getItem("oregon.wins")||0)+1; localStorage.setItem("oregon.wins",wins);
+    const best=Math.max(score, +localStorage.getItem("oregon.best")||0); localStorage.setItem("oregon.best",best);
+    bestLine=` Journeys completed: ${wins}. Best score: ${best}.`;
+  }
   $("#over-title").textContent=won?"You made it to Oregon!":"The trail ends here";
-  $("#over-msg").textContent=msg+(won?` You arrived on ${dateStr()} with ${S.party.length} of your party, ${Math.floor(S.food)} lb of food and $${Math.floor(S.money)} left. Score: ${score} (${PROFS[S.prof].label} ×${PROFS[S.prof].mult}).`:"");
+  $("#over-msg").textContent=msg+(won?` You arrived on ${dateStr()} with ${S.party.length} of your party, ${Math.floor(S.food)} lb of food and $${Math.floor(S.money)} left. Score: ${score} (${PROFS[S.prof].label} ×${PROFS[S.prof].mult}).`+bestLine:"");
   $("#over").classList.add("show");
 }
 function advanceDay(){ S.day++; if(isWinter() && S.miles<TOTAL){ endGame(false,"Deep snow closes the mountain passes. Your wagon is snowed in for the winter."); return false } return true }
+function riverDepthNow(){ const mo=dateParts().mo; const adj=mo<=5?0.7:mo===6?0.2:mo===7?0:mo===8?-0.4:-0.6;
+  return Math.max(1.2, Math.min(5.2, rnd(2,4.5)+adj)) }
 
 function travel(){
-  if(S.atRiver||S.over) return;
+  if(S.atRiver||S.trade!=null||S.over) return;
   if(S.oxen<=0){ log("You have no oxen left. You cannot move — rest and hope, or start over.","bad"); render(); return }
   const [lo,hi,hp]=PACE[S.pace];
   let dist=rnd(lo,hi)*(S.oxen>=3?1:S.oxen===2?0.8:0.55);
-  // stop at the next river or landmark, whichever comes first
   const river=RIVERS.find(r=>r.m>S.miles && r.m<=S.miles+dist);
   const fortStop=LANDMARKS.find(l=>l.m>S.miles && l.m<=S.miles+dist);
-  if(river){ dist=river.m-S.miles; S.miles=river.m; S.atRiver=river; S.riverDepth=rnd(2,4.5); }
+  if(river){ dist=river.m-S.miles; S.miles=river.m; S.atRiver=river; S.riverDepth=riverDepthNow(); }
   else if(fortStop){ dist=fortStop.m-S.miles; S.miles=fortStop.m; }
   else S.miles+=dist;
-  S.health+=hp;
+  applyAll(hp, "exhaustion");
   eatAndHealth();
-  if(S.health<=0 && !S.over){ kill("exhaustion and sickness"); }
-  if(!advanceDay()||S.over){ render(); save(); return }
+  if(S.over){ render(); save(); return }
+  if(!advanceDay()){ render(); save(); return }
   if(S.miles>=TOTAL){ S.miles=TOTAL; render(); endGame(true,"After months on the trail, your wagon rolls into Oregon City."); return }
-  if(river) log(`You reach the ${river.name}. You must cross it.`,"warn");
-  else if(fortStop) log(`You arrive at ${fortStop.name}. ${fortStop.fort?"There is a store here.":""}`,"good");
+  if(river) log(`You reach the ${river.name}. ${dateParts().mo<=5?"Spring snowmelt has it running high. ":""}You must cross it.`,"warn");
+  else if(fortStop){ log(`You arrive at ${fortStop.name}. ${fortStop.note}`,"good"); }
   else log(`Traveled ${Math.round(dist)} miles. ${Math.floor(S.miles)} miles from Independence.`);
-  if(!river && !fortStop) randomEvent();
-  if(S.health<=0 && !S.over) kill("sickness");
+  if(!river && !fortStop){
+    if(Math.random()<0.08){ S.trade=ri(0,TRADES.length-1); log("A lone trader rides up alongside your wagon.","warn"); }
+    else randomEvent();
+  }
   render(); save();
 }
 function randomEvent(){
   const roll=Math.random(); if(roll>0.30) return;
   const e=ri(0,7);
   if(e===0){ const sick=pick(["dysentery","cholera","a fever","typhoid"]);
-    log(`Someone has ${sick==="dysentery"?"dysentery":sick}.`,"bad"); hurt(14, sick); if(Math.random()<0.25&&S.health<40) kill(sick); }
+    log(`Sickness spreads through the wagon — ${sick}.`,"bad"); hurtRandom(40, sick); }
   else if(e===1){ if(S.parts>0){ S.parts--; log("A wagon wheel breaks. You use a spare part and roll on.","warn"); }
     else { S.day++; log("A wagon wheel breaks. With no spare part, repairs take an extra day.","bad"); } }
   else if(e===2){ if(S.oxen>1 && Math.random()<0.5){ S.oxen--; log("An ox wanders off in the night and is gone.","bad"); }
     else { log("A thunderstorm soaks everything, but nothing is ruined.","warn"); } }
   else if(e===3){ const f=ri(20,70); S.food+=f; log(`You find an abandoned wagon with ${f} lb of usable food.`,"good"); }
   else if(e===4){ const lost=Math.min(S.food, ri(15,50)); S.food-=lost; log(`Thieves slip in at night and steal ${Math.floor(lost)} lb of food.`,"bad"); }
-  else if(e===5){ log("A snake bites a traveler!","bad"); hurt(10,"a snake bite"); }
+  else if(e===5){ log("A snake bites a traveler!","bad"); hurtRandom(18,"a snake bite"); }
   else if(e===6){ const f=ri(10,40); S.food+=f; log(`Good hunting grounds — you bring back ${f} lb of meat.`,"good"); }
-  else { S.health=Math.min(100,S.health+6); log("A clear day and an easy stretch of trail. Spirits lift.","good"); }
+  else { applyAll(6); log("A clear day and an easy stretch of trail. Spirits lift.","good"); }
 }
 function rest(){
-  if(S.atRiver||S.over) return;
-  eatAndHealth(); S.health=Math.min(100,S.health+9);
-  log("You rest for a day. The party feels stronger.");
+  if(S.atRiver||S.trade!=null||S.over) return;
+  eatAndHealth(); if(S.over){ render(); save(); return }
+  applyAll(9);
+  log("You rest for a day. Everyone feels stronger.");
   if(!advanceDay()){ render(); save(); return }
   render(); save();
 }
 function hunt(){
-  if(S.atRiver||S.over) return;
-  eatAndHealth();
+  if(S.atRiver||S.trade!=null||S.over) return;
+  eatAndHealth(); if(S.over){ render(); save(); return }
   const got=Math.random()<0.75?ri(40,120):ri(0,12);
   S.food+=got;
   log(got>20?`A good hunt: ${got} lb of meat.`:`A poor hunt: only ${got} lb of meat.`, got>20?"good":"");
-  if(Math.random()<0.10){ log("A hunter is hurt in an accident.","bad"); hurt(8,"a hunting accident"); }
+  if(Math.random()<0.10){ log("A hunter is hurt in an accident.","bad"); hurtRandom(14,"a hunting accident"); }
   if(!advanceDay()){ render(); save(); return }
   render(); save();
 }
@@ -312,23 +373,34 @@ function crossRiver(mode){
     if(S.money<12){ log("You cannot afford the ferry.","bad"); render(); return }
     S.money-=12; S.atRiver=null; eatAndHealth();
     log(`You pay $12 and cross the ${r.name} safely by ferry.`,"good");
-    if(!advanceDay()){ render(); save(); return }
+    if(!S.over && !advanceDay()){ render(); save(); return }
   } else if(mode==="wait"){
-    eatAndHealth(); S.riverDepth=Math.max(1.5, S.riverDepth-rnd(0.3,1.1));
+    eatAndHealth(); S.riverDepth=Math.max(1.2, S.riverDepth-rnd(0.3,1.1));
     log(`You wait by the ${r.name}. The water is now about ${S.riverDepth.toFixed(1)} feet deep.`);
-    if(!advanceDay()){ render(); save(); return }
-  } else { // ford
+    if(!S.over && !advanceDay()){ render(); save(); return }
+  } else {
     const risk=S.riverDepth>3.5?0.45:S.riverDepth>2.8?0.25:0.10;
     S.atRiver=null;
     if(Math.random()<risk){
       const lostF=Math.min(S.food, ri(30,120)); S.food-=lostF;
       let extra="";
       if(Math.random()<0.4 && S.oxen>1){ S.oxen--; extra=" An ox drowned."; }
-      if(Math.random()<0.25){ hurt(15,"the crossing"); extra+=" A traveler nearly drowned."; }
+      if(Math.random()<0.35){ hurtRandom(28,"the crossing"); extra+=" A traveler nearly drowned."; }
       log(`The wagon tips in the ${r.name}! You lose ${Math.floor(lostF)} lb of food.${extra}`,"bad");
     } else log(`You ford the ${r.name} safely.`,"good");
   }
   render(); save();
+}
+function acceptTrade(){
+  if(S.trade==null) return;
+  const t=TRADES[S.trade];
+  if(t.can()){ t.apply(); log(`Trade made: ${t.text}.`,"good"); }
+  S.trade=null; render(); save();
+}
+function declineTrade(){
+  if(S.trade==null) return;
+  log("You wave the trader off and roll on.");
+  S.trade=null; render(); save();
 }
 
 document.querySelectorAll("[data-prof]").forEach(b=>b.onclick=()=>newGame(b.dataset.prof));
@@ -339,13 +411,17 @@ $("#act-hunt").onclick=hunt;
 $("#rv-ford").onclick=()=>crossRiver("ford");
 $("#rv-ferry").onclick=()=>crossRiver("ferry");
 $("#rv-wait").onclick=()=>crossRiver("wait");
+$("#tr-accept").onclick=acceptTrade;
+$("#tr-decline").onclick=declineTrade;
 $("#pace").onchange=e=>{ S.pace=e.target.value; save() };
 $("#rations").onchange=e=>{ S.rations=e.target.value; save() };
-$("#new-game").onclick=()=>{ if(confirm("Abandon this journey and start over?")){ localStorage.removeItem("oregon.state"); location.reload() } };
-$("#over-again").onclick=()=>{ localStorage.removeItem("oregon.state"); location.reload() };
+$("#new-game").onclick=()=>{ if(confirm("Abandon this journey and start over?")){ localStorage.removeItem(SAVE_KEY); location.reload() } };
+$("#over-again").onclick=()=>{ localStorage.removeItem(SAVE_KEY); location.reload() };
 
-// resume a saved journey
-try{ const s=JSON.parse(localStorage.getItem("oregon.state"));
+// setup stats + resume a saved journey
+try{ const wins=+localStorage.getItem("oregon.wins")||0, best=+localStorage.getItem("oregon.best")||0;
+  if(wins){ const el=$("#setup-stats"); el.hidden=false; el.textContent=`Journeys completed: ${wins} · Best score: ${best}`; }
+  const s=JSON.parse(localStorage.getItem(SAVE_KEY));
   if(s && !s.over && s.party && s.party.length){ S=s;
     $("#continue-row").hidden=false;
     $("#continue-info").textContent=`${Math.floor(S.miles)} miles in, ${S.party.length} travelers, ${dateStr()}.`;

@@ -1651,10 +1651,11 @@ CLOUD_NODES = [
     ("minimax", "MiniMax", "https://api.minimax.io/v1", "MINIMAX_API_KEY", "https://platform.minimax.io", "/models"),
     ("cohere", "Cohere", "https://api.cohere.ai/compatibility/v1", "COHERE_API_KEY", "https://dashboard.cohere.com/api-keys", "/models"),
     ("meta", "Meta Muse AI", "https://api.meta.ai/v1", "MODEL_API_KEY", "https://dev.meta.ai", "/models"),
+    ("pollinations", "Pollinations", "https://text.pollinations.ai/openai", "", "", "/models"),
 ]
 # Providers whose API keys work on a no-card free plan, so they cannot charge anything. The OpenRouter node only
 # ever adds ":free" models. Everything else (and every paid OpenRouter route) is off unless paid AI is allowed.
-FREE_NODE_IDS = {"openrouter", "gemini", "groq", "mistral", "sambanova", "nvidia", "huggingface", "cohere"}
+FREE_NODE_IDS = {"openrouter", "gemini", "groq", "mistral", "sambanova", "nvidia", "huggingface", "cohere", "pollinations"}
 NODE_KEY_NAMES = sorted({c[3] for c in CLOUD_NODES})
 # local model servers: port -> software that usually listens there
 LOCAL_PORTS = {11434: "Ollama", 1234: "LM Studio", 8080: "llama.cpp / LocalAI", 8000: "vLLM", 1337: "Jan",
@@ -1751,7 +1752,7 @@ def _list_cloud(node: tuple, cfg: dict) -> dict:
            "trusted": True, "models": [], "models_total": 0,
            "free": nid in FREE_NODE_IDS}
     key = node_key(env)
-    if not key:
+    if env and not key:
         rec["status"] = "needs_key"
         return rec
     try:
@@ -1848,8 +1849,10 @@ def scan_nodes(path: str, gw: Optional["Gateway"] = None) -> dict:
     prev = load_nodes(path)
     trusted = set(prev.get("trusted", []))
     extra = [u.strip().rstrip("/") for u in os.getenv("MCUBED_NODES", "").split(",") if u.strip()]
+    dead = set(load_key_health().get("dead_nodes", []))
+    live_nodes = [n for n in CLOUD_NODES if n[0] not in dead]
     with ThreadPoolExecutor(max_workers=24) as ex:
-        cloud = list(ex.map(lambda n: _list_cloud(n, cfg), CLOUD_NODES))
+        cloud = list(ex.map(lambda n: _list_cloud(n, cfg), live_nodes))
         local = [r for r in ex.map(lambda p: _probe_local("127.0.0.1", p[0], p[1]), LOCAL_PORTS.items()) if r]
         lan = []
         if cfg.get("lan_scan"):
@@ -2086,6 +2089,11 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
                 run_node_scan(gw, lock)
         except Exception:  # noqa: BLE001
             log.exception("AI node scan failed")
+        try:  # check keys and providers, clean what is broken, adopt free nodes
+            if gw.store.get_policy("bg_gardener", True):
+                run_gardener(gw)
+        except Exception:  # noqa: BLE001
+            log.exception("provider gardener failed")
         time.sleep(poll_s)
 
 
@@ -3066,6 +3074,197 @@ def save_keys(updates: dict) -> dict:
 
 
 
+# --------------------------------------------------------------------------- #
+# Provider gardener: automated checking, updating and cleaning of API keys and
+# providers, plus automatic adoption of free AI nodes.
+# --------------------------------------------------------------------------- #
+GARDENER_EVERY_HOURS = 6
+GARDENER_MAX_FAILS = 3  # consecutive failed checks before a key/provider is cleaned
+
+
+def key_health_path() -> Path:
+    """Where the gardener keeps key/provider health: next to keys.json."""
+    return Path(os.getenv("MCUBED_DATA", str(HERE))) / "key_health.json"
+
+
+def load_key_health() -> dict:
+    try:
+        h = json.loads(key_health_path().read_text())
+        return h if isinstance(h, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_key_health(h: dict) -> None:
+    path = key_health_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name("key_health.json.tmp")
+        tmp.write_text(json.dumps(h, indent=1))
+        try:
+            tmp.chmod(0o600)
+        except OSError:
+            pass
+        tmp.replace(path)
+    except OSError:
+        pass
+
+
+def _http_status(url: str, key: Optional[str] = None, headers: Optional[dict] = None,
+                 timeout: float = 8) -> Optional[int]:
+    """HTTP status of a GET, or None when the host cannot be reached at all."""
+    import urllib.error
+    import urllib.request
+    h = {"User-Agent": "MCUBED", "Accept": "application/json", **(headers or {})}
+    if key:
+        h["Authorization"] = f"Bearer {key}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout) as r:
+            r.read(512)
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:  # noqa: BLE001 - DNS, TLS or timeout: the host is unreachable
+        return None
+
+
+def _classify(code: Optional[int]) -> str:
+    if code is None:
+        return "unreachable"
+    if code == 200:
+        return "ok"
+    if code in (401, 403):
+        return "invalid"
+    if code == 429:
+        return "limited"
+    return "ok"  # any other reply still proves the endpoint is alive and answered
+
+
+def _key_probe(env: str) -> str:
+    """Check one saved key against its own provider."""
+    key = os.getenv(env) or ""
+    if not key:
+        return "unset"
+    if env == "ANTHROPIC_API_KEY":
+        return _classify(_http_status("https://api.anthropic.com/v1/models", None,
+                                      {"x-api-key": key, "anthropic-version": "2023-06-01"}))
+    if env == "GITHUB_TOKEN":
+        return _classify(_http_status("https://api.github.com/user", key))
+    for _nid, _name, base, nenv, _signup, path in CLOUD_NODES:
+        if nenv == env:
+            return _classify(_http_status(base + (path or "/models"), key))
+    return "ok"
+
+
+def _provider_probe(node: tuple) -> str:
+    """Is this provider reachable at all (and is its saved key the problem)?"""
+    _nid, _name, base, env, _signup, path = node
+    if env and node_key(env):
+        return {"ok": "online", "limited": "online", "invalid": "key_invalid",
+                "unreachable": "unreachable"}.get(_key_probe(env), "online")
+    code = _http_status(base + (path or "/models"), None)
+    if code is None:
+        return "unreachable"
+    return "online" if not env else "needs_key"  # keyless nodes are online when they answer
+
+
+def run_gardener(gw: "Gateway", force: bool = False) -> Optional[dict]:
+    """Check every saved key and provider; clean what is broken; adopt free nodes.
+
+    Cleaning is deliberately conservative: only a definitive rejection counts.
+    A key its provider rejects (401/403) on GARDENER_MAX_FAILS consecutive
+    checks is removed — and only when it came from keys.json, never when it was
+    supplied through the environment. A provider that cannot be reached at all
+    on that many checks is parked (scans skip it) until a later check finds it
+    alive again. Free and keyless nodes need no cleaning: the node scan that
+    follows adopts their current models automatically.
+    """
+    every = float(os.getenv("GATEWAY_GARDENER_HOURS")
+                  or gw.defaults.get("gardener_every_hours", GARDENER_EVERY_HOURS))
+    last = float(gw.store.get_policy("last_gardener_ts", 0) or 0)
+    if not force and every > 0 and time.time() - last < every * 3600:
+        return None
+    from concurrent.futures import ThreadPoolExecutor
+    health = load_key_health()
+    keys_h = health.setdefault("keys", {})
+    prov_h = health.setdefault("providers", {})
+    cleaned = health.setdefault("cleaned", [])
+    try:
+        saved = json.loads(keys_path().read_text())
+        if not isinstance(saved, dict):
+            saved = {}
+    except (OSError, ValueError):
+        saved = {}
+    set_envs = [env for env in KEY_NAMES if os.getenv(env)]
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        key_results = dict(zip(set_envs, ex.map(_key_probe, set_envs)))
+        prov_results = dict(zip([n[0] for n in CLOUD_NODES], ex.map(_provider_probe, CLOUD_NODES)))
+    now = time.time()
+    removed = []
+    for env, status in key_results.items():
+        name = next((n for e, n, *_ in KEY_SLOTS if e == env), env)
+        rec = keys_h.setdefault(env, {})
+        if status == "invalid":
+            rec["fails"] = int(rec.get("fails", 0)) + 1
+        elif status in ("ok", "limited"):
+            rec["fails"] = 0
+        rec.update(name=name, status=status, checked_at=now)
+        if status == "invalid" and rec["fails"] >= GARDENER_MAX_FAILS and env in saved:
+            save_keys({env: ""})
+            rec.update(status="removed", fails=0)
+            entry = {"env": env, "name": name, "at": now,
+                     "reason": "the provider rejected this key (401/403) on 3 checks in a row"}
+            cleaned.append(entry)
+            removed.append(entry)
+            log.info("gardener: removed invalid key %s", env)
+    health["cleaned"] = cleaned[-20:]
+    dead = set(health.get("dead_nodes", []))
+    for node in CLOUD_NODES:
+        nid = node[0]
+        status = prov_results.get(nid, "unreachable")
+        rec = prov_h.setdefault(nid, {})
+        if status == "unreachable":
+            rec["fails"] = int(rec.get("fails", 0)) + 1
+        elif status in ("online", "needs_key", "key_invalid"):
+            rec["fails"] = 0
+        rec.update(name=node[1], status=status, checked_at=now)
+        if rec["fails"] >= GARDENER_MAX_FAILS and nid not in dead:
+            dead.add(nid)
+            log.info("gardener: provider %s unreachable on 3 checks; parked", nid)
+        elif nid in dead and status != "unreachable":
+            dead.discard(nid)
+            log.info("gardener: provider %s answers again; unparked", nid)
+    health["dead_nodes"] = sorted(dead)
+    health["checked_at"] = now
+    _save_key_health(health)
+    gw.store.set_policy("last_gardener_ts", now)
+    return {"checked_at": now, "keys": key_results, "providers": prov_results,
+            "removed": removed, "dead_nodes": sorted(dead)}
+
+
+def gardener_status(gw: "Gateway") -> dict:
+    """Gardener summary for the Toolbox: toggle state plus the latest health."""
+    health = load_key_health()
+    nodes = load_nodes(gw.nodes_path)
+    free_online = [n for n in nodes.get("nodes", []) if n.get("free") and n.get("status") == "online"]
+    return {
+        "on": bool(gw.store.get_policy("bg_gardener", True)),
+        "every": float(os.getenv("GATEWAY_GARDENER_HOURS")
+                       or gw.defaults.get("gardener_every_hours", GARDENER_EVERY_HOURS)),
+        "unit": "hours",
+        "last_at": float(gw.store.get_policy("last_gardener_ts", 0) or 0) or None,
+        "keys": [{"env": e, "name": r.get("name", e), "status": r.get("status"),
+                  "checked_at": r.get("checked_at")}
+                 for e, r in sorted(health.get("keys", {}).items())],
+        "providers_down": [r.get("name", nid) for nid, r in health.get("providers", {}).items()
+                           if r.get("status") in ("unreachable", "key_invalid")],
+        "dead_nodes": health.get("dead_nodes", []),
+        "cleaned": health.get("cleaned", [])[-5:],
+        "free_nodes_online": len(free_online),
+        "free_models": sum(len(n.get("models", [])) for n in free_online),
+    }
+
+
 _GUI_STARTED_AT: float = 0.0
 
 
@@ -3094,7 +3293,9 @@ def toolbox_status(gw: "Gateway") -> dict:
                              float(nodes_config(gw).get("scan_every_minutes", 60)), "minutes",
                              "last_node_scan_ts"),
             "lan_scan": {"on": bool(nodes_config(gw).get("lan_scan", True))},
+            "gardener": gardener_status(gw),
         },
+        "gardener": gardener_status(gw),
     }
 
 
@@ -3278,7 +3479,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 bg = b.get("background")
                 if isinstance(bg, dict):  # toggles for the scheduled background jobs
                     for name, policy in (("auto_improve", "bg_auto_improve"), ("repo_sync", "bg_repo_sync"),
-                                         ("node_scan", "bg_node_scan"), ("lan_scan", "bg_lan_scan")):
+                                         ("node_scan", "bg_node_scan"), ("lan_scan", "bg_lan_scan"),
+                                         ("gardener", "bg_gardener")):
                         if name in bg:
                             gw.store.set_policy(policy, bool(bg[name]))
                 action = b.get("action")
@@ -3299,8 +3501,11 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                             gw.store.set_policy("last_repo_sync_ts", time.time())
                         elif job_name == "nodes":
                             run_node_scan(gw, lock, force=True)
+                        elif job_name == "gardener":
+                            run_gardener(gw, force=True)
+                            run_node_scan(gw, lock, force=True)  # adopt free nodes / drop cleaned ones
                         else:
-                            return self._send(400, {"error": "job must be improve, repos or nodes"})
+                            return self._send(400, {"error": "job must be improve, repos, nodes or gardener"})
                     except (GatewayError, ValueError, OSError) as e:
                         return self._send(400, {"error": str(e)})
                 with lock:
