@@ -1650,6 +1650,7 @@ CLOUD_NODES = [
     ("zai", "Z.ai GLM", "https://api.z.ai/api/paas/v4", "ZAI_API_KEY", "https://z.ai/manage-apikey/apikey-list", "/models"),
     ("minimax", "MiniMax", "https://api.minimax.io/v1", "MINIMAX_API_KEY", "https://platform.minimax.io", "/models"),
     ("cohere", "Cohere", "https://api.cohere.ai/compatibility/v1", "COHERE_API_KEY", "https://dashboard.cohere.com/api-keys", "/models"),
+    ("meta", "Meta Muse AI", "https://api.meta.ai/v1", "MODEL_API_KEY", "https://dev.meta.ai", "/models"),
 ]
 # Providers whose API keys work on a no-card free plan, so they cannot charge anything. The OpenRouter node only
 # ever adds ":free" models. Everything else (and every paid OpenRouter route) is off unless paid AI is allowed.

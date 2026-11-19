@@ -68,6 +68,7 @@ public class MainActivity extends Activity {
             {"DASHSCOPE_API_KEY", "Alibaba Qwen (paid)"},
             {"ZAI_API_KEY", "Z.ai GLM (paid)"},
             {"MINIMAX_API_KEY", "MiniMax (paid)"},
+            {"MODEL_API_KEY", "Meta Muse AI (paid)"},
     };
     private static final int MENU_KEY = 1, MENU_RELOAD = 2, MENU_TOOLBOX = 3;
 
