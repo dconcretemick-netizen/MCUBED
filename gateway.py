@@ -2099,6 +2099,11 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
                 run_ui_polish(gw)
         except Exception:  # noqa: BLE001
             log.exception("UI polish audit failed")
+        try:  # refresh the OBD trouble-code database from its open-source upstream
+            if gw.store.get_policy("bg_obd_update", True):
+                run_obd_update(gw)
+        except Exception:  # noqa: BLE001
+            log.exception("OBD code database update failed")
         time.sleep(poll_s)
 
 
@@ -3304,11 +3309,14 @@ def shutdown_gateway(delay: float = 0.6) -> None:
 # no overscroll chaining, and compact spacing on narrow screens.
 # --------------------------------------------------------------------------- #
 UI_POLISH_MARKER = "mcubed-ui-polish"
+UI_POLISH_VERSION = "mcubed-ui-polish v2"
 UI_POLISH_HTML = (
     "<style data-mcubed-ui-polish>\n"
-    "/* mcubed-ui-polish: automated Android UI improvements, injected by the gateway */\n"
+    "/* mcubed-ui-polish v2: automated Android UI improvements, injected by the gateway */\n"
     "html{-webkit-tap-highlight-color:transparent}\n"
+    "html,body{overflow-x:hidden;overflow-x:clip}\n"
     "body{overscroll-behavior-y:none}\n"
+    "img,svg,video,canvas,iframe{max-width:100%}\n"
     "@media (pointer:coarse){\n"
     "  button,select,.btn,[role=tab]{min-height:48px}\n"
     "  input,textarea{font-size:16px}\n"
@@ -3325,7 +3333,8 @@ UI_PAGES = ("dashboard.html", "oregon.html", "game.html", "solitaire.html",
 
 
 def polish_html(body: bytes) -> bytes:
-    """Add the automated Android UI polish (and any missing mobile basics) to a page."""
+    """Add the automated Android UI polish (and any missing mobile basics) to a page.
+    A page carrying an older built-in polish gets it refreshed to the current version."""
     try:
         text = body.decode("utf-8")
     except UnicodeDecodeError:
@@ -3341,6 +3350,8 @@ def polish_html(body: bytes) -> bytes:
         add += '<meta name="theme-color" content="#0f1417">\n'
     if UI_POLISH_MARKER not in text:
         add += UI_POLISH_HTML + "\n"
+    elif UI_POLISH_VERSION not in text:  # stale built-in polish: swap in the current one
+        text = re.sub(r"<style data-mcubed-ui-polish>.*?</style>", UI_POLISH_HTML, text, count=1, flags=re.S)
     if add:
         text = text.replace("</head>", add + "</head>", 1)
     return text.encode("utf-8")
@@ -3361,9 +3372,11 @@ def ui_audit() -> dict:
             issues.append("viewport misses viewport-fit=cover")
         if 'name="theme-color"' not in text:
             issues.append("no theme-color")
-        pages.append({"page": name, "polished": UI_POLISH_MARKER in text, "issues": issues})
+        pages.append({"page": name, "polished": UI_POLISH_MARKER in text,
+                      "outdated": UI_POLISH_MARKER in text and UI_POLISH_VERSION not in text,
+                      "issues": issues})
     return {"pages": pages,
-            "auto_fixed": sum(1 for p in pages if not p["polished"] or p["issues"]),
+            "auto_fixed": sum(1 for p in pages if not p["polished"] or p["outdated"] or p["issues"]),
             "checked_at": time.time()}
 
 
@@ -3421,8 +3434,10 @@ def toolbox_status(gw: "Gateway") -> dict:
             "lan_scan": {"on": bool(nodes_config(gw).get("lan_scan", True))},
             "gardener": gardener_status(gw),
             "ui_polish": ui_status(gw),
+            "obd_update": obd_data_status(gw),
         },
         "gardener": gardener_status(gw),
+        "obd_data": obd_data_status(gw),
     }
 
 
@@ -3435,8 +3450,43 @@ class ObdError(Exception):
     pass
 
 
-# pid -> (label, unit, decode bytes -> value, byte count)
+def _fuel_system_status(d: bytes) -> str:
+    """PID 0x03: bit-coded open/closed loop state for each bank."""
+    def one(b: int) -> str:
+        if b & 0x02:
+            return "closed loop"
+        if b & 0x10:
+            return "closed loop (fault)"
+        if b & 0x08:
+            return "open loop (failure)"
+        if b & 0x04:
+            return "open loop (load)"
+        if b & 0x01:
+            return "open loop (warming up)"
+        return "—"
+    out = one(d[0])
+    if len(d) > 1 and d[1]:
+        out += " · bank 2: " + one(d[1])
+    return out
+
+
+_OBD_STANDARDS = {1: "OBD-II (California ARB)", 2: "OBD (US EPA)", 3: "OBD-I and OBD-II",
+                  4: "OBD-I", 5: "No OBD", 6: "EOBD (Europe)", 7: "EOBD and OBD-II",
+                  8: "EOBD and OBD", 9: "EOBD, OBD and OBD-II", 10: "JOBD (Japan)",
+                  11: "JOBD and OBD-II", 12: "JOBD and EOBD", 13: "JOBD, EOBD and OBD-II"}
+
+_FUEL_TYPES = {1: "Gasoline", 2: "Methanol", 3: "Ethanol", 4: "Diesel", 5: "LPG",
+               6: "CNG", 7: "Propane", 8: "Electric", 9: "Bifuel — gasoline",
+               10: "Bifuel — methanol", 11: "Bifuel — ethanol", 12: "Bifuel — LPG",
+               13: "Bifuel — CNG", 14: "Bifuel — propane", 15: "Bifuel — electric",
+               16: "Hybrid gasoline", 17: "Hybrid ethanol", 18: "Hybrid diesel",
+               19: "Hybrid electric", 20: "Hybrid running electric", 21: "Bifuel running electric"}
+
+
+# pid -> (label, unit, decode bytes -> value, byte count). Standard SAE J1979
+# Mode 01 formulas, cross-checked against the python-OBD project's decoders.
 OBD_PIDS = {
+    0x03: ("Fuel system", "", _fuel_system_status, 2),
     0x04: ("Engine load", "%", lambda d: d[0] * 100 / 255, 1),
     0x05: ("Coolant temp", "°C", lambda d: d[0] - 40, 1),
     0x06: ("Short fuel trim B1", "%", lambda d: (d[0] - 128) * 100 / 128, 1),
@@ -3451,16 +3501,71 @@ OBD_PIDS = {
     0x0F: ("Intake air temp", "°C", lambda d: d[0] - 40, 1),
     0x10: ("MAF air flow", "g/s", lambda d: (d[0] * 256 + d[1]) / 100, 2),
     0x11: ("Throttle", "%", lambda d: d[0] * 100 / 255, 1),
+    0x14: ("O2 voltage B1S1", "V", lambda d: d[0] / 200, 2),
+    0x15: ("O2 voltage B1S2", "V", lambda d: d[0] / 200, 2),
+    0x16: ("O2 voltage B1S3", "V", lambda d: d[0] / 200, 2),
+    0x17: ("O2 voltage B1S4", "V", lambda d: d[0] / 200, 2),
+    0x18: ("O2 voltage B2S1", "V", lambda d: d[0] / 200, 2),
+    0x19: ("O2 voltage B2S2", "V", lambda d: d[0] / 200, 2),
+    0x1A: ("O2 voltage B2S3", "V", lambda d: d[0] / 200, 2),
+    0x1B: ("O2 voltage B2S4", "V", lambda d: d[0] / 200, 2),
+    0x1C: ("OBD standard", "", lambda d: _OBD_STANDARDS.get(d[0], f"standard {d[0]}"), 1),
     0x1F: ("Run time", "s", lambda d: d[0] * 256 + d[1], 2),
     0x21: ("Distance with light on", "km", lambda d: d[0] * 256 + d[1], 2),
+    0x22: ("Fuel rail pressure", "kPa", lambda d: (d[0] * 256 + d[1]) * 0.079, 2),
+    0x23: ("Fuel rail pressure (gauge)", "kPa", lambda d: (d[0] * 256 + d[1]) * 10, 2),
+    0x2C: ("Commanded EGR", "%", lambda d: d[0] * 100 / 255, 1),
+    0x2D: ("EGR error", "%", lambda d: (d[0] - 128) * 100 / 128, 1),
+    0x2E: ("Evap purge", "%", lambda d: d[0] * 100 / 255, 1),
     0x2F: ("Fuel level", "%", lambda d: d[0] * 100 / 255, 1),
+    0x30: ("Warm-ups since codes cleared", "", lambda d: d[0], 1),
+    0x31: ("Distance since codes cleared", "km", lambda d: d[0] * 256 + d[1], 2),
+    0x32: ("Evap vapor pressure", "Pa", lambda d: ((d[0] * 256 + d[1]) - (65536 if d[0] & 0x80 else 0)) / 4, 2),
     0x33: ("Barometric pressure", "kPa", lambda d: d[0], 1),
+    0x34: ("O2 ratio B1S1", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x35: ("O2 ratio B1S2", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x36: ("O2 ratio B1S3", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x37: ("O2 ratio B1S4", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x38: ("O2 ratio B2S1", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x39: ("O2 ratio B2S2", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x3A: ("O2 ratio B2S3", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x3B: ("O2 ratio B2S4", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 4),
+    0x3C: ("Catalyst temp B1S1", "°C", lambda d: (d[0] * 256 + d[1]) / 10 - 40, 2),
+    0x3D: ("Catalyst temp B2S1", "°C", lambda d: (d[0] * 256 + d[1]) / 10 - 40, 2),
+    0x3E: ("Catalyst temp B1S2", "°C", lambda d: (d[0] * 256 + d[1]) / 10 - 40, 2),
+    0x3F: ("Catalyst temp B2S2", "°C", lambda d: (d[0] * 256 + d[1]) / 10 - 40, 2),
     0x42: ("Battery voltage", "V", lambda d: (d[0] * 256 + d[1]) / 1000, 2),
+    0x43: ("Absolute load", "%", lambda d: (d[0] * 256 + d[1]) * 100 / 255, 2),
+    0x44: ("Fuel-air ratio", "lambda", lambda d: (d[0] * 256 + d[1]) / 32768, 2),
+    0x45: ("Relative throttle", "%", lambda d: d[0] * 100 / 255, 1),
     0x46: ("Ambient temp", "°C", lambda d: d[0] - 40, 1),
+    0x47: ("Throttle position B", "%", lambda d: d[0] * 100 / 255, 1),
+    0x48: ("Throttle position C", "%", lambda d: d[0] * 100 / 255, 1),
+    0x49: ("Accelerator pedal D", "%", lambda d: d[0] * 100 / 255, 1),
+    0x4A: ("Accelerator pedal E", "%", lambda d: d[0] * 100 / 255, 1),
+    0x4B: ("Accelerator pedal F", "%", lambda d: d[0] * 100 / 255, 1),
+    0x4C: ("Throttle actuator", "%", lambda d: d[0] * 100 / 255, 1),
+    0x4D: ("Time with light on", "min", lambda d: d[0] * 256 + d[1], 2),
+    0x4E: ("Time since codes cleared", "min", lambda d: d[0] * 256 + d[1], 2),
+    0x51: ("Fuel type", "", lambda d: _FUEL_TYPES.get(d[0], f"type {d[0]}"), 1),
+    0x5A: ("Relative accelerator", "%", lambda d: d[0] * 100 / 255, 1),
+    0x5B: ("Hybrid battery", "%", lambda d: d[0] * 100 / 255, 1),
     0x5C: ("Oil temp", "°C", lambda d: d[0] - 40, 1),
+    0x5D: ("Fuel injection timing", "°", lambda d: (d[0] * 256 + d[1]) / 128 - 210, 2),
+    0x5E: ("Engine fuel rate", "L/h", lambda d: (d[0] * 256 + d[1]) / 20, 2),
+    0x61: ("Demand torque", "%", lambda d: d[0] - 125, 1),
+    0x62: ("Engine torque", "%", lambda d: d[0] - 125, 1),
+    0x63: ("Reference torque", "Nm", lambda d: d[0] * 256 + d[1], 2),
 }
-OBD_LIVE_PIDS = [0x0C, 0x0D, 0x05, 0x42, 0x04, 0x11, 0x2F, 0x10, 0x0F, 0x06, 0x07, 0x1F]
+OBD_LIVE_PIDS = [0x0C, 0x0D, 0x05, 0x42, 0x04, 0x11, 0x2F, 0x10, 0x0F, 0x06, 0x07, 0x1F, 0x14, 0x5C]
 
+# Trouble-code descriptions come from the open-source dtc-database project by
+# Wal33D (MIT License, Copyright (c) 2024 Wal33D):
+# https://github.com/Wal33D/dtc-database — 12,128 generic SAE J2012 and
+# manufacturer-specific codes, bundled as dtc_codes.json (see
+# dtc_codes.SOURCE.txt) and refreshed by the weekly check in run_obd_update().
+# The small hand-written table below stays as a fallback for anything the
+# database does not cover; database text wins where both have a code.
 DTC_DESCRIPTIONS = {
     "P0101": "Mass air flow sensor range/performance problem",
     "P0102": "Mass air flow sensor low input",
@@ -3517,12 +3622,184 @@ def decode_dtc(b1: int, b2: int) -> str:
 
 
 def describe_dtc(code: str) -> str:
+    if code in DTC_DATABASE:
+        return DTC_DATABASE[code]
     if code in DTC_DESCRIPTIONS:
         return DTC_DESCRIPTIONS[code]
     if code.startswith("P03") and code[-1].isdigit() and code != "P0300":
         return f"Cylinder {code[-1]} misfire detected"
     family = {"P": "Powertrain", "C": "Chassis/ABS", "B": "Body", "U": "Network/communication"}.get(code[:1], "")
     return f"{family} trouble code — look up {code} in the service manual for this vehicle".strip()
+
+
+# --------------------------------------------------------------------------- #
+# DTC description database: bundled dtc_codes.json plus a weekly automated
+# check of the upstream project (download-only; a failed or implausible
+# download never replaces the database already in use).
+# --------------------------------------------------------------------------- #
+DTC_DB_URL = "https://raw.githubusercontent.com/Wal33D/dtc-database/main/data/dtc_codes.db"
+DTC_DB_SOURCE = "Wal33D/dtc-database on GitHub (MIT License)"
+DTC_DB_MAX_BYTES = 6 * 1024 * 1024
+_DTC_CODE_RE = re.compile(r"[PCBU][0-9A-F]{4}")
+
+DTC_DATABASE: dict = {}
+DTC_DB_INFO: dict = {"source": "built-in table", "count": 0, "bundled_count": 0, "total": 0}
+
+
+def dtc_bundled_path() -> Path:
+    return HERE / "dtc_codes.json"
+
+
+def dtc_live_path() -> Path:
+    """Where a downloaded database lives: the same data dir as the saved keys."""
+    return Path(os.getenv("MCUBED_DATA", str(HERE))) / "dtc_codes.json"
+
+
+def _read_dtc_json(path: Path) -> dict:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v.strip() for k, v in raw.items()
+            if isinstance(k, str) and _DTC_CODE_RE.fullmatch(k)
+            and isinstance(v, str) and v.strip()}
+
+
+def load_dtc_database() -> dict:
+    """(Re)load the trouble-code database. A downloaded copy in the data dir
+    wins over the bundled dtc_codes.json; both win over the built-in table,
+    which (with the pattern fallbacks) covers anything they miss."""
+    global DTC_DATABASE, DTC_DB_INFO
+    bundled = _read_dtc_json(dtc_bundled_path())
+    live = _read_dtc_json(dtc_live_path()) if dtc_live_path() != dtc_bundled_path() else {}
+    merged = dict(DTC_DESCRIPTIONS)
+    source, count = "built-in table", 0
+    if bundled:
+        merged.update(bundled)
+        source, count = "bundled", len(bundled)
+    if live:
+        merged.update(live)
+        source, count = "downloaded", len(live)
+    DTC_DATABASE = merged
+    DTC_DB_INFO = {"source": source, "count": count,
+                   "bundled_count": len(bundled), "total": len(merged)}
+    return DTC_DB_INFO
+
+
+def _dtc_map_from_sqlite(raw: bytes) -> dict:
+    """Extract a code -> description map from an upstream dtc-database SQLite
+    file. Generic (SAE) definitions win; for manufacturer-only codes the most
+    common definition across brands is used."""
+    import tempfile
+    from collections import Counter
+    fd, tmp = tempfile.mkstemp(suffix=".db")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+        con = sqlite3.connect(f"file:{tmp}?mode=ro", uri=True)
+        try:
+            rows = con.execute("SELECT code, manufacturer, description, is_generic "
+                               "FROM dtc_definitions WHERE locale='en'").fetchall()
+        finally:
+            con.close()
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    generic, votes = {}, {}
+    for code, maker, desc, is_gen in rows:
+        code = (code or "").strip().upper()
+        desc = " ".join((desc or "").split())
+        if not _DTC_CODE_RE.fullmatch(code) or not desc:
+            continue
+        if is_gen or (maker or "").strip().upper() == "GENERIC":
+            generic.setdefault(code, desc)
+        else:
+            votes.setdefault(code, Counter())[desc] += 1
+    out = dict(generic)
+    for code, counter in votes.items():
+        if code in out:
+            continue
+        short = {d: n for d, n in counter.items() if len(d) <= 200} or counter
+        out[code] = sorted(short.items(), key=lambda kv: (-kv[1], len(kv[0]), kv[0]))[0][0]
+    return out
+
+
+def _download_dtc_db() -> bytes:
+    import urllib.request
+    req = urllib.request.Request(DTC_DB_URL, headers={"User-Agent": "MCUBED"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        chunks, total = [], 0
+        while True:
+            chunk = r.read(1 << 16)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > DTC_DB_MAX_BYTES:
+                raise ValueError(f"upstream database is larger than {DTC_DB_MAX_BYTES} bytes")
+            chunks.append(chunk)
+    raw = b"".join(chunks)
+    if not raw.startswith(b"SQLite format 3\x00"):
+        raise ValueError("upstream file is not a SQLite database")
+    return raw
+
+
+def run_obd_update(gw: "Gateway", force: bool = False) -> Optional[dict]:
+    """Weekly check for a newer trouble-code database at the upstream project.
+    The download is converted and validated (plausible size, at least as many
+    codes as the bundled database) before it replaces anything; any failure
+    keeps the database already in use."""
+    days = float(os.getenv("GATEWAY_OBD_UPDATE_DAYS") or 7)
+    last = float(gw.store.get_policy("last_obd_update_ts", 0) or 0)
+    if not force and time.time() - last < days * 86400:
+        return None
+    now = time.time()
+    try:
+        new = _dtc_map_from_sqlite(_download_dtc_db())
+        bundled = DTC_DB_INFO.get("bundled_count") or 0
+        if not 5000 <= len(new) <= 60000:
+            raise ValueError(f"upstream database has an implausible code count ({len(new)})")
+        if bundled and len(new) < bundled:
+            raise ValueError(f"upstream database has fewer codes ({len(new)}) than the "
+                             f"bundled one ({bundled}); keeping the bundled one")
+        target = dtc_live_path()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.parent / (target.name + ".tmp")
+        tmp.write_text(json.dumps(new, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
+                       encoding="utf-8")
+        os.replace(tmp, target)
+        load_dtc_database()
+        res = {"ok": True, "at": now, "codes": len(new)}
+        log.info("OBD code database updated: %d codes from %s", len(new), DTC_DB_URL)
+    except Exception as e:  # noqa: BLE001 - any failure keeps the current database
+        res = {"ok": False, "at": now, "error": f"{type(e).__name__}: {e}"[:200]}
+        log.info("OBD code database check failed: %s", res["error"])
+    gw.store.set_policy("last_obd_update_ts", now)
+    gw.store.set_policy("obd_update_result", json.dumps(res))
+    return res
+
+
+def obd_data_status(gw: "Gateway") -> dict:
+    """OBD code-database summary for the Toolbox and the OBD tab."""
+    result = {}
+    try:
+        result = json.loads(gw.store.get_policy("obd_update_result", "") or "{}")
+    except ValueError:
+        result = {}
+    return {"on": bool(gw.store.get_policy("bg_obd_update", True)),
+            "every": float(os.getenv("GATEWAY_OBD_UPDATE_DAYS") or 7), "unit": "days",
+            "last_at": float(gw.store.get_policy("last_obd_update_ts", 0) or 0) or None,
+            "source": DTC_DB_SOURCE, "url": DTC_DB_URL,
+            "codes": DTC_DB_INFO.get("count", 0),
+            "bundled_codes": DTC_DB_INFO.get("bundled_count", 0),
+            "database": DTC_DB_INFO.get("source", "built-in table"),
+            "last_result": result}
+
+
+load_dtc_database()
 
 
 def _hex_frames(raw: str) -> list:
@@ -4154,7 +4431,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 if isinstance(bg, dict):  # toggles for the scheduled background jobs
                     for name, policy in (("auto_improve", "bg_auto_improve"), ("repo_sync", "bg_repo_sync"),
                                          ("node_scan", "bg_node_scan"), ("lan_scan", "bg_lan_scan"),
-                                         ("gardener", "bg_gardener"), ("ui_polish", "bg_ui_polish")):
+                                         ("gardener", "bg_gardener"), ("ui_polish", "bg_ui_polish"),
+                                         ("obd_update", "bg_obd_update")):
                         if name in bg:
                             gw.store.set_policy(policy, bool(bg[name]))
                 action = b.get("action")
@@ -4184,8 +4462,10 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                             run_node_scan(gw, lock, force=True)  # adopt free nodes / drop cleaned ones
                         elif job_name == "ui":
                             run_ui_polish(gw, force=True)
+                        elif job_name == "obd":
+                            run_obd_update(gw, force=True)
                         else:
-                            return self._send(400, {"error": "job must be improve, repos, nodes, gardener or ui"})
+                            return self._send(400, {"error": "job must be improve, repos, nodes, gardener, ui or obd"})
                     except (GatewayError, ValueError, OSError) as e:
                         return self._send(400, {"error": str(e)})
                 with lock:

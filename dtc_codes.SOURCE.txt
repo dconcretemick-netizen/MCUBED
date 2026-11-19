@@ -1,0 +1,15 @@
+dtc_codes.json — OBD-II diagnostic trouble code descriptions for MCUBED.
+
+Source:  dtc-database by Wal33D (Waleed Judah)
+         https://github.com/Wal33D/dtc-database
+File:    data/dtc_codes.db (SQLite), converted to a flat code -> description
+         JSON map. Generic SAE J2012 definitions win; for codes only defined
+         by manufacturers, the most common definition across brands is used.
+License: MIT License (Copyright (c) 2024 Wal33D) — see the LICENSE file in the
+         upstream repository. Free for commercial and non-commercial use.
+
+MCUBED checks that same raw file weekly (Toolbox background job "OBD code
+database updates") and, when a valid newer database is found, stores the
+converted JSON in its data folder, where it takes precedence over this
+bundled copy. Nothing is ever uploaded; the check is download-only.
+Update URL: https://raw.githubusercontent.com/Wal33D/dtc-database/main/data/dtc_codes.db

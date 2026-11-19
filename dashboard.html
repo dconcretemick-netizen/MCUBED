@@ -10,9 +10,11 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314b8a6'/%3E%3Cpath d='M14 46V18l9 14 9-14 9 14 9-14v28' fill='none' stroke='%230f1417' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
 <title>MCUBED Gateway</title>
 <style data-mcubed-ui-polish>
-/* mcubed-ui-polish: automated Android UI improvements, injected by the gateway */
+/* mcubed-ui-polish v2: automated Android UI improvements, injected by the gateway */
 html{-webkit-tap-highlight-color:transparent}
+html,body{overflow-x:hidden;overflow-x:clip}
 body{overscroll-behavior-y:none}
+img,svg,video,canvas,iframe{max-width:100%}
 @media (pointer:coarse){
   button,select,.btn,[role=tab]{min-height:48px}
   input,textarea{font-size:16px}
@@ -40,24 +42,34 @@ body{overscroll-behavior-y:none}
   --accent:#0d9488;--accent-ink:#ffffff;--good:#059669;--warn:#b45309;--bad:#dc2626;--c1:#0d9488;--c2:#6366f1;--c3:#d97706;--c4:#db2777;--c5:#2563eb;--l-left:#2563eb;--l-right:#dc2626}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--font);-webkit-text-size-adjust:100%}
-body{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+html,body{height:100%}
+body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .num{font-variant-numeric:tabular-nums lining-nums}
 button,select,input,textarea{font:inherit;color:inherit}
-header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);
+header{flex:none;order:1;position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--border);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.01em;margin-right:auto;min-width:0}
 .brand svg{flex:none}
 .brand small{display:block;font-weight:450;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ctl{min-height:40px;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:0 12px}
 .icon-btn{width:40px;min-height:40px;display:grid;place-items:center;border:1px solid var(--border);background:var(--surface);border-radius:10px;cursor:pointer}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:var(--surface);border-top:1px solid var(--border);
+nav.tabs{order:3;flex:none;z-index:20;display:flex;background:var(--surface);border-top:1px solid var(--border);
   padding-bottom:env(safe-area-inset-bottom)}
 nav.tabs button{flex:1;min-width:0;min-height:60px;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;cursor:pointer}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected=true]{color:var(--accent)}
 nav.tabs button{position:relative}nav.tabs .dot{position:absolute;top:9px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--warn)}
 @media (min-width:900px){nav.tabs .dot{position:static;margin-left:-2px}}
-main{max-width:1240px;margin:0 auto;padding:14px}
+main{order:2;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;width:100%;max-width:1240px;margin:0 auto;padding:14px}
+section#v-playground.active{display:flex;flex-direction:column;height:100%}
+#v-playground .chat{flex:1;min-height:0}
+#v-playground .msgs{overflow-y:auto;min-height:0}
+#v-playground .composer{position:static;flex:none}
+.menu-wrap{position:relative;flex:none}
+.menu-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:50;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.menu-head{padding:8px 10px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.menu-item{display:flex;width:100%;align-items:center;gap:8px;padding:10px;border:0;background:transparent;border-radius:8px;cursor:pointer;text-align:left;font:inherit;font-weight:600;color:var(--text)}
+.menu-item:hover{background:var(--surface-2)}
 section.view{display:none}section.view.active{display:block}
 .grid{display:grid;gap:var(--gap)}
 .kpis{grid-template-columns:repeat(2,1fr)}
@@ -292,6 +304,16 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   </select>
   <button class="icon-btn" id="refresh" aria-label="Refresh"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
   <button class="icon-btn" id="theme" aria-label="Toggle theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  <div class="menu-wrap">
+    <button class="icon-btn" id="menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Stats menu" title="Stats"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></button>
+    <div class="menu-panel" id="menu-panel" hidden role="menu" aria-label="Stats">
+      <div class="menu-head">Stats</div>
+      <button class="menu-item" data-s="overview" role="menuitem">Overview</button>
+      <button class="menu-item" data-s="models" role="menuitem">Models</button>
+      <button class="menu-item" data-s="learning" role="menuitem">Learning</button>
+      <button class="menu-item" data-s="storage" role="menuitem">System</button>
+    </div>
+  </div>
 </header>
 
 <nav class="tabs" role="tablist">
@@ -299,7 +321,6 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   <button role="tab" data-v="news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13v16H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v10a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h3"/></svg>News</button>
   <button role="tab" data-v="web"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>Web</button>
   <button role="tab" data-v="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg>Games</button>
-  <button role="tab" data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Stats</button>
   <button role="tab" data-v="toolbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>Toolbox</button>
   <button role="tab" data-v="obd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4.5-4.5"/><path d="M2 14h2M20 14h2M12 6V4"/></svg>OBD</button>
   <button role="tab" data-v="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Update<i class="dot" id="upd-dot" hidden></i></button>
@@ -515,7 +536,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </div>
 
     <div class="card" style="margin-top:var(--gap)"><h2>Android UI</h2>
-      <p class="news-note">MCUBED checks its own pages every day and automatically adds the mobile polish — finger-sized buttons, no zoom when you tap a field, no tap flash — to any page missing it, for example after an update.</p>
+      <p class="news-note">MCUBED checks its own pages every day and automatically adds the mobile polish — finger-sized buttons, no zoom when you tap a field, no tap flash, and a layout that fits the screen without scrolling sideways — to any page missing it, and refreshes older polish to the latest version, for example after an update.</p>
       <div id="ui-body"><div class="skel"></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" id="tb-run-ui">Check UI now</button></div>
     </div>
@@ -579,6 +600,10 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
         <button class="btn" id="obd-clear" disabled>Clear codes</button>
       </div>
       <p class="news-note" style="margin:10px 0 0">Clearing turns off the check-engine light and erases freeze-frame data. If the fault is still there, the code comes back — clearing is not a repair.</p>
+      <p class="news-note" id="obd-db-note" style="margin:10px 0 0">Code descriptions: loading…</p>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="obd-db-check">Check for code updates</button>
+      </div>
     </div>
   </section>
 
@@ -741,10 +766,21 @@ function showView(v){
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
-  showView(b.dataset.v); window.scrollTo({top:0});
+  showView(b.dataset.v); document.querySelector("main").scrollTo({top:0});
 }));
 document.querySelectorAll("#stats-seg [data-s]").forEach(x=>x.addEventListener("click",()=>{
   statsView=x.dataset.s; localStorage.setItem("mcubed.stats",statsView); showView("stats") }));
+/* Stats now lives in the header dropdown, keeping the bottom bar for the main pages. */
+const menuPanel=$("#menu-panel"), menuBtn=$("#menu-btn");
+function closeMenu(){ menuPanel.hidden=true; menuBtn.setAttribute("aria-expanded","false") }
+menuBtn.addEventListener("click",e=>{ e.stopPropagation(); const open=menuPanel.hidden; menuPanel.hidden=!open; menuBtn.setAttribute("aria-expanded",String(open)) });
+document.addEventListener("click",e=>{ if(!menuPanel.hidden && !e.target.closest(".menu-wrap")) closeMenu() });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu() });
+document.querySelectorAll("#menu-panel [data-s]").forEach(x=>x.addEventListener("click",()=>{
+  statsView=x.dataset.s; localStorage.setItem("mcubed.stats",statsView);
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected","false"));
+  closeMenu(); showView("stats"); document.querySelector("main").scrollTo({top:0});
+}));
 $("#days").addEventListener("change", load);
 $("#refresh").addEventListener("click", load);
 $("#theme").addEventListener("click",()=>{
@@ -1112,10 +1148,11 @@ function renderToolbox(){
     row("node_scan","Look for new AI providers and local models", every(bg.node_scan), bg.node_scan) +
     row("lan_scan","Also look on my home network", "Off means only this device and cloud providers are checked", bg.lan_scan) +
     row("gardener","Key & provider gardener", "Checks keys and providers, removes rejected keys, parks dead providers, adopts free AI nodes · " + every(bg.gardener), bg.gardener) +
-    row("ui_polish","Automated Android UI improvement", "Daily check: pages missing the mobile polish get it added automatically · " + every(bg.ui_polish), bg.ui_polish);
+    row("ui_polish","Automated Android UI improvement", "Daily check: pages missing the mobile polish get it added automatically · " + every(bg.ui_polish), bg.ui_polish) +
+    row("obd_update","OBD code database updates", "Weekly check: downloads the newest open-source trouble-code database · " + every(bg.obd_update), bg.obd_update);
   const ui=bg.ui_polish||{};
   let uh="";
-  if(ui.pages&&ui.pages.length) uh+=ui.pages.map(p=>`<div class="kv"><span>${esc(p.page)}</span><code>${p.polished?"polish built in":"polish added automatically"}${p.issues&&p.issues.length?" · also fixed: "+esc(p.issues.join(", ")):""}</code></div>`).join("");
+  if(ui.pages&&ui.pages.length) uh+=ui.pages.map(p=>`<div class="kv"><span>${esc(p.page)}</span><code>${p.outdated?"polish updated automatically":p.polished?"polish built in":"polish added automatically"}${p.issues&&p.issues.length?" · also fixed: "+esc(p.issues.join(", ")):""}</code></div>`).join("");
   else uh+='<p class="news-note">Not checked yet — tap "Check UI now".</p>';
   $("#ui-body").innerHTML=uh;
   const g=d.gardener||{};
@@ -1169,11 +1206,11 @@ $("#tb-restart").addEventListener("click",async()=>{
 
 /* ---------- OBD-II diagnostics ---------- */
 let OBD=null, obdTimer=null;
-const OBD_TILE_ORDER=["0C","0D","05","42","04","11","2F","10","0F","06","07","1F"];
+const OBD_TILE_ORDER=["0C","0D","05","42","04","11","2F","10","0F","06","07","1F","14","5C"];
 function obdTile(k,v){
   let val=v.value, unit=v.unit;
   if(k==="0D"){ val=Math.round(v.value*0.621371); unit="mph" }
-  else if(["05","0F","46","5C"].includes(k)){ val=Math.round(v.value*9/5+32); unit="°F" }
+  else if(["05","0F","46","5C","3C","3D","3E","3F"].includes(k)){ val=Math.round(v.value*9/5+32); unit="°F" }
   else if(k==="42"){ val=(+v.value).toFixed(1) }
   else if(typeof val==="number") val=Math.round(val*10)/10;
   return `<div class="obd-tile"><b>${esc(v.name)}</b><span>${val} <small>${esc(unit)}</small></span></div>`;
@@ -1207,6 +1244,7 @@ function startObdPoll(){ stopObdPoll(); obdPoll(); obdTimer=setInterval(obdPoll,
 function stopObdPoll(){ if(obdTimer){ clearInterval(obdTimer); obdTimer=null } }
 async function loadObd(){
   if(STATIC){ $("#obd-chip").textContent="static snapshot"; return }
+  loadObdDb();
   try{ OBD=await api("/api/obd/status"); renderObdStatus(); if(OBD.connected) startObdPoll() }catch(e){ $("#obd-msg").textContent=e.message }
   try{ const bt=await api("/api/obd/devices");
     const sel=$("#obd-device");
@@ -1219,6 +1257,25 @@ function syncObdFields(){
   $("#obd-wifi-fields").hidden=t!=="wifi";
   $("#obd-bt-fields").hidden=t!=="bluetooth";
 }
+function renderObdDb(d){
+  const el=$("#obd-db-note"); if(!el||!d) return;
+  const r=d.last_result||{};
+  let tail="";
+  if(r.at) tail=r.ok?` · last check ${fmtWhen(r.at)}: updated (${(r.codes||0).toLocaleString()} codes)`:` · last check ${fmtWhen(r.at)}: no update — ${esc(r.error||"kept the current database")}`;
+  else if(d.last_at) tail=` · last check ${fmtWhen(d.last_at)}`;
+  el.innerHTML=`Code descriptions: <b>${(d.codes||0).toLocaleString()}</b> codes in the ${esc(d.database||"built-in")} database · free &amp; open source (${esc(d.source||"")})${tail}. Updates are checked weekly in the background (Toolbox can turn this off).`;
+}
+async function loadObdDb(){
+  try{ const t=await api("/api/toolbox"); renderObdDb(t.obd_data) }catch(e){}
+}
+$("#obd-db-check").addEventListener("click",async()=>{
+  const el=$("#obd-db-note"); if(el) el.textContent="Checking for a newer code database…";
+  try{ const t=await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"run",job:"obd"})});
+    renderObdDb(t.obd_data);
+    const r=(t.obd_data||{}).last_result||{};
+    toast(r.ok?"Code database updated":"No update — current database kept");
+  }catch(e){ toast(e.message); loadObdDb() }
+});
 $("#obd-transport").addEventListener("change",syncObdFields);
 $("#obd-connect").addEventListener("click",async()=>{
   const t=$("#obd-transport").value;
