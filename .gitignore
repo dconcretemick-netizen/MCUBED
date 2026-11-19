@@ -27,6 +27,7 @@ android/app/src/main/python/build_info.json
 build_info.json
 *.log
 repos.json
+keys.json
 repos/
 nodes.json
 update.apk

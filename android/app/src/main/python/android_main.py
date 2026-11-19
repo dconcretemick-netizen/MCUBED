@@ -18,6 +18,25 @@ KEY_NAMES = ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "GITHUB
              "DEEPINFRA_API_KEY", "NOVITA_API_KEY", "HYPERBOLIC_API_KEY", "MOONSHOT_API_KEY",
              "DASHSCOPE_API_KEY", "ZAI_API_KEY", "MINIMAX_API_KEY", "COHERE_API_KEY")
 _state: dict = {}
+_data_dir: str = ""
+
+
+def _mirror_keys_file() -> None:
+    """Keep keys.json (the dashboard's store, in the data dir) in step with the keys in use."""
+    if not _data_dir:
+        return
+    try:
+        saved = {n: os.environ[n] for n in KEY_NAMES if os.getenv(n)}
+        tmp = join(_data_dir, "keys.json.tmp")
+        with open(tmp, "w") as f:
+            json.dump(saved, f, indent=1)
+        try:
+            os.chmod(tmp, 0o600)
+        except OSError:
+            pass
+        os.replace(tmp, join(_data_dir, "keys.json"))
+    except OSError:
+        pass
 
 
 def _apply_keys(keys_json: str) -> bool:
@@ -29,11 +48,14 @@ def _apply_keys(keys_json: str) -> bool:
             os.environ[name] = value
         else:
             os.environ.pop(name, None)
+    _mirror_keys_file()
     return any(os.getenv(n) for n in KEY_NAMES if n != "GITHUB_TOKEN")
 
 
 def start(data_dir: str, keys_json: str = "{}") -> str:
     """Start the gateway once per process and return the dashboard URL."""
+    global _data_dir
+    _data_dir = data_dir
     if _state:
         set_keys(keys_json)
         return _state["url"]

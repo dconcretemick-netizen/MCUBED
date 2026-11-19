@@ -156,6 +156,16 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .kv code{flex:1;min-width:0}
 .kv code,.msg code{font-family:var(--mono);font-size:13px;background:var(--surface-2);padding:2px 6px;border-radius:6px;word-break:break-all}
 .kv .hint{color:var(--faint);font-size:12px}.btn.sm{min-height:30px;padding:0 10px;font-size:13px}
+.key-row{display:grid;gap:6px;padding:10px 0;border-bottom:1px solid var(--border)}
+.key-row:last-child{border-bottom:0}
+.key-row .k-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.key-row .k-head b{font-size:14.5px}.key-row .k-head .spacer{flex:1}
+.key-row input{width:100%}
+.tool-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.tool-row:last-child{border-bottom:0}.tool-row small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+.tool-row input[type=checkbox]{appearance:none;-webkit-appearance:none;width:50px;height:30px;border-radius:999px;background:var(--border);position:relative;flex:none;cursor:pointer;transition:background .15s;margin:0}
+.tool-row input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tool-row input[type=checkbox]:checked{background:var(--accent)}.tool-row input[type=checkbox]:checked::after{transform:translateX(20px)}
 .msgs{flex:1;display:flex;flex-direction:column;gap:14px;padding:6px 0 14px}
 .empty-chat{margin:auto;text-align:center;max-width:520px;padding:20px 6px}
 .empty-chat h1{font-size:24px;margin:12px 0 4px}.empty-chat p{color:var(--muted);margin:0 0 16px}
@@ -266,6 +276,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   <button role="tab" data-v="web"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>Web</button>
   <button role="tab" data-v="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg>Games</button>
   <button role="tab" data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Stats</button>
+  <button role="tab" data-v="toolbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>Toolbox</button>
   <button role="tab" data-v="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Update<i class="dot" id="upd-dot" hidden></i></button>
 </nav>
 
@@ -439,6 +450,42 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div id="news-list"><div class="card"><div class="skel"></div><div class="skel" style="margin-top:8px"></div></div></div>
   </section>
 
+  <section class="view" id="v-toolbox">
+    <div class="card"><h2>Status <span class="chip" id="tb-chip">checking</span></h2>
+      <div class="kv"><span>Gateway</span><code id="tb-running">…</code></div>
+      <div class="kv"><span>Uptime</span><code id="tb-uptime">…</code></div>
+      <div class="kv"><span>Mode</span><code id="tb-mode">…</code></div>
+      <div class="kv"><span>AI keys</span><code id="tb-keys">…</code></div>
+      <p class="news-note" id="tb-android-note" hidden style="margin:10px 0 0">On Android, use the app menu → <b>Toolbox</b> for “Keep running in the background” and battery settings, so Android does not stop MCUBED when you switch apps.</p>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)"><h2>AI keys <span class="chip" id="keys-chip">checking</span></h2>
+      <p class="news-note">Paste a key, then tap <b>Save keys</b>. Keys are stored only on this device, take effect right away — no restart needed — and are never shown again (only the last 4 characters). Leave a field blank to keep the key already saved.</p>
+      <div id="keys-list"><div class="skel"></div></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn primary" id="btn-save-keys" style="flex:1">Save keys</button>
+        <button class="btn" id="btn-clear-keys">Remove all</button>
+      </div>
+      <p class="news-note" id="keys-msg" role="status" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)"><h2>Background</h2>
+      <p class="news-note">What MCUBED may do on its own while you are not looking. Changes apply to the next background run.</p>
+      <div id="bg-list"><div class="skel"></div></div>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)"><h2>Tools</h2>
+      <div class="row">
+        <button class="btn" id="tb-run-nodes">Scan for AI now</button>
+        <button class="btn" id="tb-run-repos">Sync repositories now</button>
+        <button class="btn" id="tb-run-improve">Improve now</button>
+        <button class="btn" id="tb-compact">Compact storage</button>
+        <button class="btn" id="tb-restart">Restart gateway</button>
+      </div>
+      <p class="news-note" id="tb-msg" role="status" style="margin:10px 0 0"></p>
+    </div>
+  </section>
+
   <section class="view" id="v-update">
     <div class="card"><h2>MCUBED version <span class="chip" id="upd-chip">checking</span></h2>
       <div class="kv"><span>Installed</span><code id="upd-cur">…</code></div>
@@ -593,6 +640,7 @@ function showView(v){
   syncGames(v==="games");
   if(v==="news") loadNews();
   if(v==="update") loadUpdate();
+  if(v==="toolbox"){ loadKeys(); loadToolbox(); }
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
@@ -898,6 +946,102 @@ $("#nodes-scan").addEventListener("click", async e=>{ const b=e.currentTarget; b
 $("#t-nodes").addEventListener("click", async e=>{ const b=e.target.closest("[data-trust]"); if(!b) return;
   try{ renderNodes(await api("/api/nodes/trust",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({base_url:b.dataset.trust,trusted:b.dataset.to==="1"})})); loadNodes() }catch(err){ toast(err.message) } });
 setTimeout(loadNodes, 1500);
+
+
+/* ---------- toolbox: status, AI keys, background behaviour ---------- */
+let KEYS=null, TB=null;
+function renderKeys(){
+  const d=KEYS; if(!d) return;
+  $("#keys-chip").textContent = d.saved ? `${d.saved} saved` : "none saved";
+  $("#keys-list").innerHTML = d.keys.map(k=>`<div class="key-row">
+    <div class="k-head"><b>${esc(k.name)}</b><span class="tag ${k.free?"free":""}">${k.free?"free":"paid"}</span>
+      <span class="spacer"></span>
+      ${k.set?`<span class="chip kept">Saved ${esc(k.hint)}</span><button class="btn sm" data-remove-key="${esc(k.env)}">Remove</button>`:`<span class="chip">Not set</span>`}
+      ${k.signup?`<a class="btn sm" style="text-decoration:none;color:inherit" href="${esc(k.signup)}" target="_blank" rel="noopener">Get key</a>`:""}
+    </div>
+    <input class="ctl" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+      data-key-env="${esc(k.env)}" placeholder="${k.set?"Saved \u2014 leave blank to keep it":"Paste key here"}" aria-label="${esc(k.name)} key">
+  </div>`).join("");
+}
+async function loadKeys(){
+  if(STATIC){ $("#keys-chip").textContent="static snapshot"; $("#keys-msg").textContent="Run python gateway.py gui to save keys."; return }
+  try{ KEYS=await api("/api/keys"); renderKeys() }catch(e){ $("#keys-msg").textContent=e.message }
+}
+async function saveKeys(updates,msg){
+  const b=$("#btn-save-keys"); b.disabled=true; const old=b.textContent; b.textContent="Saving\u2026";
+  try{ KEYS=await api("/api/keys",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys:updates})});
+    renderKeys(); $("#keys-msg").textContent=msg||"Saved. New keys take effect right away.";
+    toast("Keys saved"); loadUnits(); loadToolbox();
+  }catch(e){ toast(e.message); $("#keys-msg").textContent=e.message }
+  finally{ b.disabled=false; b.textContent=old }
+}
+$("#btn-save-keys").addEventListener("click",()=>{
+  const updates={}; document.querySelectorAll("[data-key-env]").forEach(i=>{ const v=i.value.trim(); if(v) updates[i.dataset.keyEnv]=v });
+  if(!Object.keys(updates).length){ $("#keys-msg").textContent="Nothing to save yet \u2014 paste at least one key first."; toast("Paste a key first"); return }
+  const n=Object.keys(updates).length;
+  saveKeys(updates, `Saved ${n} key${n===1?"":"s"}. They take effect right away.`);
+});
+$("#btn-clear-keys").addEventListener("click",()=>{
+  if(!KEYS||!KEYS.saved) return toast("No keys saved");
+  if(!confirm("Remove all saved AI keys? MCUBED will go back to demo mode until you add one again.")) return;
+  saveKeys(Object.fromEntries(KEYS.keys.map(k=>[k.env,""])), "All keys removed.");
+});
+$("#keys-list").addEventListener("click",e=>{
+  const b=e.target.closest("[data-remove-key]"); if(!b) return;
+  if(!confirm("Remove this saved key?")) return;
+  saveKeys({[b.dataset.removeKey]:""}, "Key removed.");
+});
+const fmtDur=s=>{ if(s==null) return "\u2013"; s=Math.round(s); const h=Math.floor(s/3600), m=Math.floor(s%3600/60);
+  return h?`${h} h ${m} min`:m?`${m} min`:`${s} sec` };
+const fmtWhen=ts=>ts?new Date(ts*1000).toLocaleString():"never";
+function renderToolbox(){
+  const d=TB; if(!d) return;
+  $("#tb-chip").textContent = d.running ? "running" : "stopped";
+  $("#tb-chip").className = "chip "+(d.running?"kept":"rolled_back");
+  $("#tb-running").textContent = d.running ? `Running since ${fmtWhen(d.started_at)}` : "Not running";
+  $("#tb-uptime").textContent = fmtDur(d.uptime_s);
+  $("#tb-mode").textContent = d.mock ? "Demo mode \u2014 replies are simulated (no AI keys saved)" : "Real AI";
+  $("#tb-keys").textContent = d.keys_saved ? `${d.keys_saved} saved` : "None saved \u2014 add one under AI keys below";
+  $("#tb-android-note").hidden = !d.android;
+  $("#tb-restart").hidden = !!d.android;
+  const bg=d.background||{};
+  const row=(name,label,sub,j)=>`<div class="tool-row"><span><b>${label}</b><small>${sub}</small></span>
+    <input type="checkbox" role="switch" data-bg="${name}" ${j&&j.on?"checked":""} aria-label="${label}"></div>`;
+  const every=j=>j?`every ${j.every} ${j.unit}, last ran ${j.last_at?fmtWhen(j.last_at):"never"}`:"";
+  $("#bg-list").innerHTML =
+    row("auto_improve","Auto-improve in the background", every(bg.auto_improve), bg.auto_improve) +
+    row("repo_sync","Sync my GitHub repositories", every(bg.repo_sync), bg.repo_sync) +
+    row("node_scan","Look for new AI providers and local models", every(bg.node_scan), bg.node_scan) +
+    row("lan_scan","Also look on my home network", "Off means only this device and cloud providers are checked", bg.lan_scan);
+}
+async function loadToolbox(){
+  if(STATIC){ $("#tb-chip").textContent="static snapshot"; return }
+  try{ TB=await api("/api/toolbox"); renderToolbox() }catch(e){ $("#tb-msg").textContent=e.message }
+}
+async function toolboxPost(body,msg){
+  try{ TB=await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    renderToolbox(); if(msg) toast(msg); return true
+  }catch(e){ toast(e.message); $("#tb-msg").textContent=e.message; return false }
+}
+$("#bg-list").addEventListener("change",e=>{
+  const t=e.target.closest("[data-bg]"); if(!t) return;
+  toolboxPost({background:{[t.dataset.bg]:t.checked}}, t.checked?"Background task on":"Background task off");
+});
+async function toolboxRun(job,label){
+  $("#tb-msg").textContent=label+"\u2026";
+  if(await toolboxPost({action:"run",job}, label+" done")) $("#tb-msg").textContent=label+" done.";
+}
+$("#tb-run-nodes").addEventListener("click",()=>toolboxRun("nodes","Scanning for AI"));
+$("#tb-run-repos").addEventListener("click",()=>toolboxRun("repos","Syncing repositories"));
+$("#tb-run-improve").addEventListener("click",()=>toolboxRun("improve","Improving"));
+$("#tb-compact").addEventListener("click",async()=>{
+  try{ await api("/api/compact",{method:"POST"}); toast("Storage compacted"); $("#tb-msg").textContent="Storage compacted." }catch(e){ toast(e.message) }
+});
+$("#tb-restart").addEventListener("click",async()=>{
+  if(!confirm("Restart the MCUBED gateway? It comes back in a few seconds.")) return;
+  try{ await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"restart"})}) }catch(e){}
+  toast("Restarting\u2026"); await waitForRestart();
+});
 
 /* ---- AI units in use ---- */
 let UNITS=null;

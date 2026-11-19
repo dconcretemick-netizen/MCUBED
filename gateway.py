@@ -1822,6 +1822,11 @@ def _lan_hosts() -> list[str]:
 
 def nodes_config(gw: Optional["Gateway"] = None) -> dict:
     cfg = dict(NODE_DEFAULTS, **((gw.defaults.get("nodes") or {}) if gw else {}))
+    store = getattr(gw, "store", None)
+    if store is not None:
+        lan = store.get_policy("bg_lan_scan", None)
+        if lan is not None:
+            cfg["lan_scan"] = bool(lan)
     if os.getenv("MCUBED_LAN_SCAN") is not None:
         cfg["lan_scan"] = os.getenv("MCUBED_LAN_SCAN") == "1"
     return cfg
@@ -2057,12 +2062,15 @@ def run_scheduled_improvement(gw: "Gateway", force: bool = False) -> Optional[li
 def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300) -> None:
     while True:
         try:
-            with lock:
-                run_scheduled_improvement(gw)
+            if gw.store.get_policy("bg_auto_improve", True):
+                with lock:
+                    run_scheduled_improvement(gw)
         except Exception:  # noqa: BLE001
             log.exception("scheduled improvement failed")
         try:  # auto-add new repositories (registry only; cloning stays manual)
             hours = float(os.getenv("GATEWAY_REPO_SYNC_HOURS") or gw.defaults.get("repo_sync_every_hours", 6))
+            if not gw.store.get_policy("bg_repo_sync", True):
+                hours = 0
             last = float(gw.store.get_policy("last_repo_sync_ts", 0) or 0)
             if (_github_token() or __import__("shutil").which("gh")) and hours > 0 \
                     and time.time() - last >= hours * 3600:
@@ -2073,7 +2081,8 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
         except Exception:  # noqa: BLE001
             log.exception("repository sync failed")
         try:  # keep looking for more AI nodes (cloud keys, this device, home network)
-            run_node_scan(gw, lock)
+            if gw.store.get_policy("bg_node_scan", True):
+                run_node_scan(gw, lock)
         except Exception:  # noqa: BLE001
             log.exception("AI node scan failed")
         time.sleep(poll_s)
@@ -2264,7 +2273,7 @@ def fetch_page(url: str, max_bytes: int = 3_000_000) -> dict:
 UPDATE_REPO = os.getenv("MCUBED_REPO", "dconcretemick-netizen/MCUBED")
 UPDATE_BRANCH = os.getenv("MCUBED_BRANCH", "main")
 UPDATE_EXT = (".py", ".html", ".json", ".sh", ".md", ".txt")
-UPDATE_SKIP = {"repos.json", "build_info.json", "package.json", "package-lock.json"}  # data, not program files
+UPDATE_SKIP = {"repos.json", "build_info.json", "package.json", "package-lock.json", "keys.json"}  # data, not program files
 UPDATE_CONFIG = {"models.json", "news.json"}  # your edits here are kept (the new version is saved as *.new)
 _update_cache: dict = {}
 
@@ -2971,11 +2980,134 @@ def openai_stream_chunks(resp: dict) -> list[bytes]:
     return [f"data: {json.dumps(e)}\n\n".encode() for e in events] + [b"data: [DONE]\n\n"]
 
 
+
+# --------------------------------------------------------------------------- #
+# AI provider keys: saved from the dashboard's AI keys tab (or the Android dialog)
+# --------------------------------------------------------------------------- #
+# (env name, label, where to get a key, free-plan?) — cloud nodes first, then the
+# direct-route and GitHub keys that are not nodes themselves.
+KEY_SLOTS = [(env, name, signup, nid in FREE_NODE_IDS)
+             for nid, name, _base, env, signup, _path in CLOUD_NODES if env]
+KEY_SLOTS += [("ANTHROPIC_API_KEY", "Anthropic Claude", "https://console.anthropic.com/settings/keys", False),
+              ("GITHUB_TOKEN", "GitHub token (optional: repositories)", "https://github.com/settings/tokens", True)]
+KEY_NAMES = [env for env, *_ in KEY_SLOTS]
+
+
+def keys_path() -> Path:
+    """Where saved keys live: the app's private data dir on Android, the gateway folder elsewhere."""
+    return Path(os.getenv("MCUBED_DATA", str(HERE))) / "keys.json"
+
+
+def load_saved_keys() -> int:
+    """Apply keys saved from the AI keys tab to the environment. Returns how many are set."""
+    try:
+        saved = json.loads(keys_path().read_text())
+    except (OSError, ValueError):
+        saved = None
+    if isinstance(saved, dict):
+        for name in KEY_NAMES:
+            value = str(saved.get(name) or "").strip()
+            if value:
+                os.environ[name] = value
+            elif name in saved:  # present but empty means removed: do not resurrect it
+                os.environ.pop(name, None)
+    return sum(1 for n in KEY_NAMES if os.getenv(n))
+
+
+def keys_status() -> dict:
+    """Which key slots are set — never the keys themselves, only a last-4 hint."""
+    out = []
+    for env, name, signup, free in KEY_SLOTS:
+        value = os.getenv(env) or ""
+        out.append({"env": env, "name": name, "signup": signup, "free": free,
+                    "set": bool(value), "hint": ("\u2026" + value[-4:]) if value else ""})
+    return {"keys": out, "saved": sum(1 for k in out if k["set"])}
+
+
+def save_keys(updates: dict) -> dict:
+    """Persist key changes from the AI keys tab and apply them live.
+
+    A non-empty value sets a key, an empty string removes it, and a name that is
+    not mentioned is left as it is. Keys live only in keys.json on this device
+    (0600, git-ignored, skipped by updates) and are never sent anywhere else."""
+    if not isinstance(updates, dict):
+        raise ValueError("keys object required")
+    unknown = [k for k in updates if k not in KEY_NAMES]
+    if unknown:
+        raise ValueError(f"unknown key name: {unknown[0]}")
+    try:
+        saved = json.loads(keys_path().read_text())
+        if not isinstance(saved, dict):
+            saved = {}
+    except (OSError, ValueError):
+        saved = {}
+    for name, raw in updates.items():
+        value = str(raw or "").strip()
+        if value:
+            if len(value) > 512 or any(c.isspace() for c in value):
+                raise ValueError(f"{name} does not look like an API key (check for spaces)")
+            saved[name] = value
+            os.environ[name] = value
+        else:
+            saved.pop(name, None)
+            os.environ.pop(name, None)
+    path = keys_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name("keys.json.tmp")
+    tmp.write_text(json.dumps(saved, indent=1))
+    try:
+        tmp.chmod(0o600)
+    except OSError:
+        pass
+    tmp.replace(path)
+    return keys_status()
+
+
+
+
+_GUI_STARTED_AT: float = 0.0
+
+
+def toolbox_status(gw: "Gateway") -> dict:
+    """Toolbox view: is the app running, and what is it allowed to do in the background?"""
+    def job(policy: str, every: float, unit: str, last_key: str) -> dict:
+        return {"on": bool(gw.store.get_policy(policy, True)), "every": every, "unit": unit,
+                "last_at": float(gw.store.get_policy(last_key, 0) or 0) or None}
+    return {
+        "running": True,
+        "started_at": _GUI_STARTED_AT or None,
+        "uptime_s": int(time.time() - _GUI_STARTED_AT) if _GUI_STARTED_AT else None,
+        "android": _is_android(),
+        "mock": bool(gw.mock),
+        "keys_saved": keys_status()["saved"],
+        "background": {
+            "auto_improve": job("bg_auto_improve",
+                                float(os.getenv("GATEWAY_AUTO_IMPROVE_HOURS")
+                                      or gw.defaults.get("auto_improve_every_hours", 6)), "hours",
+                                "last_scheduled_improve_ts"),
+            "repo_sync": job("bg_repo_sync",
+                             float(os.getenv("GATEWAY_REPO_SYNC_HOURS")
+                                   or gw.defaults.get("repo_sync_every_hours", 6)), "hours",
+                             "last_repo_sync_ts"),
+            "node_scan": job("bg_node_scan",
+                             float(nodes_config(gw).get("scan_every_minutes", 60)), "minutes",
+                             "last_node_scan_ts"),
+            "lan_scan": {"on": bool(nodes_config(gw).get("lan_scan", True))},
+        },
+    }
+
+
 def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None) -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from urllib.parse import parse_qs, urlparse
 
     lock = threading.Lock()  # one gateway, many phone/browser clients
+    global _GUI_STARTED_AT
+    _GUI_STARTED_AT = time.time()
+    if gw.mock and os.getenv("GATEWAY_MOCK") != "1" and load_saved_keys():
+        gw.mock = False  # keys saved in the tab on an earlier run: demo mode is over
+    else:
+        load_saved_keys()
 
     class H(BaseHTTPRequestHandler):
         server_version = "MCUBED/1.0"
@@ -3083,6 +3215,11 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                     return self._send(502, {"error": f"news unavailable ({type(e).__name__}: {str(e)[:160]})"})
             if u.path == "/api/wine":
                 return self._send(200, wine_status())
+            if u.path == "/api/keys":
+                return self._send(200, keys_status())
+            if u.path == "/api/toolbox":
+                with lock:
+                    return self._send(200, toolbox_status(gw))
             if u.path == "/api/units":
                 with lock:
                     return self._send(200, gw.ai_units())
@@ -3125,6 +3262,48 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 if res.get("restart") and not _is_android():
                     restart_process()
                 return
+            if u.path == "/api/keys":
+                try:
+                    res = save_keys(self._body().get("keys") or {})
+                except (ValueError, GatewayError, OSError) as e:
+                    return self._send(400, {"error": str(e)})
+                if res["saved"] and gw.mock and os.getenv("GATEWAY_MOCK") != "1":
+                    gw.mock = False  # a real key was just saved: leave demo mode
+                with lock:
+                    gw.load_nodes()  # cached scan: newly keyed providers join the pool
+                return self._send(200, res)
+            if u.path == "/api/toolbox":
+                b = self._body()
+                bg = b.get("background")
+                if isinstance(bg, dict):  # toggles for the scheduled background jobs
+                    for name, policy in (("auto_improve", "bg_auto_improve"), ("repo_sync", "bg_repo_sync"),
+                                         ("node_scan", "bg_node_scan"), ("lan_scan", "bg_lan_scan")):
+                        if name in bg:
+                            gw.store.set_policy(policy, bool(bg[name]))
+                action = b.get("action")
+                if action == "restart":  # desktop/Termux only: Android restarts from its Toolbox menu
+                    if _is_android():
+                        return self._send(400, {"error": "on Android, restart from the app menu (Toolbox)"})
+                    self._send(200, toolbox_status(gw))
+                    restart_process()
+                    return
+                if action == "run":  # run one background job right now
+                    job_name = str(b.get("job") or "")
+                    try:
+                        if job_name == "improve":
+                            with lock:
+                                run_scheduled_improvement(gw, force=True)
+                        elif job_name == "repos":
+                            res = sync_repos(gw.repo_registry)
+                            gw.store.set_policy("last_repo_sync_ts", time.time())
+                        elif job_name == "nodes":
+                            run_node_scan(gw, lock, force=True)
+                        else:
+                            return self._send(400, {"error": "job must be improve, repos or nodes"})
+                    except (GatewayError, ValueError, OSError) as e:
+                        return self._send(400, {"error": str(e)})
+                with lock:
+                    return self._send(200, toolbox_status(gw))
             if u.path == "/api/cost":
                 b = self._body()
                 with lock:

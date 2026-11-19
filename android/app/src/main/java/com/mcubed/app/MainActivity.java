@@ -1,11 +1,14 @@
 package com.mcubed.app;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.PowerManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -19,6 +22,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -38,6 +43,7 @@ import com.chaquo.python.android.AndroidPlatform;
 public class MainActivity extends Activity {
     private static final String PREFS = "mcubed";
     private static final String KEY_CONFIGURED = "keys_configured";
+    private static final String KEY_KEEP_BG = "keep_background";
     /** Provider key slots: environment variable name and label shown in the dialog. */
     private static final String[][] KEYS = {
             {"GEMINI_API_KEY", "Google Gemini (free)"},
@@ -63,7 +69,7 @@ public class MainActivity extends Activity {
             {"ZAI_API_KEY", "Z.ai GLM (paid)"},
             {"MINIMAX_API_KEY", "MiniMax (paid)"},
     };
-    private static final int MENU_KEY = 1, MENU_RELOAD = 2;
+    private static final int MENU_KEY = 1, MENU_RELOAD = 2, MENU_TOOLBOX = 3;
 
     private WebView web;
     private TextView status;
@@ -124,6 +130,7 @@ public class MainActivity extends Activity {
     }
 
     private void startGateway() {
+        applyBackgroundPref();
         final String keys = keysJson();
         new Thread(() -> {
             try {
@@ -140,13 +147,52 @@ public class MainActivity extends Activity {
         }, "mcubed-start").start();
     }
 
-    private String keysJson() {
+    private File keysFile() {
+        return new File(getFilesDir(), "gateway/keys.json");
+    }
+
+    /** Saved keys as one object: the dashboard's keys.json first, then this dialog's prefs on top. */
+    private JSONObject mergedKeys() {
         JSONObject o = new JSONObject();
         try {
-            for (String[] k : KEYS) o.put(k[0], prefs().getString(k[0], ""));
+            File f = keysFile();
+            if (f.isFile()) {
+                byte[] buf = new byte[(int) f.length()];
+                try (FileInputStream in = new FileInputStream(f)) {
+                    int n = 0, r;
+                    while (n < buf.length && (r = in.read(buf, n, buf.length - n)) > 0) n += r;
+                }
+                JSONObject fromFile = new JSONObject(new String(buf, "UTF-8"));
+                for (String[] k : KEYS) {
+                    String v = fromFile.optString(k[0], "");
+                    if (!v.isEmpty()) o.put(k[0], v);
+                }
+            }
         } catch (Exception ignored) {
         }
-        return o.toString();
+        try {
+            for (String[] k : KEYS) {
+                String v = prefs().getString(k[0], "");
+                if (!v.isEmpty()) o.put(k[0], v);
+            }
+        } catch (Exception ignored) {
+        }
+        return o;
+    }
+
+    private String keysJson() {
+        return mergedKeys().toString();
+    }
+
+    private boolean hasKey(String name) {
+        return !mergedKeys().optString(name, "").isEmpty();
+    }
+
+    private int savedKeyCount() {
+        JSONObject o = mergedKeys();
+        int n = 0;
+        for (String[] k : KEYS) if (!o.optString(k[0], "").isEmpty()) n++;
+        return n;
     }
 
     private void askForKey(final boolean firstRun) {
@@ -161,28 +207,25 @@ public class MainActivity extends Activity {
             box.addView(label);
             EditText input = new EditText(this);
             input.setSingleLine(true);
-            input.setHint(prefs().getString(KEYS[i][0], "").isEmpty() ? "not set" : "saved (leave blank to keep)");
+            input.setHint(hasKey(KEYS[i][0]) ? "saved (leave blank to keep)" : "not set");
             input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
             box.addView(input);
             fields[i] = input;
         }
+        // A Save button inside the form itself, at the end of the list: the dialog's
+        // button bar is easy to miss behind the keyboard on a long form like this.
+        final Button saveBtn = new Button(this);
+        saveBtn.setText("Save keys");
+        box.addView(saveBtn);
         final android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         scroll.addView(box);
-        new AlertDialog.Builder(this)
+        final AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("AI provider keys")
                 .setMessage("MCUBED is free: only free AI is used unless you turn on paid AI. Keys are stored only on this device. "
                         + "With no keys, MCUBED runs in demo mode with simulated replies.")
                 .setView(scroll)
                 .setCancelable(false)
-                .setPositiveButton("Save", (d, w) -> {
-                    SharedPreferences.Editor e = prefs().edit();
-                    for (int i = 0; i < KEYS.length; i++) {
-                        String v = fields[i].getText().toString().trim();
-                        if (!v.isEmpty()) e.putString(KEYS[i][0], v);
-                    }
-                    e.putBoolean(KEY_CONFIGURED, true).apply();
-                    applyKeys(firstRun);
-                })
+                .setPositiveButton("Save keys", (d, w) -> saveKeysFrom(fields, firstRun))
                 .setNegativeButton(firstRun ? "Demo mode" : "Cancel", (d, w) -> {
                     if (firstRun) {
                         prefs().edit().putBoolean(KEY_CONFIGURED, true).apply();
@@ -193,9 +236,29 @@ public class MainActivity extends Activity {
                     SharedPreferences.Editor e = prefs().edit();
                     for (String[] k : KEYS) e.remove(k[0]);
                     e.apply();
+                    keysFile().delete(); // the dashboard saves to the same store
                     applyKeys(false);
                 })
-                .show();
+                .create();
+        saveBtn.setOnClickListener(v -> {
+            saveKeysFrom(fields, firstRun);
+            dialog.dismiss();
+        });
+        dialog.show();
+    }
+
+    /** Persist whatever was typed (blank fields keep the saved key) and say so out loud. */
+    private void saveKeysFrom(EditText[] fields, boolean firstRun) {
+        SharedPreferences.Editor e = prefs().edit();
+        for (int i = 0; i < KEYS.length; i++) {
+            String v = fields[i].getText().toString().trim();
+            if (!v.isEmpty()) e.putString(KEYS[i][0], v);
+        }
+        e.putBoolean(KEY_CONFIGURED, true).apply();
+        int saved = savedKeyCount();
+        Toast.makeText(this, saved > 0 ? "AI keys saved (" + saved + ")" : "No keys saved \u2014 demo mode",
+                Toast.LENGTH_LONG).show();
+        applyKeys(firstRun);
     }
 
     private void applyKeys(boolean firstRun) {
@@ -213,10 +276,88 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    /** Start or stop the keep-alive foreground service, as the Toolbox toggle says. */
+    private void applyBackgroundPref() {
+        boolean keep = prefs().getBoolean(KEY_KEEP_BG, true);
+        if (keep) {
+            if (Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
+            }
+            GatewayService.start(this);
+        } else {
+            GatewayService.stop(this);
+        }
+    }
+
+    private boolean batteryUnrestricted() {
+        if (Build.VERSION.SDK_INT < 23) return true;
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    /** Basic background behaviour, in one place: keep-alive, battery, status, restart. */
+    private void showToolbox() {
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, pad / 2);
+
+        TextView statusLine = new TextView(this);
+        statusLine.setText("Gateway: running in this app\nAI keys saved: " + savedKeyCount()
+                + "\nBattery: " + (batteryUnrestricted() ? "unrestricted (good)" : "restricted \u2014 Android may stop MCUBED"));
+        box.addView(statusLine);
+
+        final CheckBox keep = new CheckBox(this);
+        keep.setText("Keep running in the background");
+        keep.setChecked(prefs().getBoolean(KEY_KEEP_BG, true));
+        keep.setOnCheckedChangeListener((b, on) -> {
+            prefs().edit().putBoolean(KEY_KEEP_BG, on).apply();
+            applyBackgroundPref();
+            Toast.makeText(this, on ? "MCUBED will keep running in the background"
+                    : "Background keep-alive off", Toast.LENGTH_LONG).show();
+        });
+        box.addView(keep);
+
+        Button battery = new Button(this);
+        battery.setText("Allow background battery use");
+        battery.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ex) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                } catch (Exception ignored) {
+                }
+            }
+        });
+        box.addView(battery);
+
+        Button restart = new Button(this);
+        restart.setText("Restart app");
+        restart.setOnClickListener(v -> recreate());
+        box.addView(restart);
+
+        Button reload = new Button(this);
+        reload.setText("Reload dashboard");
+        reload.setOnClickListener(v -> {
+            if (web != null) web.reload();
+        });
+        box.addView(reload);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Toolbox")
+                .setView(box)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         menu.add(0, MENU_KEY, 0, "AI keys");
-        menu.add(0, MENU_RELOAD, 1, "Reload");
+        menu.add(0, MENU_TOOLBOX, 1, "Toolbox");
+        menu.add(0, MENU_RELOAD, 2, "Reload");
         return true;
     }
 
@@ -224,6 +365,10 @@ public class MainActivity extends Activity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == MENU_KEY) {
             askForKey(false);
+            return true;
+        }
+        if (item.getItemId() == MENU_TOOLBOX) {
+            showToolbox();
             return true;
         }
         if (item.getItemId() == MENU_RELOAD) {
