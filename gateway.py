@@ -1733,7 +1733,7 @@ def guess_tier(model_id: str, local: bool = False) -> tuple[str, int]:
     size = max((float(x) for x in re.findall(r"(\d+(?:\.\d+)?)b\b", m)), default=0.0)
     if re.search(r"(nano|mini|small|tiny|lite|flash|haiku|instant|\b[1-9]b\b|:free)", m) or (0 < size <= 14):
         tier, q = "economy", 4
-    elif re.search(r"(opus|ultra|large|-pro\b|pro-|max\b|reasoner|r1\b|405b|671b|235b|480b)", m) or size >= 120:
+    elif re.search(r"(opus|ultra|large|-pro\b|pro-|max\b|reasoner|r1\b|405b|671b|235b|480b|muse-spark|muse-wonder)", m) or size >= 120:
         tier, q = "premium", 7
     else:
         tier, q = "standard", 6
@@ -1767,6 +1767,8 @@ def _list_cloud(node: tuple, cfg: dict) -> dict:
         i["id"] = i["id"].removeprefix("models/")  # Gemini lists ids as models/<id>
     items = [i for i in items if i["id"] and not _NON_CHAT.search(i["id"])]
     rec["models_total"] = len(items)
+    if nid in ("nvidia", "groq"):  # free hosts that carry Meta's Muse models: keep Muse inside the per-node cap
+        items.sort(key=lambda i: 0 if "muse" in i["id"] else 1)
     if nid == "openrouter":  # every paid model is already an OpenRouter fallback route; add the free ones
         items = [i for i in items if i["id"].endswith(":free") or i.get("free")][: int(cfg["max_free_openrouter"])]
     rec["models"] = items[: int(cfg["max_models_per_node"])] if nid != "openrouter" else items
