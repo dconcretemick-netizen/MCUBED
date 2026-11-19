@@ -70,7 +70,7 @@ public class MainActivity extends Activity {
             {"MINIMAX_API_KEY", "MiniMax (paid)"},
             {"MODEL_API_KEY", "Meta Muse AI (paid)"},
     };
-    private static final int MENU_KEY = 1, MENU_RELOAD = 2, MENU_TOOLBOX = 3;
+    private static final int MENU_KEY = 1, MENU_RELOAD = 2, MENU_TOOLBOX = 3, MENU_CLOSE = 4;
 
     private WebView web;
     private TextView status;
@@ -104,6 +104,7 @@ public class MainActivity extends Activity {
                 String scheme = u.getScheme();
                 if ("mcubed".equals(scheme)) { // mcubed://install-update from the Update tab
                     if ("install-update".equals(u.getHost())) installUpdate();
+                    if ("close-app".equals(u.getHost())) confirmClose(); // dashboard's Close app button
                     return true;
                 }
                 if ("github.com".equals(u.getHost()) && u.getPath() != null && u.getPath().contains("/releases")) {
@@ -352,6 +353,11 @@ public class MainActivity extends Activity {
         });
         box.addView(reload);
 
+        Button close = new Button(this);
+        close.setText("Shut down MCUBED");
+        close.setOnClickListener(v -> confirmClose());
+        box.addView(close);
+
         new AlertDialog.Builder(this)
                 .setTitle("Toolbox")
                 .setView(box)
@@ -359,11 +365,31 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    /** Ask first, then shut everything down: service, gateway and app. */
+    private void confirmClose() {
+        new AlertDialog.Builder(this)
+                .setTitle("Shut down MCUBED?")
+                .setMessage("The gateway will stop and the app will close. Your keys and settings stay saved — just open MCUBED again to restart it.")
+                .setPositiveButton("Shut down", (d, w) -> closeApp())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Full stop: the keep-alive service ends, the task is removed, and the
+     *  process exits — which also ends the embedded Python gateway with it. */
+    private void closeApp() {
+        GatewayService.stop(this);
+        finishAndRemoveTask();
+        android.os.Process.killProcess(android.os.Process.myPid());
+        System.exit(0);
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         menu.add(0, MENU_KEY, 0, "AI keys");
         menu.add(0, MENU_TOOLBOX, 1, "Toolbox");
         menu.add(0, MENU_RELOAD, 2, "Reload");
+        menu.add(0, MENU_CLOSE, 3, "Close app");
         return true;
     }
 
@@ -379,6 +405,10 @@ public class MainActivity extends Activity {
         }
         if (item.getItemId() == MENU_RELOAD) {
             web.reload();
+            return true;
+        }
+        if (item.getItemId() == MENU_CLOSE) {
+            confirmClose();
             return true;
         }
         return super.onOptionsItemSelected(item);

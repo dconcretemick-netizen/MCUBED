@@ -2094,6 +2094,11 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
                 run_gardener(gw)
         except Exception:  # noqa: BLE001
             log.exception("provider gardener failed")
+        try:  # audit the pages for the automated Android UI polish
+            if gw.store.get_policy("bg_ui_polish", True):
+                run_ui_polish(gw)
+        except Exception:  # noqa: BLE001
+            log.exception("UI polish audit failed")
         time.sleep(poll_s)
 
 
@@ -3266,6 +3271,127 @@ def gardener_status(gw: "Gateway") -> dict:
 
 
 _GUI_STARTED_AT: float = 0.0
+_GUI_SERVER = None  # the running ThreadingHTTPServer, so the Toolbox can shut it down
+
+
+def shutdown_gateway(delay: float = 0.6) -> None:
+    """Stop the GUI server for good. On desktop the process exits too; on Android
+    the dashboard follows up with mcubed://close-app and the app closes itself
+    (stopping the keep-alive service and the process), so nothing is left running."""
+    def go() -> None:
+        time.sleep(delay)  # let the HTTP reply reach the dashboard first
+        srv = _GUI_SERVER
+        if srv is not None:
+            try:
+                srv.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                srv.server_close()
+            except Exception:  # noqa: BLE001
+                pass
+        if not _is_android():
+            os._exit(0)
+    threading.Thread(target=go, name="mcubed-shutdown", daemon=True).start()
+
+
+# --------------------------------------------------------------------------- #
+# Automated UI improvement for Android: every page the gateway serves is
+# checked for the mobile polish below and gets it injected at serve time when
+# it is missing (self-healing after updates), and a scheduled audit reports
+# the state in the Toolbox. The polish itself is deliberately small and safe:
+# finger-sized touch targets, no focus zoom on form fields, no tap flash,
+# no overscroll chaining, and compact spacing on narrow screens.
+# --------------------------------------------------------------------------- #
+UI_POLISH_MARKER = "mcubed-ui-polish"
+UI_POLISH_HTML = (
+    "<style data-mcubed-ui-polish>\n"
+    "/* mcubed-ui-polish: automated Android UI improvements, injected by the gateway */\n"
+    "html{-webkit-tap-highlight-color:transparent}\n"
+    "body{overscroll-behavior-y:none}\n"
+    "@media (pointer:coarse){\n"
+    "  button,select,.btn,[role=tab]{min-height:48px}\n"
+    "  input,textarea{font-size:16px}\n"
+    "  input[type=checkbox][role=switch]{width:52px;height:30px}\n"
+    "}\n"
+    "@media (max-width:480px){\n"
+    "  .card{padding:14px}\n"
+    "  .row{gap:8px}\n"
+    "}\n"
+    "</style>"
+)
+UI_PAGES = ("dashboard.html", "oregon.html", "game.html", "solitaire.html",
+            "tetris.html", "platformer.html")
+
+
+def polish_html(body: bytes) -> bytes:
+    """Add the automated Android UI polish (and any missing mobile basics) to a page."""
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return body
+    if "</head>" not in text:
+        return body
+    add = ""
+    if 'name="viewport"' not in text:
+        add += '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+    elif "viewport-fit=cover" not in text:
+        text = text.replace('initial-scale=1"', 'initial-scale=1, viewport-fit=cover"', 1)
+    if 'name="theme-color"' not in text:
+        add += '<meta name="theme-color" content="#0f1417">\n'
+    if UI_POLISH_MARKER not in text:
+        add += UI_POLISH_HTML + "\n"
+    if add:
+        text = text.replace("</head>", add + "</head>", 1)
+    return text.encode("utf-8")
+
+
+def ui_audit() -> dict:
+    """Check each served page for the mobile basics and the UI polish."""
+    pages = []
+    for name in UI_PAGES:
+        p = HERE / name
+        if not p.exists():
+            continue
+        text = p.read_text(errors="replace")
+        issues = []
+        if 'name="viewport"' not in text:
+            issues.append("no viewport meta")
+        elif "viewport-fit=cover" not in text:
+            issues.append("viewport misses viewport-fit=cover")
+        if 'name="theme-color"' not in text:
+            issues.append("no theme-color")
+        pages.append({"page": name, "polished": UI_POLISH_MARKER in text, "issues": issues})
+    return {"pages": pages,
+            "auto_fixed": sum(1 for p in pages if not p["polished"] or p["issues"]),
+            "checked_at": time.time()}
+
+
+def run_ui_polish(gw: "Gateway", force: bool = False) -> Optional[dict]:
+    """Scheduled audit (~daily). Nothing is rewritten on disk: pages that miss
+    the polish get it injected by polish_html() every time they are served."""
+    last = float(gw.store.get_policy("last_ui_audit_ts", 0) or 0)
+    if not force and time.time() - last < 24 * 3600:
+        return None
+    audit = ui_audit()
+    gw.store.set_policy("ui_audit", json.dumps(audit))
+    gw.store.set_policy("last_ui_audit_ts", audit["checked_at"])
+    log.info("ui polish audit: %d pages, %d auto-fixed at serve time",
+             len(audit["pages"]), audit["auto_fixed"])
+    return audit
+
+
+def ui_status(gw: "Gateway") -> dict:
+    audit = {}
+    try:
+        audit = json.loads(gw.store.get_policy("ui_audit", "") or "{}")
+    except ValueError:
+        audit = {}
+    return {"on": bool(gw.store.get_policy("bg_ui_polish", True)),
+            "every": 24, "unit": "hours",
+            "last_at": float(gw.store.get_policy("last_ui_audit_ts", 0) or 0) or None,
+            "pages": audit.get("pages", []),
+            "auto_fixed": audit.get("auto_fixed", 0)}
 
 
 def toolbox_status(gw: "Gateway") -> dict:
@@ -3294,6 +3420,7 @@ def toolbox_status(gw: "Gateway") -> dict:
                              "last_node_scan_ts"),
             "lan_scan": {"on": bool(nodes_config(gw).get("lan_scan", True))},
             "gardener": gardener_status(gw),
+            "ui_polish": ui_status(gw),
         },
         "gardener": gardener_status(gw),
     }
@@ -3820,7 +3947,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
     from urllib.parse import parse_qs, urlparse
 
     lock = threading.Lock()  # one gateway, many phone/browser clients
-    global _GUI_STARTED_AT
+    global _GUI_STARTED_AT, _GUI_SERVER
     _GUI_STARTED_AT = time.time()
     if gw.mock and os.getenv("GATEWAY_MOCK") != "1" and load_saved_keys():
         gw.mock = False  # keys saved in the tab on an earlier run: demo mode is over
@@ -3911,7 +4038,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             if u.path == "/v1/models":
                 return self._send(200, openai_models(gw))
             if u.path in ("/", "/index.html"):
-                body = (HERE / "dashboard.html").read_bytes()
+                body = polish_html((HERE / "dashboard.html").read_bytes())
                 self.send_response(200)
                 if token:
                     self.send_header("Set-Cookie", f"mcubed_token={token}; Path=/; SameSite=Strict; HttpOnly")
@@ -3921,7 +4048,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 self.wfile.write(body)
                 return
             if u.path in ("/game.html", "/solitaire.html", "/tetris.html", "/platformer.html", "/oregon.html") and (HERE / u.path[1:]).exists():
-                return self._send(200, (HERE / u.path[1:]).read_bytes(), "text/html; charset=utf-8")
+                return self._send(200, polish_html((HERE / u.path[1:]).read_bytes()), "text/html; charset=utf-8")
             if u.path == "/api/repos":
                 return self._send(200, dict(load_repos(gw.repo_registry),
                                              github_token=bool(_github_token() or __import__("shutil").which("gh"))))
@@ -4027,7 +4154,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 if isinstance(bg, dict):  # toggles for the scheduled background jobs
                     for name, policy in (("auto_improve", "bg_auto_improve"), ("repo_sync", "bg_repo_sync"),
                                          ("node_scan", "bg_node_scan"), ("lan_scan", "bg_lan_scan"),
-                                         ("gardener", "bg_gardener")):
+                                         ("gardener", "bg_gardener"), ("ui_polish", "bg_ui_polish")):
                         if name in bg:
                             gw.store.set_policy(policy, bool(bg[name]))
                 action = b.get("action")
@@ -4036,6 +4163,10 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                         return self._send(400, {"error": "on Android, restart from the app menu (Toolbox)"})
                     self._send(200, toolbox_status(gw))
                     restart_process()
+                    return
+                if action == "shutdown":  # full stop: server down; Android closes the app via mcubed://close-app
+                    self._send(200, {**toolbox_status(gw), "shutdown": True})
+                    shutdown_gateway()
                     return
                 if action == "run":  # run one background job right now
                     job_name = str(b.get("job") or "")
@@ -4051,8 +4182,10 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                         elif job_name == "gardener":
                             run_gardener(gw, force=True)
                             run_node_scan(gw, lock, force=True)  # adopt free nodes / drop cleaned ones
+                        elif job_name == "ui":
+                            run_ui_polish(gw, force=True)
                         else:
-                            return self._send(400, {"error": "job must be improve, repos, nodes or gardener"})
+                            return self._send(400, {"error": "job must be improve, repos, nodes, gardener or ui"})
                     except (GatewayError, ValueError, OSError) as e:
                         return self._send(400, {"error": str(e)})
                 with lock:
@@ -4126,6 +4259,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             self._send(404, {"error": "not found"})
 
     srv = ThreadingHTTPServer((host, port), H)
+    _GUI_SERVER = srv
     threading.Thread(target=_scheduled_improver, args=(gw, lock), name="mcubed-improver", daemon=True).start()
     shown = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
     print(f"MCUBED GUI on http://{shown}:{port}/" + (f"?token={token}" if token else ""))

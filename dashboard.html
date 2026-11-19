@@ -9,6 +9,20 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314b8a6'/%3E%3Cpath d='M14 46V18l9 14 9-14 9 14 9-14v28' fill='none' stroke='%230f1417' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
 <title>MCUBED Gateway</title>
+<style data-mcubed-ui-polish>
+/* mcubed-ui-polish: automated Android UI improvements, injected by the gateway */
+html{-webkit-tap-highlight-color:transparent}
+body{overscroll-behavior-y:none}
+@media (pointer:coarse){
+  button,select,.btn,[role=tab]{min-height:48px}
+  input,textarea{font-size:16px}
+  input[type=checkbox][role=switch]{width:52px;height:30px}
+}
+@media (max-width:480px){
+  .card{padding:14px}
+  .row{gap:8px}
+}
+</style>
 <style>
 :root{
   --bg:#0f1417;--surface:#161d21;--surface-2:#1d262b;--border:#2a353b;
@@ -73,6 +87,7 @@ td.r,th.r{text-align:right}
 .policy div{background:var(--surface-2);border-radius:10px;padding:10px}
 .policy b{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px}
 .btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-weight:600}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -499,6 +514,12 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <div id="gardener-body"><div class="skel"></div></div>
     </div>
 
+    <div class="card" style="margin-top:var(--gap)"><h2>Android UI</h2>
+      <p class="news-note">MCUBED checks its own pages every day and automatically adds the mobile polish — finger-sized buttons, no zoom when you tap a field, no tap flash — to any page missing it, for example after an update.</p>
+      <div id="ui-body"><div class="skel"></div></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="tb-run-ui">Check UI now</button></div>
+    </div>
+
     <div class="card" style="margin-top:var(--gap)"><h2>Tools</h2>
       <div class="row">
         <button class="btn" id="tb-run-nodes">Scan for AI now</button>
@@ -507,6 +528,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
         <button class="btn" id="tb-run-gardener">Check keys &amp; providers now</button>
         <button class="btn" id="tb-compact">Compact storage</button>
         <button class="btn" id="tb-restart">Restart gateway</button>
+        <button class="btn danger" id="tb-close">Close app</button>
       </div>
       <p class="news-note" id="tb-msg" role="status" style="margin:10px 0 0"></p>
     </div>
@@ -1089,7 +1111,13 @@ function renderToolbox(){
     row("repo_sync","Sync my GitHub repositories", every(bg.repo_sync), bg.repo_sync) +
     row("node_scan","Look for new AI providers and local models", every(bg.node_scan), bg.node_scan) +
     row("lan_scan","Also look on my home network", "Off means only this device and cloud providers are checked", bg.lan_scan) +
-    row("gardener","Key & provider gardener", "Checks keys and providers, removes rejected keys, parks dead providers, adopts free AI nodes · " + every(bg.gardener), bg.gardener);
+    row("gardener","Key & provider gardener", "Checks keys and providers, removes rejected keys, parks dead providers, adopts free AI nodes · " + every(bg.gardener), bg.gardener) +
+    row("ui_polish","Automated Android UI improvement", "Daily check: pages missing the mobile polish get it added automatically · " + every(bg.ui_polish), bg.ui_polish);
+  const ui=bg.ui_polish||{};
+  let uh="";
+  if(ui.pages&&ui.pages.length) uh+=ui.pages.map(p=>`<div class="kv"><span>${esc(p.page)}</span><code>${p.polished?"polish built in":"polish added automatically"}${p.issues&&p.issues.length?" · also fixed: "+esc(p.issues.join(", ")):""}</code></div>`).join("");
+  else uh+='<p class="news-note">Not checked yet — tap "Check UI now".</p>';
+  $("#ui-body").innerHTML=uh;
   const g=d.gardener||{};
   const keyWord={ok:"working",limited:"working (rate limited)",invalid:"rejected by provider",unreachable:"cannot be reached",removed:"removed — paste the key again to retry"};
   let gh="";
@@ -1121,6 +1149,14 @@ $("#tb-run-nodes").addEventListener("click",()=>toolboxRun("nodes","Scanning for
 $("#tb-run-repos").addEventListener("click",()=>toolboxRun("repos","Syncing repositories"));
 $("#tb-run-improve").addEventListener("click",()=>toolboxRun("improve","Improving"));
 $("#tb-run-gardener").addEventListener("click",()=>toolboxRun("gardener","Checking keys and providers"));
+$("#tb-run-ui").addEventListener("click",()=>toolboxRun("ui","Checking UI"));
+$("#tb-close").addEventListener("click",async()=>{
+  if(!confirm("Shut MCUBED down completely? The gateway stops, and on Android the app closes too. Your keys and settings stay saved — just open MCUBED again to restart.")) return;
+  let android=!!(TB&&TB.android);
+  try{ const r=await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"shutdown"})}); if(r&&r.android) android=true; }catch(e){}
+  $("#off-screen").hidden=false;
+  if(android) setTimeout(()=>{ location.href="mcubed://close-app" },350);
+});
 $("#tb-compact").addEventListener("click",async()=>{
   try{ await api("/api/compact",{method:"POST"}); toast("Storage compacted"); $("#tb-msg").textContent="Storage compacted." }catch(e){ toast(e.message) }
 });
@@ -1251,5 +1287,10 @@ $("#free-only").addEventListener("change", async e=>{
 $("#btn-units").addEventListener("click",()=>{ const box=$("#units-info"); box.hidden=!box.hidden; $("#btn-units").setAttribute("aria-expanded",String(!box.hidden)); if(!box.hidden) loadUnits() });
 loadUnits();
 </script>
+<div id="off-screen" hidden style="position:fixed;inset:0;z-index:99;background:var(--bg);color:var(--text);text-align:center;padding:24px">
+  <div style="margin-top:30vh;font-size:44px" aria-hidden="true">⏻</div>
+  <h2>MCUBED is off</h2>
+  <p class="news-note" style="max-width:340px;margin:0 auto">The gateway has stopped. On Android the app closes itself now — if it doesn't, swipe it away. Open MCUBED again whenever you want it back.</p>
+</div>
 </body>
 </html>
