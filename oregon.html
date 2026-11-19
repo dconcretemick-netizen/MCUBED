@@ -3,430 +3,1056 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Oregon Trail · MCUBED</title>
+<title>The Oregon Trail · MCUBED</title>
 <style>
-:root{--bg:#0d1216;--panel:#151c21;--panel2:#1d262b;--line:#24303a;--text:#e6ecea;--muted:#8a9a97;--accent:#14b8a6;--accent-ink:#04201d;--good:#34d399;--warn:#fbbf24;--bad:#f87171}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:760px;margin:0 auto;padding:12px 12px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
-h1{font-size:20px;margin:2px 0 0}
-.sub{color:var(--muted);font-size:13px;margin:0}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;min-width:0}
-.stat b{display:block;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-.stat span{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-.stat span small{font-size:12px;color:var(--muted);font-weight:500}
-.trail{position:relative;height:54px;background:linear-gradient(180deg,#274b63 0 55%,#3d5a37 55% 100%);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.trail .road{position:absolute;left:0;right:0;top:34px;height:7px;background:#8a6f4d;opacity:.85}
-.trail .dot{position:absolute;top:30px;width:9px;height:9px;margin-left:-4px;border-radius:50%;background:#d8e2df;border:1px solid #223}
-.trail .dot i{position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-style:normal;font-size:9.5px;color:#eaf3f0;white-space:nowrap;text-shadow:0 1px 2px #000}
-.trail .wagon{position:absolute;top:12px;font-size:22px;transform:translateX(-50%);transition:left .5s;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.btn{min-height:46px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font-weight:600;font-size:15px}
-.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.btn:active:not(:disabled){transform:scale(.97)}
-.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-label.ctl{display:grid;gap:4px;font-size:12px;color:var(--muted);flex:1;min-width:130px}
-label.ctl select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:0 10px;font:inherit;font-size:14px;width:100%}
-#log{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px;max-height:300px;overflow:auto}
-#log li{background:var(--panel2);border-radius:8px;padding:7px 10px}
-#log li.bad{color:var(--bad)}#log li.good{color:var(--good)}#log li.warn{color:var(--warn)}
-.shop{display:grid;gap:8px}
-.shop .item{display:flex;align-items:center;gap:8px;justify-content:space-between}
-.shop .item span{color:var(--muted);font-size:13px}
-.member{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
-.member:last-child{border-bottom:0}
-.member .nm{width:64px;font-weight:600}
-.member .bar{flex:1;height:10px;background:var(--panel2);border-radius:5px;overflow:hidden}
-.member .bar i{display:block;height:100%;border-radius:5px}
-.member .st{width:86px;text-align:right;font-size:13px;color:var(--muted)}
-.over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,10,.78);z-index:5;padding:16px}
-.over.show{display:flex}
-.over .card{max-width:420px;width:100%;text-align:center}
-.over h2{margin:0 0 6px;font-size:24px}.over p{color:var(--muted);margin:0 0 14px}
-.hidden{display:none!important}
+  :root{--grn:#3dff5e;--grn-dim:#1f9e3f;--grn-dark:#0a2b12;--bg:#000}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#000;color:var(--grn);
+    font:16px/1.5 "Courier New",ui-monospace,Menlo,Consolas,monospace}
+  body{padding:10px 10px calc(14px + env(safe-area-inset-bottom))}
+  #crt{max-width:780px;margin:0 auto;position:relative;padding:14px 14px 18px;
+    background:#010a03;border:2px solid #123d1d;border-radius:10px;
+    text-shadow:0 0 6px rgba(61,255,94,.45);min-height:70vh}
+  #crt::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:10px;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px)}
+  #art{white-space:pre;overflow-x:auto;font-size:12.5px;line-height:1.25;margin:0 0 10px;color:var(--grn)}
+  #text{white-space:pre-wrap;word-wrap:break-word;min-height:120px}
+  #menu{margin-top:14px;display:flex;flex-direction:column;gap:7px}
+  .mbtn{display:block;width:100%;text-align:left;background:#021507;color:var(--grn);
+    border:1px solid #14532a;border-radius:4px;padding:11px 12px;font:inherit;cursor:pointer;
+    text-shadow:inherit}
+  .mbtn:active,.mbtn:hover{background:var(--grn);color:#021507;text-shadow:none}
+  .mbtn:disabled{opacity:.38;cursor:not-allowed}
+  .mbtn:disabled:active,.mbtn:disabled:hover{background:#021507;color:var(--grn)}
+  #prompt{margin-top:16px}
+  #spacebar{display:block;width:100%;background:#021507;color:#b6ffc4;border:1px solid var(--grn-dim);
+    border-radius:4px;padding:12px;font:inherit;cursor:pointer;letter-spacing:.04em}
+  #spacebar:active{background:var(--grn);color:#021507}
+  .cursor{display:inline-block;width:.62em;height:1.05em;background:var(--grn);
+    vertical-align:text-bottom;animation:blink 1.06s steps(1) infinite}
+  @keyframes blink{0%,55%{opacity:1}56%,100%{opacity:0}}
+  #entryrow{margin-top:14px;display:none;gap:8px}
+  #entryrow.on{display:flex}
+  #entry{flex:1;min-width:0;background:#000;border:1px solid var(--grn-dim);border-radius:4px;
+    color:var(--grn);font:inherit;padding:11px;text-transform:none}
+  #entryok{background:var(--grn);color:#021507;border:0;border-radius:4px;padding:11px 18px;
+    font:inherit;font-weight:700;cursor:pointer}
+  #huntzone{margin-top:10px}
+  #shoot{display:none;width:100%;background:#3d0a0a;color:#ff6b5e;border:2px solid #a33;
+    border-radius:6px;padding:16px;font:inherit;font-size:20px;font-weight:700;cursor:pointer;letter-spacing:.15em}
+  #shoot.on{display:block}
+  #shoot:active{background:#ff6b5e;color:#200}
+  .tiny{font-size:12.5px;color:var(--grn-dim);text-align:center;margin-top:10px}
+  @media (max-width:520px){ #art{font-size:10.5px} html,body{font-size:15px} }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div>
-    <h1>The Oregon Trail <small style="color:var(--muted);font-size:12px">v2</small></h1>
-    <p class="sub">Independence, Missouri to Oregon City — 2,000 miles. Leave in May, arrive before the snow. New in v2: every traveler has their own health, traders flag you down on the trail, and the rivers run high in spring.</p>
-  </div>
-
-  <div class="card" id="setup">
-    <h2 style="margin:0 0 6px;font-size:16px">Who is leading this wagon?</h2>
-    <p class="sub" style="margin-bottom:10px">Bankers start rich but score no bonus. Farmers start poor and score triple — if they make it.</p>
-    <div class="row">
-      <button class="btn" data-prof="banker">Banker · $1600 · score ×1</button>
-      <button class="btn" data-prof="carpenter">Carpenter · $800 · score ×2</button>
-      <button class="btn" data-prof="farmer">Farmer · $400 · score ×3</button>
-    </div>
-    <p class="sub" id="setup-stats" style="margin-top:10px" hidden></p>
-    <div class="row" style="margin-top:10px" id="continue-row" hidden>
-      <button class="btn primary" id="continue">Continue your journey</button>
-      <span class="sub" id="continue-info"></span>
-    </div>
-  </div>
-
-  <div id="game" class="hidden" style="display:flex;flex-direction:column;gap:10px">
-    <div class="trail" id="trail" aria-label="Progress along the trail"></div>
-    <div class="stats">
-      <div class="stat"><b>Date</b><span id="st-date">May 1</span></div>
-      <div class="stat"><b>Distance</b><span id="st-miles">0 <small>/ 2000 mi</small></span></div>
-      <div class="stat"><b>Next landmark</b><span id="st-next" style="font-size:14px">Fort Kearny</span></div>
-      <div class="stat"><b>Party health</b><span id="st-health">100</span></div>
-      <div class="stat"><b>Party</b><span id="st-party">4</span></div>
-      <div class="stat"><b>Food</b><span id="st-food">0 <small>lb</small></span></div>
-      <div class="stat"><b>Oxen</b><span id="st-oxen">4</span></div>
-      <div class="stat"><b>Money</b><span id="st-money">$0</span></div>
-      <div class="stat"><b>Supplies</b><span id="st-sup" style="font-size:14px">0 parts · 0 meds</span></div>
-    </div>
-
-    <div class="card">
-      <h2 style="margin:0 0 4px;font-size:16px">Your party</h2>
-      <div id="members"></div>
-    </div>
-
-    <div class="card hidden" id="river">
-      <h2 style="margin:0 0 6px;font-size:16px" id="river-name">River crossing</h2>
-      <p class="sub" id="river-info" style="margin-bottom:10px"></p>
-      <div class="row">
-        <button class="btn primary" id="rv-ford">Ford the river</button>
-        <button class="btn" id="rv-ferry">Take the ferry · $12 · 1 day</button>
-        <button class="btn" id="rv-wait">Wait a day</button>
-      </div>
-    </div>
-
-    <div class="card hidden" id="trade">
-      <h2 style="margin:0 0 6px;font-size:16px">A trader flags you down</h2>
-      <p class="sub" id="trade-info" style="margin-bottom:10px"></p>
-      <div class="row">
-        <button class="btn primary" id="tr-accept">Make the trade</button>
-        <button class="btn" id="tr-decline">No thanks</button>
-      </div>
-    </div>
-
-    <div class="card hidden" id="shop-card">
-      <h2 style="margin:0 0 4px;font-size:16px" id="shop-name">Store</h2>
-      <p class="sub" style="margin-bottom:8px">Prices rise the further west you go.</p>
-      <div class="shop" id="shop"></div>
-    </div>
-
-    <div class="card">
-      <div class="row" style="margin-bottom:10px">
-        <label class="ctl">Pace
-          <select id="pace">
-            <option value="steady">Steady (12–18 mi/day)</option>
-            <option value="strenuous">Strenuous (18–26 mi/day)</option>
-            <option value="grueling">Grueling (24–34 mi/day)</option>
-          </select></label>
-        <label class="ctl">Rations
-          <select id="rations">
-            <option value="filling">Filling (10 lb/day)</option>
-            <option value="meager">Meager (6 lb/day)</option>
-            <option value="bare">Bare bones (3 lb/day)</option>
-          </select></label>
-      </div>
-      <div class="acts">
-        <button class="btn primary" id="act-travel">Travel</button>
-        <button class="btn" id="act-rest">Rest a day</button>
-        <button class="btn" id="act-hunt">Hunt</button>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn" id="new-game">Start over</button>
-      </div>
-    </div>
-
-    <ul id="log" aria-live="polite"></ul>
-  </div>
+<div id="crt">
+  <pre id="art"></pre>
+  <div id="text"></div>
+  <div id="huntzone"><button id="shoot" type="button">* SHOOT *</button></div>
+  <div id="menu"></div>
+  <div id="entryrow"><input id="entry" autocomplete="off" autocapitalize="words" enterkeyhint="done"><button id="entryok" type="button">OK</button></div>
+  <div id="prompt" hidden><button id="spacebar" type="button">Press SPACE BAR to continue <span class="cursor"></span></button></div>
+  <p class="tiny">THE OREGON TRAIL — an Apple IIe-style homage. Number keys work too.</p>
 </div>
-
-<div class="over" id="over">
-  <div class="card">
-    <h2 id="over-title">The trail ends</h2>
-    <p id="over-msg"></p>
-    <button class="btn primary" id="over-again">Play again</button>
-  </div>
-</div>
-
 <script>
 "use strict";
-const $=s=>document.querySelector(s);
-const TOTAL=2000, NAMES=["Mick","Ada","June","Silas"];
+/* ============================== data ============================== */
+const MONTHS=["January","February","March","April","May","June","July",
+  "August","September","October","November","December"];
+const OCC=[
+  {id:"banker",   name:"Banker from Boston",    money:1600, mult:1},
+  {id:"carpenter",name:"Carpenter from Ohio",   money:800,  mult:2},
+  {id:"farmer",   name:"Farmer from Illinois",  money:400,  mult:3},
+];
 const LANDMARKS=[
-  {m:0,name:"Independence",fort:true,note:"A muddy boomtown packed with wagons. Everyone here is going somewhere."},
-  {m:300,name:"Fort Kearny",fort:true,note:"The first Army post on the Platte. Mail home costs a fortune and takes forever."},
-  {m:530,name:"Chimney Rock",note:"A stone spire visible for days. Halfway across the plains, give or take."},
-  {m:640,name:"Fort Laramie",fort:true,note:"A busy trading post. Prices are already higher than Independence."},
-  {m:850,name:"South Pass",note:"A broad, gentle saddle over the Continental Divide. All downhill from here — in theory."},
-  {m:1010,name:"Fort Bridger",fort:true,note:"Jim Bridger's post. Mountain men swap stories and warn you about the rivers ahead."},
-  {m:1250,name:"Fort Hall",fort:true,note:"On the Snake River plain. The trail turns rougher from here."},
-  {m:1500,name:"Fort Boise",fort:true,note:"The last real outpost. Stock up — the Blue Mountains are no joke."},
-  {m:1750,name:"Blue Mountains",note:"Steep, forested ridges. Snow can close these passes early."},
-  {m:2000,name:"Oregon City",note:"The end of the trail, at the falls of the Willamette."}];
-const RIVERS=[{m:420,name:"Big Blue River"},{m:1150,name:"Snake River"},{m:1850,name:"Columbia River"}];
-const PROFS={banker:{money:1600,mult:1,label:"Banker"},carpenter:{money:800,mult:2,label:"Carpenter"},farmer:{money:400,mult:3,label:"Farmer"}};
-const PACE={steady:[12,18,0],strenuous:[18,26,-2],grueling:[24,34,-5]};
-const RATIONS={filling:[2.5,1],meager:[1.5,-1],bare:[0.75,-4]};
-const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
-const TRADES=[
-  {text:"30 lb of your food for a spare wagon part", can:()=>S.food>=30, apply:()=>{S.food-=30;S.parts++}},
-  {text:"25 lb of your food for a bottle of medicine", can:()=>S.food>=25, apply:()=>{S.food-=25;S.meds++}},
-  {text:"$10 for 40 lb of salted meat", can:()=>S.money>=10, apply:()=>{S.money-=10;S.food+=40}},
-  {text:"a spare wagon part for 50 lb of food", can:()=>S.parts>=1, apply:()=>{S.parts--;S.food+=50}},
-  {text:"$15 for a fresh ox", can:()=>S.money>=15, apply:()=>{S.money-=15;S.oxen++}}];
+  {name:"Independence, Missouri", miles:0,    type:"start"},
+  {name:"Kansas River Crossing",  miles:102,  type:"river", river:"Kansas River",  base:2.6, ferry:5,
+   desc:"You have arrived at the Kansas River. It is wide here,\nand the current runs swift after the spring rains."},
+  {name:"Big Blue River Crossing",miles:185,  type:"river", river:"Big Blue River", base:2.2, ferry:5,
+   desc:"You have arrived at the Big Blue River. The water is\nclear and cold, and the far bank is lined with cottonwoods."},
+  {name:"Fort Kearny",            miles:304,  type:"fort", mult:1.25,
+   desc:"You have arrived at Fort Kearny, a U.S. Army post on\nthe Platte River. Emigrants stop here to buy supplies\nand mail letters back home."},
+  {name:"Chimney Rock",           miles:554,  type:"sight", art:"chimney",
+   desc:"Chimney Rock rises from the prairie like a giant\nstone smokestack. Every emigrant for a thousand miles\nof trail seems to have carved a name somewhere near it."},
+  {name:"Fort Laramie",           miles:640,  type:"fort", mult:1.5,
+   desc:"You have arrived at Fort Laramie, an old fur-trading\npost turned Army fort. It is the last good place to buy\nsupplies before the mountains."},
+  {name:"Independence Rock",      miles:830,  type:"sight", art:"rock",
+   desc:"Independence Rock — the great register of the desert.\nHundreds of emigrants have painted or carved their\nnames on this granite dome. You add yours to the list."},
+  {name:"South Pass",             miles:932,  type:"sight", art:"pass",
+   desc:"You have crossed South Pass, the wide, gentle saddle\nover the Continental Divide. From here the rivers run\nwest, toward the Pacific. Half the journey is behind you."},
+  {name:"Green River Crossing",   miles:989,  type:"river", river:"Green River", base:4.2,
+   desc:"You have arrived at the Green River. It is the most\ndangerous crossing on the whole trail — deep, cold,\nand fast, straight off the mountain snowfields."},
+  {name:"Fort Bridger",           miles:1025, type:"fort", mult:1.75, shortcut:true,
+   desc:"You have arrived at Fort Bridger, Jim Bridger's trading\npost in the valley of Black's Fork. A rough cutoff trail\nleaves here and rejoins the main road far ahead, closer\nto Soda Springs — shorter, but hard on wagons and oxen."},
+  {name:"Soda Springs",           miles:1151, type:"sight", art:"soda",
+   desc:"Soda Springs! The water bubbles up out of the ground\ntasting of soda, and a steamboat-shaped geyser spouts\nnearby. The oxen drink their fill of the strange water."},
+  {name:"Fort Hall",              miles:1190, type:"fort", mult:2,
+   desc:"You have arrived at Fort Hall, a Hudson's Bay Company\npost on the Snake River plain. Beyond here the trail\ngrows rough and water grows scarce."},
+  {name:"Snake River Crossing",   miles:1372, type:"river", river:"Snake River", base:3.6, guide:true,
+   desc:"You have arrived at the Snake River. Shoshone Indians\ncamp nearby and know every ford and eddy of this wide,\ntreacherous river."},
+  {name:"Fort Boise",             miles:1495, type:"fort", mult:2.25,
+   desc:"You have arrived at Fort Boise, a small Hudson's Bay\npost near the Boise River. The Blue Mountains loom\nahead — you must cross them before the snows come."},
+  {name:"Blue Mountains",         miles:1694, type:"sight", art:"mountains",
+   desc:"You are crossing the Blue Mountains. The trail climbs\nthrough pine forest and steep canyons. Every mile west\nis a mile closer to the Willamette Valley."},
+  {name:"Fort Walla Walla",       miles:1786, type:"fort", mult:2.5,
+   desc:"You have arrived at Fort Walla Walla, on the Columbia\nRiver. Below here the river runs swift to The Dalles,\nwhere you must choose how to finish the journey."},
+  {name:"The Dalles",             miles:1841, type:"sight", dalles:true,
+   desc:"You have reached The Dalles. The Columbia River here\nboils through narrow rock channels — too rough for a\nwagon. From here you must choose: raft the river, or\npay the toll on the Barlow Road around Mount Hood."},
+  {name:"Willamette Valley, Oregon", miles:2040, type:"end"},
+];
+const ITEMS=[
+  {id:"oxen",    name:"Oxen",       price:40,   unit:"per yoke (2 oxen)",
+   blurb:"You will need oxen to pull your wagon."},
+  {id:"food",    name:"Food",       price:0.20, unit:"per pound",
+   blurb:"Flour, bacon, coffee, sugar — the plainer, the better."},
+  {id:"clothing",name:"Clothing",   price:10,   unit:"per set",
+   blurb:"Good wool clothing wears best on the trail."},
+  {id:"bullets", name:"Ammunition", price:2,    unit:"per box (20 bullets)",
+   blurb:"For hunting game and protection on the trail."},
+  {id:"wheel",   name:"Wagon wheel",price:10,   unit:"each",
+   blurb:"Spare parts save days when something breaks."},
+  {id:"axle",    name:"Wagon axle", price:10,   unit:"each", blurb:""},
+  {id:"tongue",  name:"Wagon tongue",price:10,  unit:"each", blurb:""},
+];
+const PARTNAME={wheel:"wagon wheel", axle:"wagon axle", tongue:"wagon tongue"};
+const DEFAULT_NAMES=["Amos","Mary","Elizabeth","Samuel","Ruth"];
+const DISEASES=["cholera","dysentery","typhoid fever","measles"];
+
+/* ============================== art ============================== */
+const ART={
+title:
+" ___________________________________________\n"+
+" \\   _______  ______  ____  ____  ____  __  \\\n"+
+"  \\  |  T H E   O R E G O N   T R A I L  |  \\\n"+
+"   \\ |_________________________________|   \\\n"+
+"    \\    ___  ___                        \\\n"+
+"     \\__/   \\/   \\    _  _   __   _  _    \\\n"+
+"        \\___/ \\___/  ( \\/ ) (  ) ( \\/ )   \n"+
+"          O     O     \\__/   \\/   \\__/  \n"+
+"\n        * * *  EST. 1848  * * *",
+chimney:
+"              |\n              |\n              |\n             | |\n             | |\n            /   \\\n           /     \\\n   _______/       \\_______",
+rock:
+"        _______________________\n     _/                       \\_\n   _/   J. SMITH 1846            \\_\n  /     M. + J. WHITMAN '48        \\\n /__________________________________\\",
+pass:
+"  \\        /\\          /\\\n   \\      /  \\        /  \\\n    \\    /    \\______/    \\\n     \\__/  SOUTH  PASS     \\___",
+soda:
+"            *  *   *\n          *   |*    *\n            * | *\n         _____|_____\n        /  SODA      \\\n       /   SPRINGS     \\",
+mountains:
+"      /\\        /\\        /\\\n     /  \\      /  \\      /  \\\n    /    \\    /    \\    /    \\\n   /______\\__/______\\__/______\\",
+fort:
+"   |^^^|   |^^^|   |^^^|\n   |   |___|   |___|   |\n   |  F O R T          |\n   |   ___    ___      |\n   |__|   |__|   |_____|",
+river:
+"  ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~\n ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~\n  ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~\n ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~",
+grave:
+"        _____________\n       /             \\\n      |   R . I . P .  |\n      |               |\n      |_______________|\n      _________|_________",
+buffalo:
+"      __  __\n     (  \\/  )____\n      \\ (oo)     \\\n       \\___/--'   |\n       |  |  |  |\n       ^^  ^^  ^^  ^^",
+deer:
+"      \\  /\n       \\/   __\n       /\\__/  \\___\n      (  o  )     \\\n       \\___/--'   |\n       |  |  |  |",
+bear:
+"      /\\    /\\\n     (  \\  /  )\n      \\ (oo) /\n       \\____/--.__\n       |     |  |\n       ^^    ^^ ^^",
+rabbit:
+"      (\\  /(\\\n       \\\\//\n       ( o.o )\n       /(   )\\\n        \\___/",
+squirrel:
+"        /\\\n       ( o.o )~~\n       /(   )/~ \n        \\__|  ~~",
+};
+const ANIMALS=[
+  {id:"squirrel", name:"squirrel", meat:2,   window:900,  base:0.55},
+  {id:"rabbit",   name:"rabbit",   meat:6,   window:1200, base:0.62},
+  {id:"deer",     name:"deer",     meat:55,  window:1800, base:0.72},
+  {id:"bear",     name:"bear",     meat:180, window:1500, base:0.60},
+  {id:"buffalo",  name:"buffalo",  meat:450, window:2300, base:0.82},
+];
+
+/* ============================== state ============================== */
+const SAVE_KEY="oregon.iie.state", BEST_KEY="oregon.iie.best";
 let S=null;
-const rnd=(a,b)=>a+Math.random()*(b-a), ri=(a,b)=>Math.floor(rnd(a,b+1)), pick=a=>a[Math.floor(Math.random()*a.length)];
-const clamp=v=>Math.max(0,Math.min(100,v));
-const SAVE_KEY="oregon.state.v2";
-
-function dateParts(){ let d=S.day, mo=4, yr=1848;
-  while(d>=MDAYS[mo]){ d-=MDAYS[mo]; mo++; if(mo>11){mo=0;yr++} }
-  return {mo, day:d+1, yr}; }
-function dateStr(){ const p=dateParts(); return `${MONTHS[p.mo]} ${p.day}, ${p.yr}` }
-function isWinter(){ return dateParts().mo>=11 || dateParts().yr>1848 }
-function avgHp(){ return S.party.length? S.party.reduce((a,m)=>a+m.hp,0)/S.party.length : 0 }
-function save(){ try{ if(S&&!S.over) localStorage.setItem(SAVE_KEY,JSON.stringify(S)); else localStorage.removeItem(SAVE_KEY) }catch(e){} }
-function price(base){ return Math.max(1, Math.round(base*(1+S.miles/TOTAL))) }
-
-function newGame(prof){
-  const p=PROFS[prof];
-  S={prof, money:p.money, miles:0, day:0, party:NAMES.map(n=>({name:n,hp:100})), food:500, oxen:4,
-     parts:2, meds:2, pace:"steady", rations:"filling", atRiver:null, riverDepth:0, trade:null, over:false, log:[]};
-  log(`You set out from Independence on May 1, 1848, with 4 oxen, 500 lb of food and $${p.money}. Oregon or bust!`,"good");
-  $("#setup").classList.add("hidden"); $("#game").classList.remove("hidden");
-  render(); save();
+function newGame(){
+  return { occ:null, mult:1, money:0, party:[], date:{m:3,d:1}, days:0,
+    miles:0, lm:1, oxen:0, food:0, clothing:0, bullets:0,
+    parts:{wheel:0,axle:0,tongue:0}, pace:"steady", rations:"filling",
+    weather:"fair", rainUp:false, grassBad:0, riverDepth:0, riverWidth:0,
+    pendingDeaths:[], over:false, won:false, started:false };
 }
-function log(msg, cls){
-  S.log.unshift({msg, cls:cls||""}); S.log=S.log.slice(0,60);
-  $("#log").innerHTML=S.log.map(l=>`<li class="${l.cls}">${l.msg}</li>`).join("");
-}
-function esc(t){ return String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
-function nextLandmark(){ return LANDMARKS.find(l=>l.m>S.miles) || LANDMARKS[LANDMARKS.length-1] }
-function atFort(){ const l=LANDMARKS.find(l=>l.fort && Math.abs(l.m-S.miles)<1); return l || (S.miles===0?LANDMARKS[0]:null) }
-function statusWord(hp){ return hp>=70?"Healthy":hp>=40?"Tired":hp>=15?"Sick":"Critical" }
+function save(){ try{ if(S && !S.over) localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function loadSave(){ try{ const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+function bestScore(){ try{ return +localStorage.getItem(BEST_KEY)||0; }catch(e){ return 0; } }
+function setBest(v){ try{ localStorage.setItem(BEST_KEY, String(v)); }catch(e){} }
 
-function render(){
-  if(!S) return;
-  $("#st-date").textContent=dateStr().replace(", 1848","");
-  $("#st-miles").innerHTML=`${Math.floor(S.miles)} <small>/ ${TOTAL} mi</small>`;
-  const nl=nextLandmark();
-  $("#st-next").textContent=S.miles>=TOTAL?"—":`${nl.name} (${Math.ceil(nl.m-S.miles)} mi)`;
-  const avg=Math.round(avgHp());
-  $("#st-health").textContent=avg;
-  $("#st-health").style.color=avg<30?"var(--bad)":avg<60?"var(--warn)":"";
-  $("#st-party").textContent=S.party.length;
-  $("#st-food").innerHTML=`${Math.floor(S.food)} <small>lb</small>`;
-  $("#st-oxen").textContent=S.oxen;
-  $("#st-money").textContent="$"+Math.floor(S.money);
-  $("#st-sup").textContent=`${S.parts} parts · ${S.meds} meds`;
-  $("#pace").value=S.pace; $("#rations").value=S.rations;
-  $("#members").innerHTML=S.party.map(m=>`<div class="member"><span class="nm">${esc(m.name)}</span>
-    <span class="bar"><i style="width:${clamp(m.hp)}%;background:${m.hp<25?"var(--bad)":m.hp<55?"var(--warn)":"var(--good)"}"></i></span>
-    <span class="st">${statusWord(m.hp)} · ${Math.round(m.hp)}</span></div>`).join("") || '<p class="sub">No one is left.</p>';
-  const t=$("#trail");
-  t.innerHTML=LANDMARKS.map(l=>`<span class="dot" style="left:${l.m/TOTAL*100}%"><i>${l.m%500===0||l.fort?esc(l.name):""}</i></span>`).join("")
-    +`<span class="wagon" style="left:${Math.min(98, S.miles/TOTAL*100)}%">&#128002;</span>`
-    +`<span class="road"></span>`;
-  const rv=$("#river");
-  if(S.atRiver){ rv.classList.remove("hidden");
-    $("#river-name").textContent=S.atRiver.name;
-    $("#river-info").textContent=`The river is about ${S.riverDepth.toFixed(1)} feet deep. Ford it and risk the wagon, pay $12 for the ferry (takes a day), or wait and hope the water drops.`;
-  } else rv.classList.add("hidden");
-  const tr=$("#trade");
-  if(S.trade!=null){ tr.classList.remove("hidden");
-    $("#trade-info").textContent=`They offer: ${TRADES[S.trade].text}.`;
-    $("#tr-accept").disabled=!TRADES[S.trade].can();
-    if(!TRADES[S.trade].can()) $("#trade-info").textContent+=" You do not have what they ask for.";
-  } else tr.classList.add("hidden");
-  const fort=atFort(), shop=$("#shop-card");
-  if(fort && !S.atRiver && S.trade==null){ shop.classList.remove("hidden"); $("#shop-name").textContent="Store — "+fort.name;
-    const items=[
-      ["food","Food, 50 lb",price(13),()=>{S.food+=50}],
-      ["ox","Ox",price(40),()=>{S.oxen+=1}],
-      ["part","Spare wagon part",price(15),()=>{S.parts+=1}],
-      ["med","Medicine",price(12),()=>{S.meds+=1}]];
-    $("#shop").innerHTML=items.map(([k,label,cost])=>`<div class="item"><div><b>${label}</b> <span>$${cost}</span></div>
-      <button class="btn" data-buy="${k}" ${S.money<cost?"disabled":""}>Buy</button></div>`).join("");
-    $("#shop").querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{
-      const it=items.find(x=>x[0]===b.dataset.buy); if(!it||S.money<it[2]) return;
-      S.money-=it[2]; it[3](); log(`Bought: ${it[1]} for $${it[2]}.`); render(); save();
-    });
-  } else shop.classList.add("hidden");
-  const busy=!!S.atRiver||S.trade!=null;
-  $("#act-travel").disabled=busy; $("#act-hunt").disabled=busy; $("#act-rest").disabled=busy;
-  $("#log").innerHTML=S.log.map(l=>`<li class="${l.cls}">${l.msg}</li>`).join("");
+/* ============================== utils ============================== */
+const $=id=>document.getElementById(id);
+const R=(a,b)=>a+Math.random()*(b-a);
+const RI=(a,b)=>Math.floor(R(a,b+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const money=v=>"$"+(Math.round(v*100)/100).toFixed(2).replace(/\.00$/,"");
+const alive=()=>S.party.filter(p=>p.alive);
+const leader=()=>S.party[0];
+function hpWord(hp){ return hp>=70?"good":hp>=45?"fair":hp>=25?"poor":"very poor"; }
+function partyHealth(){ const a=alive(); if(!a.length) return "very poor";
+  return hpWord(a.reduce((t,p)=>t+p.hp,0)/a.length); }
+function dateStr(){ return MONTHS[S.date.m-1]+" "+S.date.d+", 1848"; }
+function addDay(){
+  S.days++; S.date.d++;
+  const dim=[31,29,31,30,31,30,31,31,30,31,30,31][S.date.m-1];
+  if(S.date.d>dim){ S.date.d=1; S.date.m++; }
+}
+function nextLM(){ return LANDMARKS[S.lm]; }
+function milesToNext(){ return Math.max(0, Math.round(nextLM().miles - S.miles)); }
+function eatDay(){
+  const per={filling:3, meager:2, "bare bones":1}[S.rations];
+  const need=alive().length*per;
+  if(S.food>=need){ S.food-=need; return true; }
+  S.food=0; return false;
+}
+function hurt(member, amt, cause){
+  member.hp-=amt; if(cause) member.sick=cause;
+  if(member.hp<=0 && member.alive){ member.alive=false; member.hp=0;
+    S.pendingDeaths.push({name:member.name, cause:cause||member.sick||"exhaustion"}); }
+}
+function pickWeather(){
+  const m=S.date.m, mt=S.miles>1150;
+  const t=Math.random();
+  if(m>=11||m<=2){ S.weather = t<0.45?"very cold":t<0.6?"snowing":t<0.8?"cold":"fair"; }
+  else if(m>=3&&m<=5){ S.weather = t<0.25?"rainy":t<0.4?"cool":t<0.85?"fair":"warm"; }
+  else if(m>=6&&m<=8){ S.weather = t<0.12?"rainy":t<0.3?"warm":t<0.45?"very hot":"fair"; }
+  else { S.weather = t<0.2?"rainy":t<0.45?"cool":t<0.55?"cold":"fair"; }
+  if(mt&&(S.weather==="rainy")&&m>=9) S.weather="snowing";
+  S.rainUp = S.weather==="rainy";
 }
 
-function checkDeaths(why){
-  const dead=S.party.filter(m=>m.hp<=0);
-  S.party=S.party.filter(m=>m.hp>0);
-  dead.forEach(m=>{
-    if(why==="dysentery") log(`${m.name} has died of dysentery.`,"bad");
-    else log(`${m.name} has died (${why}).`,"bad");
+/* ============================== screen engine ============================== */
+let UI={menu:[], cont:null, entry:null};
+let BTNS=[];
+function setScreen(o){
+  UI={menu:o.menu||[], cont:o.cont||null, entry:o.entry||null};
+  BTNS=UI.menu;
+  $("art").textContent=o.art||"";
+  $("art").style.display=o.art?"block":"none";
+  $("text").innerHTML=(o.lines||[]).join("\n");
+  const menu=$("menu"); menu.innerHTML="";
+  UI.menu.forEach((b,i)=>{
+    const btn=document.createElement("button");
+    btn.type="button"; btn.className="mbtn";
+    btn.textContent=(i+1)+".  "+b.label;
+    if(b.disabled) btn.disabled=true;
+    btn.addEventListener("click",()=>{ if(!btn.disabled) b.fn(); });
+    menu.appendChild(btn);
   });
-  if(dead.length && !S.party.length && !S.over)
-    endGame(false, "Your whole party has died on the trail. The Oregon Trail claims another wagon.");
-  return dead.length>0;
+  const er=$("entryrow");
+  if(UI.entry){ er.classList.add("on"); const inp=$("entry");
+    inp.value=UI.entry.value||""; inp.placeholder=UI.entry.placeholder||"";
+    inp.inputMode=UI.entry.numeric?"numeric":"text";
+    setTimeout(()=>{ try{ inp.focus({preventScroll:true}); }catch(e){} },30);
+  } else er.classList.remove("on");
+  $("prompt").hidden=!UI.cont;
+  $("shoot").classList.remove("on");
+  save();
 }
-function applyAll(delta, why){
-  S.party.forEach(m=>{ m.hp=clamp(m.hp+delta) });
-  if(delta<0) checkDeaths(why||"sickness");
+function entryOk(){
+  if(!UI.entry) return;
+  const v=$("entry").value; const fn=UI.entry.onSubmit; UI.entry=null;
+  $("entryrow").classList.remove("on"); fn(v);
 }
-function hurtRandom(amount, why){
-  if(!S.party.length) return;
-  const m=pick(S.party);
-  m.hp-=amount;
-  if(m.hp>0 && m.hp<=35 && S.meds>0){ S.meds--; m.hp=clamp(m.hp+25); log(`You use a medicine on ${m.name} (${why}). It helps.`,"good"); }
-  if(m.hp<=0) checkDeaths(why);
-  else if(amount>=15) log(`${m.name} is hurt by ${why} and looking rough.`,"warn");
-}
-function eatAndHealth(){
-  const per=RATIONS[S.rations][0], need=per*S.party.length;
-  if(S.food>=need){ S.food-=need } else {
-    S.food=0; log("You are out of food! The party is going hungry.","bad");
-    S.party.forEach(m=>{ m.hp=clamp(m.hp-8) }); checkDeaths("hunger and sickness");
-    if(S.over) return;
-  }
-  applyAll(RATIONS[S.rations][1], "sickness");
-}
-function endGame(won, msg){
-  S.over=true; save();
-  let score=0, bestLine="";
-  if(won){ score=Math.round((Math.floor(S.money)+Math.round(avgHp())*5+Math.floor(S.food)/10+S.party.length*250)*PROFS[S.prof].mult);
-    const wins=(+localStorage.getItem("oregon.wins")||0)+1; localStorage.setItem("oregon.wins",wins);
-    const best=Math.max(score, +localStorage.getItem("oregon.best")||0); localStorage.setItem("oregon.best",best);
-    bestLine=` Journeys completed: ${wins}. Best score: ${best}.`;
-  }
-  $("#over-title").textContent=won?"You made it to Oregon!":"The trail ends here";
-  $("#over-msg").textContent=msg+(won?` You arrived on ${dateStr()} with ${S.party.length} of your party, ${Math.floor(S.food)} lb of food and $${Math.floor(S.money)} left. Score: ${score} (${PROFS[S.prof].label} ×${PROFS[S.prof].mult}).`+bestLine:"");
-  $("#over").classList.add("show");
-}
-function advanceDay(){ S.day++; if(isWinter() && S.miles<TOTAL){ endGame(false,"Deep snow closes the mountain passes. Your wagon is snowed in for the winter."); return false } return true }
-function riverDepthNow(){ const mo=dateParts().mo; const adj=mo<=5?0.7:mo===6?0.2:mo===7?0:mo===8?-0.4:-0.6;
-  return Math.max(1.2, Math.min(5.2, rnd(2,4.5)+adj)) }
+$("entryok").addEventListener("click", entryOk);
+$("entry").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); entryOk(); } });
+$("spacebar").addEventListener("click", ()=>{ if(UI.cont){ const f=UI.cont; UI.cont=null; f(); } });
+document.addEventListener("keydown", e=>{
+  const tag=(e.target&&e.target.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA") return;
+  if(HUNT.active){ if(e.code==="Space"||e.code==="KeyB"){ e.preventDefault(); huntShoot(); } return; }
+  if(UI.cont&&(e.code==="Space"||e.key==="Enter")){ e.preventDefault(); const f=UI.cont; UI.cont=null; f(); return; }
+  if(/^[1-9]$/.test(e.key)){ const b=UI.menu[+e.key-1]; if(b&&!b.disabled) b.fn(); }
+});
 
-function travel(){
-  if(S.atRiver||S.trade!=null||S.over) return;
-  if(S.oxen<=0){ log("You have no oxen left. You cannot move — rest and hope, or start over.","bad"); render(); return }
-  const [lo,hi,hp]=PACE[S.pace];
-  let dist=rnd(lo,hi)*(S.oxen>=3?1:S.oxen===2?0.8:0.55);
-  const river=RIVERS.find(r=>r.m>S.miles && r.m<=S.miles+dist);
-  const fortStop=LANDMARKS.find(l=>l.m>S.miles && l.m<=S.miles+dist);
-  if(river){ dist=river.m-S.miles; S.miles=river.m; S.atRiver=river; S.riverDepth=riverDepthNow(); }
-  else if(fortStop){ dist=fortStop.m-S.miles; S.miles=fortStop.m; }
-  else S.miles+=dist;
-  applyAll(hp, "exhaustion");
-  eatAndHealth();
-  if(S.over){ render(); save(); return }
-  if(!advanceDay()){ render(); save(); return }
-  if(S.miles>=TOTAL){ S.miles=TOTAL; render(); endGame(true,"After months on the trail, your wagon rolls into Oregon City."); return }
-  if(river) log(`You reach the ${river.name}. ${dateParts().mo<=5?"Spring snowmelt has it running high. ":""}You must cross it.`,"warn");
-  else if(fortStop){ log(`You arrive at ${fortStop.name}. ${fortStop.note}`,"good"); }
-  else log(`Traveled ${Math.round(dist)} miles. ${Math.floor(S.miles)} miles from Independence.`);
-  if(!river && !fortStop){
-    if(Math.random()<0.08){ S.trade=ri(0,TRADES.length-1); log("A lone trader rides up alongside your wagon.","warn"); }
-    else randomEvent();
+/* ============================== setup screens ============================== */
+function titleScreen(){
+  S=S||newGame();
+  const sv=loadSave();
+  const menu=[
+    {label:"Travel the trail", fn:()=>{ S=newGame(); occScreen(); }},
+    {label:"Learn about the trail", fn:learnScreen},
+  ];
+  if(sv && sv.started && !sv.over)
+    menu.push({label:"Continue your journey ("+sv.party[0].name+"'s party, "+Math.round(sv.miles)+" miles)", fn:()=>{ S=sv; travelScreen(); }});
+  if(bestScore()>0)
+    menu.push({label:"See the best score so far: "+bestScore(), fn:()=>titleScreen()});
+  setScreen({ art:ART.title, lines:[
+    "",
+    "          T H E   O R E G O N   T R A I L",
+    "",
+    "You may:",
+    "",
+  ], menu });
+}
+function learnScreen(){
+  setScreen({ lines:[
+    "ABOUT THE TRAIL",
+    "",
+    "The year is 1848. You and your family have sold",
+    "nearly everything you own to make the journey west",
+    "to the Willamette Valley of Oregon — 2,040 miles",
+    "of prairie, river, desert and mountain.",
+    "",
+    "HOW TO PLAY",
+    " * Buy supplies before you leave Independence.",
+    "   Food, oxen and spare parts are life itself.",
+    " * Travel each day, watching your food and health.",
+    " * Rivers must be crossed — ford them, float your",
+    "   wagon, pay a ferry, or wait for lower water.",
+    " * Hunt to add meat, but you can only carry 100",
+    "   pounds of it back to the wagon.",
+    " * Reach Oregon before winter. Snow in the",
+    "   mountains has ended many a journey — and if",
+    "   December 31 comes, the trail ends with it.",
+    "",
+    "Good luck. You will need it.",
+  ], cont:()=>titleScreen() });
+}
+function occScreen(){
+  setScreen({ lines:[
+    "Many kinds of people made the trip to Oregon.",
+    "",
+    "You may:",
+    "",
+  ], menu: OCC.map(o=>({ label:o.name+" — "+money(o.money),
+    fn:()=>{ S.occ=o.id; S.mult=o.mult; S.money=o.money; nameScreen(0); } })) });
+}
+function nameScreen(i){
+  const prompts=[
+    "What is the first name of the wagon leader?",
+    "What is the first name of the second party member?",
+    "What is the first name of the third party member?",
+    "What is the first name of the fourth party member?",
+    "What is the first name of the last party member?",
+  ];
+  const lines=["The members of your party are:"];
+  S.party.forEach((p,j)=>lines.push("  "+(j+1)+". "+p.name));
+  lines.push("", prompts[i], "", "(Leave it blank to use: "+DEFAULT_NAMES[i]+")");
+  setScreen({ lines, entry:{ placeholder:DEFAULT_NAMES[i], value:"",
+    onSubmit:v=>{
+      const name=(v||"").trim()||DEFAULT_NAMES[i];
+      S.party.push({name:name.slice(0,16), hp:100, alive:true, sick:null});
+      if(i<4) nameScreen(i+1); else monthScreen();
+    } } });
+}
+function monthScreen(){
+  const months=[["March",3],["April",4],["May",5],["June",6],["July",7]];
+  setScreen({ lines:[
+    "It is 1848. Your jumping-off place is Independence,",
+    "Missouri. You must decide which month to leave.",
+    "",
+    "Leaving in March means mud and cold rivers swollen",
+    "with snowmelt. Leaving in July means little grass",
+    "left for the oxen — and winter waiting in the",
+    "mountains if you are slow.",
+    "",
+  ], menu: months.map(([n,m])=>({ label:n+" 1848",
+    fn:()=>{ S.date={m:m,d:1}; storeIntro(); } })) });
+}
+function storeIntro(){
+  setScreen({ lines:[
+    "Before leaving Independence you should buy",
+    "equipment and supplies. You have "+money(S.money)+" in",
+    "cash, and this storekeeper — Matt — is happy to",
+    "sell you what you need. He says:",
+    "",
+    "\"I can fix you up mighty fine. I recommend at",
+    "least 3 yoke of oxen — that's 6 oxen — to pull",
+    "your wagon. About 200 pounds of food per person",
+    "is none too much. Clothing: 2 sets for each",
+    "person. And don't forget spare wagon parts —",
+    "a broken wheel a thousand miles from anywhere",
+    "is a sorrowful thing.\"",
+  ], cont:()=>storeScreen("matt") });
+}
+/* storeCtx: "matt" at Independence, or a LANDMARKS fort object */
+function storeScreen(ctx){
+  const fort = ctx==="matt" ? null : ctx;
+  const mult = fort ? fort.mult : 1;
+  const storeName = fort ? "the store at "+fort.name : "Matt's General Store";
+  const lines=[
+    "Welcome to "+storeName+".",
+    fort ? "Prices out here are higher than back east." : "",
+    "",
+    "You have "+money(S.money)+".",
+    "Your wagon now holds:",
+    "   Oxen: "+S.oxen+"    Food: "+Math.round(S.food)+" pounds",
+    "   Clothing: "+S.clothing+" sets    Bullets: "+S.bullets,
+    "   Spare wheels: "+S.parts.wheel+"  axles: "+S.parts.axle+"  tongues: "+S.parts.tongue,
+    "",
+    "What would you like to buy?",
+    "",
+  ];
+  const menu=ITEMS.map(it=>({ label:it.name+" — "+money(it.price*mult)+" "+it.unit,
+    fn:()=>buyScreen(ctx,it,mult) }));
+  menu.push({ label: fort ? "Leave the store" : "Leave the store and start down the trail",
+    fn:()=>{
+      if(!fort){
+        if(S.oxen<2){
+          setScreen({ lines:["Matt shakes his head slowly.",
+            "",
+            "\"Friend, with fewer than one yoke of oxen your",
+            "wagon isn't going anywhere at all.\"",""],
+            menu:[ {label:"Go back and buy oxen", fn:()=>storeScreen(ctx)},
+                   {label:"Leave anyway (the wagon will not move)", fn:()=>{ S.started=true; travelScreen(); }} ] });
+          return;
+        }
+        S.started=true; travelScreen(["You leave Independence, Missouri, and point",
+          "your wagon west. Oregon is 2,040 miles away."]);
+      } else travelScreen();
+    }});
+  setScreen({ art: fort?ART.fort:"", lines, menu });
+}
+function buyScreen(ctx, it, mult){
+  const price=it.price*mult;
+  const lines=[
+    it.name+" — "+money(price)+" "+it.unit+".",
+    it.blurb||"",
+    "You have "+money(S.money)+".",
+    "",
+    "How many do you want to buy? (0 to cancel)",
+  ];
+  setScreen({ lines, entry:{ numeric:true, placeholder:"0", value:"",
+    onSubmit:v=>{
+      let n=Math.floor(Math.abs(+v)||0);
+      const cost=n*price;
+      if(n===0){ storeScreen(ctx); return; }
+      if(cost>S.money){
+        setScreen({ lines:["You only have "+money(S.money)+" — that is not enough for "+n+"."],
+          cont:()=>buyScreen(ctx,it,mult) });
+        return;
+      }
+      S.money-=cost;
+      if(it.id==="oxen") S.oxen+=n*2;
+      else if(it.id==="food") S.food+=n;
+      else if(it.id==="clothing") S.clothing+=n;
+      else if(it.id==="bullets") S.bullets+=n*20;
+      else S.parts[it.id]+=n;
+      storeScreen(ctx);
+    } } });
+}
+
+/* ============================== travel hub ============================== */
+function statusLines(){
+  return [
+    "Date:          "+dateStr(),
+    "Weather:       "+S.weather,
+    "Health:        "+partyHealth(),
+    "Food:          "+Math.round(S.food)+" pounds",
+    "Next landmark: "+nextLM().name+", "+milesToNext()+" miles",
+    "Miles traveled: "+Math.round(S.miles),
+  ];
+}
+function travelScreen(extra){
+  pickWeather();
+  setScreen({ lines:[].concat(extra||[], statusLines(), ["", "You may:"]),
+    menu:[
+      {label:"Continue on the trail", fn:continueTrail},
+      {label:"Check supplies", fn:suppliesScreen},
+      {label:"Look at the map", fn:mapScreen},
+      {label:"Change pace", fn:paceScreen},
+      {label:"Change food rations", fn:rationsScreen},
+      {label:"Stop to rest", fn:restScreen},
+      {label:"Attempt to trade", fn:tradeScreen},
+      {label:"Hunt for food", fn:()=>startHunt()},
+    ] });
+}
+function suppliesScreen(){
+  const lines=[
+    "YOUR SUPPLIES",
+    "",
+    "Oxen:          "+S.oxen,
+    "Food:          "+Math.round(S.food)+" pounds",
+    "Clothing:      "+S.clothing+" sets",
+    "Bullets:       "+S.bullets,
+    "Wagon wheels:  "+S.parts.wheel,
+    "Wagon axles:   "+S.parts.axle,
+    "Wagon tongues: "+S.parts.tongue,
+    "Money left:    "+money(S.money),
+    "",
+    "YOUR PARTY",
+  ];
+  S.party.forEach(p=>lines.push("  "+p.name+": "+(p.alive?hpWord(p.hp)+" health"+(p.sick?" (sick: "+p.sick+")":""):"dead")));
+  setScreen({ lines, cont:()=>travelScreen() });
+}
+function mapScreen(){
+  const lines=["THE TRAIL WEST",""];
+  LANDMARKS.forEach((l,i)=>{
+    let mark="   ";
+    if(l.miles<S.miles-1) mark=" * ";
+    if(i===S.lm) mark="==>";
+    lines.push(mark+" "+l.name.padEnd(30," ")+" "+l.miles+" miles");
+  });
+  lines.push("", "You have traveled "+Math.round(S.miles)+" miles of 2,040.");
+  setScreen({ lines, cont:()=>travelScreen() });
+}
+function paceScreen(){
+  const cur={steady:"Your oxen travel at a walking pace, day after day.",
+    strenuous:"A faster pace. Harder on the oxen and on you.",
+    grueling:"You push from dawn to dark. The miles come fast — so does exhaustion."};
+  setScreen({ lines:["Your pace is now: "+S.pace.toUpperCase(), "", cur[S.pace], "", "Change it to:"],
+    menu:["steady","strenuous","grueling"].map(p=>({ label:p[0].toUpperCase()+p.slice(1),
+      fn:()=>{ S.pace=p; travelScreen(); } })) });
+}
+function rationsScreen(){
+  const cur={filling:"Meals are generous. 3 pounds of food per person each day.",
+    meager:"Meals are lean. 2 pounds of food per person each day.",
+    "bare bones":"Meals are very thin. 1 pound of food per person each day."};
+  setScreen({ lines:["Your food rations are now: "+S.rations.toUpperCase(), "", cur[S.rations], "", "Change them to:"],
+    menu:["filling","meager","bare bones"].map(p=>({ label:p[0].toUpperCase()+p.slice(1),
+      fn:()=>{ S.rations=p; travelScreen(); } })) });
+}
+function restScreen(){
+  setScreen({ lines:["How many days will you rest?","",
+    "Resting restores health, but the party still eats,","and winter does not wait."],
+    menu:[1,2,3].map(d=>({ label:"Rest "+d+" day"+(d>1?"s":""), fn:()=>{
+      const log=[];
+      for(let i=0;i<d;i++){ addDay(); const fed=eatDay();
+        alive().forEach(p=>{ p.hp=clamp(p.hp+(p.sick?3:7),0,100); });
+        if(!fed) log.push("There is no food to eat, even resting.");
+        log.push("You rest a day. ("+dateStr()+")");
+        if(checkDeaths(()=>travelScreen(log))) return;
+      }
+      afterAction(()=>travelScreen(log));
+    } })) });
+}
+function tradeScreen(){
+  addDay(); eatDay();
+  if(Math.random()<0.35){
+    afterAction(()=>travelScreen(["You ride out looking for someone to trade with,",
+      "but you see no one. The day is gone."]));
+    return;
   }
-  render(); save();
+  const offers=[
+    {txt:"An emigrant offers you 1 ox for 50 pounds of food.",
+     can:()=>S.food>=50, do:()=>{ S.food-=50; S.oxen+=1; return "You make the trade. The ox looks strong."; }},
+    {txt:"A trapper offers you 40 bullets for 1 set of clothing.",
+     can:()=>S.clothing>=1, do:()=>{ S.clothing-=1; S.bullets+=40; return "You make the trade."; }},
+    {txt:"An Indian offers you 60 pounds of dried meat for 2 sets of clothing.",
+     can:()=>S.clothing>=2, do:()=>{ S.clothing-=2; S.food+=60; return "You make the trade. The meat is good."; }},
+    {txt:"A passing family, down on their luck, offers 100 pounds of food for $15.",
+     can:()=>S.money>=15, do:()=>{ S.money-=15; S.food+=100; return "You make the trade. They thank you kindly."; }},
+    {txt:"A trader offers you a spare wagon wheel for 30 pounds of food.",
+     can:()=>S.food>=30, do:()=>{ S.food-=30; S.parts.wheel+=1; return "You make the trade."; }},
+  ];
+  const o=pick(offers);
+  setScreen({ lines:["Someone is willing to trade.","", o.txt],
+    menu:[
+      {label:"Make the trade", disabled:!o.can(), fn:()=>{ const m=o.do(); afterAction(()=>travelScreen([m])); }},
+      {label:"No, thank you", fn:()=>afterAction(()=>travelScreen(["You decide to keep what you have."]))},
+    ] });
 }
-function randomEvent(){
-  const roll=Math.random(); if(roll>0.30) return;
-  const e=ri(0,7);
-  if(e===0){ const sick=pick(["dysentery","cholera","a fever","typhoid"]);
-    log(`Sickness spreads through the wagon — ${sick}.`,"bad"); hurtRandom(40, sick); }
-  else if(e===1){ if(S.parts>0){ S.parts--; log("A wagon wheel breaks. You use a spare part and roll on.","warn"); }
-    else { S.day++; log("A wagon wheel breaks. With no spare part, repairs take an extra day.","bad"); } }
-  else if(e===2){ if(S.oxen>1 && Math.random()<0.5){ S.oxen--; log("An ox wanders off in the night and is gone.","bad"); }
-    else { log("A thunderstorm soaks everything, but nothing is ruined.","warn"); } }
-  else if(e===3){ const f=ri(20,70); S.food+=f; log(`You find an abandoned wagon with ${f} lb of usable food.`,"good"); }
-  else if(e===4){ const lost=Math.min(S.food, ri(15,50)); S.food-=lost; log(`Thieves slip in at night and steal ${Math.floor(lost)} lb of food.`,"bad"); }
-  else if(e===5){ log("A snake bites a traveler!","bad"); hurtRandom(18,"a snake bite"); }
-  else if(e===6){ const f=ri(10,40); S.food+=f; log(`Good hunting grounds — you bring back ${f} lb of meat.`,"good"); }
-  else { applyAll(6); log("A clear day and an easy stretch of trail. Spirits lift.","good"); }
+
+/* ---- after any day-consuming action: deaths, then winter check ---- */
+function afterAction(next){
+  if(checkDeaths(next)) return;
+  if(winterCheck(next)) return;
+  next();
 }
-function rest(){
-  if(S.atRiver||S.trade!=null||S.over) return;
-  eatAndHealth(); if(S.over){ render(); save(); return }
-  applyAll(9);
-  log("You rest for a day. Everyone feels stronger.");
-  if(!advanceDay()){ render(); save(); return }
-  render(); save();
+function checkDeaths(next){
+  if(!S.pendingDeaths.length) return false;
+  const d=S.pendingDeaths.shift();
+  const allDead=alive().length===0, leaderDead=!leader().alive;
+  setScreen({ art:ART.grave, lines:[
+    d.name+" has died of "+d.cause+".",
+    "",
+    "You stop the wagon and dig a grave beside the trail.",
+    "You carve a marker:",
+    "",
+    "        HERE LIES "+d.name.toUpperCase(),
+    "        DIED "+dateStr().toUpperCase()+"",
+    "        AGED IN HARD MILES",
+  ], cont:()=>{
+    if(allDead||leaderDead) return gameOver(leaderDead && !allDead
+      ? leader().name+", the wagon leader, has died. Without a leader, the party can go no farther."
+      : "Your whole party has perished on the trail.");
+    checkDeaths(next)||next();
+  }});
+  return true;
 }
-function hunt(){
-  if(S.atRiver||S.trade!=null||S.over) return;
-  eatAndHealth(); if(S.over){ render(); save(); return }
-  const got=Math.random()<0.75?ri(40,120):ri(0,12);
-  S.food+=got;
-  log(got>20?`A good hunt: ${got} lb of meat.`:`A poor hunt: only ${got} lb of meat.`, got>20?"good":"");
-  if(Math.random()<0.10){ log("A hunter is hurt in an accident.","bad"); hurtRandom(14,"a hunting accident"); }
-  if(!advanceDay()){ render(); save(); return }
-  render(); save();
+function winterCheck(){
+  if(S.date.m>=13 || (S.date.m===12&&S.date.d>=31)){
+    gameOver("December 31, 1848 has come, and you are still on the trail.\nThe snows close the passes. Your journey ends here.");
+    return true;
+  }
+  if(S.date.m>=11 && S.miles>1190 && Math.random()<0.04){
+    gameOver("A blizzard howls down out of the mountains and buries\nthe trail in snow. Your party is caught in the open,\nfar from any shelter.");
+    return true;
+  }
+  return false;
 }
-function crossRiver(mode){
-  const r=S.atRiver; if(!r) return;
-  if(mode==="ferry"){
-    if(S.money<12){ log("You cannot afford the ferry.","bad"); render(); return }
-    S.money-=12; S.atRiver=null; eatAndHealth();
-    log(`You pay $12 and cross the ${r.name} safely by ferry.`,"good");
-    if(!S.over && !advanceDay()){ render(); save(); return }
-  } else if(mode==="wait"){
-    eatAndHealth(); S.riverDepth=Math.max(1.2, S.riverDepth-rnd(0.3,1.1));
-    log(`You wait by the ${r.name}. The water is now about ${S.riverDepth.toFixed(1)} feet deep.`);
-    if(!S.over && !advanceDay()){ render(); save(); return }
+function gameOver(why){
+  S.over=true; clearSave();
+  const lines=["", why, "",
+    "You traveled "+Math.round(S.miles)+" miles in "+S.days+" days.",
+    alive().length+" of your party of "+S.party.length+" still live."];
+  setScreen({ art:ART.grave, lines,
+    menu:[{label:"Try the trail again", fn:()=>{ S=newGame(); titleScreen(); }}] });
+}
+
+/* ============================== one day on the trail ============================== */
+function oneDay(){
+  /* returns: "ok" | "landmark" | "event" (event text in S.eventLines) */
+  if(S.oxen<2){ S.eventLines=["Your wagon cannot move — you have fewer than",
+    "one yoke of oxen to pull it. Without oxen, here",
+    "the journey must end."]; return "stranded"; }
+  pickWeather();
+  addDay();
+  let mph={steady:15, strenuous:20, grueling:25}[S.pace];
+  mph*=R(0.8,1.15);
+  if(S.grassBad>0){ mph*=0.6; S.grassBad--; }
+  if(S.weather==="snowing"||S.weather==="very cold") mph*=0.55;
+  if(S.weather==="rainy") mph*=0.8;
+  if(S.oxen<4) mph*=0.8;
+  S.miles+=mph;
+  const fed=eatDay();
+  /* health drift */
+  alive().forEach(p=>{
+    let d=0;
+    if(S.rations==="filling") d+=0.6; else if(S.rations==="bare bones") d-=1.6;
+    if(S.pace==="strenuous") d-=0.7; else if(S.pace==="grueling") d-=2.2;
+    if(!fed) d-=6;
+    if(p.sick) d-=7;
+    if(S.weather==="very cold"||S.weather==="snowing") d-=1.2;
+    if(S.weather==="very hot") d-=0.8;
+    p.hp=clamp(p.hp+d,0,100);
+    if(p.sick && Math.random()<0.30){ if(!DISEASES.includes(p.sick)) p.sick=null;
+      else if(Math.random()<0.5) p.sick=null; }
+    if(p.hp<=0) hurt(p,0,p.sick||"exhaustion");
+  });
+  if(S.miles>=nextLM().miles){ S.miles=nextLM().miles; return "landmark"; }
+  if(S.pendingDeaths.length) return "ok";
+  if(Math.random()<0.16) return "event";
+  return "ok";
+}
+function continueTrail(){
+  let guard=0;
+  while(guard++<30){
+    const r=oneDay();
+    if(r==="stranded"){ gameOver(S.eventLines.join("\n")); return; }
+    if(checkDeaths(()=>continueTrail())) return;
+    if(winterCheck()) return;
+    if(r==="landmark"){ arriveLandmark(); return; }
+    if(r==="event"){ runEvent(); return; }
+  }
+  travelScreen();
+}
+function arriveLandmark(){
+  const lm=nextLM();
+  if(lm.type==="end"){ winGame(); return; }
+  if(lm.type==="river"){ setupRiver(lm); return; }
+  if(lm.dalles){ dallesScreen(lm); return; }
+  S.lm++;
+  const menu=[
+    {label:"Continue on the trail", fn:()=>travelScreen()},
+    {label:"Stop to rest", fn:restScreen},
+  ];
+  if(lm.type==="fort")
+    menu.unshift({label:"Buy supplies at the fort store", fn:()=>storeScreen(lm)});
+  if(lm.shortcut)
+    menu.splice(1,0,{label:"Take the cutoff shortcut toward Soda Springs", fn:shortcutChoice});
+  setScreen({ art: lm.art?ART[lm.art]:(lm.type==="fort"?ART.fort:""),
+    lines:[lm.desc||("You have arrived at "+lm.name+"."), "",
+      "Date: "+dateStr()+"   Miles traveled: "+Math.round(S.miles)],
+    menu });
+}
+function shortcutChoice(){
+  const lines=["You take the rough cutoff trail. It is dry and",
+    "rutted, but it cuts many miles off the journey."];
+  if(Math.random()<0.35){
+    if(S.oxen>2){ S.oxen-=1; lines.push("","The dry trail is hard on the oxen — one of them",
+      "gives out and has to be left behind."); }
+    else { alive().forEach(p=>hurt(p,6)); lines.push("","Short of water, the party suffers in the heat."); }
+  }
+  S.miles=Math.max(S.miles, 1081);
+  afterAction(()=>travelScreen(lines));
+}
+
+/* ============================== random events ============================== */
+function runEvent(){
+  const ev=pick(EVENTS);
+  const lines=ev();
+  setScreen({ lines, cont:()=>{ afterAction(()=>travelScreen()); } });
+}
+const EVENTS=[
+  function brokenPart(){
+    const part=pick(["wheel","axle","tongue"]);
+    if(S.parts[part]>0){ S.parts[part]--;
+      return ["Your wagon "+(part==="wheel"?"wheel breaks":part==="axle"?"axle cracks":"tongue snaps")+".",
+        "","Luckily, you have a spare "+PARTNAME[part]+".",
+        "You fit the spare and roll on, losing half a day."]; }
+    addDay(); eatDay();
+    return ["Your wagon "+(part==="wheel"?"wheel breaks":part==="axle"?"axle cracks":"tongue snaps")+".",
+      "","You have no spare "+PARTNAME[part]+". You spend a hard",
+      "day making a repair with green wood and rope.",
+      "It will hold — probably. You lose a full day."];
+  },
+  function oxDies(){
+    if(S.oxen>0) S.oxen--;
+    return ["One of your oxen lies down in the traces and",
+      "cannot get up. By evening it is dead.",
+      "","You have "+S.oxen+" oxen left."];
+  },
+  function oxWanders(){
+    addDay(); eatDay();
+    if(Math.random()<0.25 && S.oxen>0){ S.oxen--;
+      return ["Your oxen wander off in the night. You spend a",
+        "day searching, but one of them is never found.",
+        "","You have "+S.oxen+" oxen left."]; }
+    return ["Your oxen wander off in the night. You spend a",
+      "long, anxious day finding them and driving them",
+      "back to camp. You lose a day's travel."];
+  },
+  function disease(){
+    const p=pick(alive()); if(!p) return ["The trail is quiet today."];
+    const dz=pick(DISEASES); hurt(p,8,dz);
+    return [p.name+" is feeling very sick.",
+      "","The others say it looks like "+dz+"."];
+  },
+  function snakebite(){
+    const p=pick(alive()); if(!p) return ["The trail is quiet today."];
+    hurt(p,18,"a snakebite");
+    return [p.name+" steps on a rattlesnake at the edge of camp.",
+      "","The bite is ugly and swollen. "+p.name+" must ride",
+      "in the wagon while the poison works through."];
+  },
+  function brokenBone(){
+    const p=pick(alive()); if(!p) return ["The trail is quiet today."];
+    const bone=Math.random()<0.5?"arm":"leg"; hurt(p,22,"a broken "+bone);
+    return [p.name+" falls from the wagon tongue and breaks a "+bone+".",
+      "","You set the bone as best you can. "+p.name+" will",
+      "ride in the wagon for a good while."];
+  },
+  function badWater(){
+    alive().forEach(p=>hurt(p,5));
+    return ["The water at last night's camp was bad — alkaline",
+      "and foul. The whole party is sick to their stomachs",
+      "and weak on their feet today."];
+  },
+  function noGrass(){
+    S.grassBad=2;
+    return ["The grass here is poor and eaten down to the",
+      "roots by the wagons ahead of you. Your oxen go",
+      "hungry, and hungry oxen pull slow."];
+  },
+  function fog(){
+    addDay(); eatDay();
+    return ["Heavy fog rolls in off the river bottoms. You",
+      "cannot see the trail markers, and dare not travel.",
+      "You lose a full day waiting for it to lift."];
+  },
+  function hail(){
+    addDay(); eatDay(); alive().forEach(p=>hurt(p,3));
+    if(S.food>0) S.food=Math.max(0,S.food-8);
+    return ["A hail storm batters the wagon — stones the size",
+      "of hen's eggs! The party huddles under the canvas",
+      "until it passes. Some flour is spoiled by the wet."];
+  },
+  function helpfulIndians(){
+    const amt=RI(40,100); S.food+=amt;
+    return ["A band of Indians rides into camp. They are",
+      "friendly, and after much smiling and sign talk",
+      "they give you "+amt+" pounds of dried meat and roots.",
+      "You thank them the best you can."];
+  },
+  function abandonedWagon(){
+    const found=pick(["food","bullets","clothing","part"]);
+    if(found==="food"){ const a=RI(30,90); S.food+=a;
+      return ["You pass an abandoned wagon, its team gone.",
+        "Inside you find "+a+" pounds of food, still good."]; }
+    if(found==="bullets"){ S.bullets+=20;
+      return ["You pass an abandoned wagon, its team gone.",
+        "Inside you find a box of 20 bullets."]; }
+    if(found==="clothing"){ S.clothing+=1;
+      return ["You pass an abandoned wagon, its team gone.",
+        "Inside you find a set of warm clothing."]; }
+    const part=pick(["wheel","axle","tongue"]); S.parts[part]++;
+    return ["You pass an abandoned wagon, its team gone.",
+      "Its "+PARTNAME[part]+" is sound. You take it along."];
+  },
+  function thief(){
+    if(S.food>=40){ const a=RI(25,70); S.food-=a;
+      return ["In the night, a thief slips into camp and makes",
+        "off with "+a+" pounds of your food. The watch",
+        "hears nothing but the wind."]; }
+    if(S.bullets>=20){ S.bullets-=20;
+      return ["In the night, a thief slips into camp and steals",
+        "a box of your bullets."]; }
+    return ["You hear a noise in the night — a thief, scared",
+      "off before he could take anything of value."];
+  },
+  function wildFruit(){
+    if(S.date.m>=6&&S.date.m<=9){ const a=RI(15,40); S.food+=a;
+      return ["The children find wild plums and berries along",
+        "the creek. You gather "+a+" pounds of fruit —",
+        "a welcome change from bacon and beans."]; }
+    return ["A cold wind blows all day. The party wraps up",
+      "in blankets and trudges on in silence."];
+  },
+  function exhaustion(){
+    const p=pick(alive()); if(!p) return ["The trail is quiet today."];
+    hurt(p,12,"exhaustion");
+    return ["The pace and the endless walking wear "+p.name+" down.",
+      p.name+" collapses by the wagon at noon and must",
+      "be lifted into the back to rest."];
+  },
+];
+
+/* ============================== river crossings ============================== */
+function setupRiver(lm){
+  let depth=lm.base + R(-0.4,0.7);
+  if(S.date.m>=4&&S.date.m<=6) depth+=1.1;            /* spring snowmelt */
+  if(S.date.m===3) depth+=0.6;
+  if(S.rainUp) depth+=0.6;
+  S.riverDepth=Math.round(clamp(depth,1.2,7)*10)/10;
+  S.riverWidth=RI(400,1000);
+  riverScreen(lm,[]);
+}
+function riverScreen(lm, extra){
+  const menu=[
+    {label:"Attempt to ford the river", fn:()=>crossRiver(lm,"ford")},
+    {label:"Caulk the wagon and float it across", fn:()=>crossRiver(lm,"caulk")},
+  ];
+  if(lm.ferry) menu.push({label:"Take the ferry ("+money(lm.ferry)+")",
+    disabled:S.money<lm.ferry, fn:()=>crossRiver(lm,"ferry")});
+  if(lm.guide) menu.push({label:"Hire an Indian guide (3 sets of clothing)",
+    disabled:S.clothing<3, fn:()=>crossRiver(lm,"guide")});
+  menu.push({label:"Wait to see if conditions improve", fn:()=>waitRiver(lm)});
+  setScreen({ art:ART.river, lines:[].concat(extra,[
+    lm.desc,"",
+    "The "+lm.river+" is "+S.riverWidth+" feet across here.",
+    "The water is "+S.riverDepth.toFixed(1)+" feet deep in the middle.",
+    "",
+    "You may:",
+  ]), menu });
+}
+function waitRiver(lm){
+  addDay(); eatDay(); pickWeather();
+  const t=Math.random();
+  if(t<0.5) S.riverDepth=Math.round(clamp(S.riverDepth-R(0.3,0.9),1.2,7)*10)/10;
+  else if(t<0.7) S.riverDepth=Math.round(clamp(S.riverDepth+R(0.2,0.5),1.2,7)*10)/10;
+  const msg=["You camp by the river and wait a day.",
+    "The water now stands at "+S.riverDepth.toFixed(1)+" feet deep."];
+  if(checkDeaths(()=>riverScreen(lm,msg))) return;
+  if(winterCheck()) return;
+  riverScreen(lm,msg);
+}
+function crossRiver(lm, method){
+  addDay(); eatDay();
+  if(method==="ferry") S.money-=lm.ferry;
+  if(method==="guide") S.clothing-=3;
+  const d=S.riverDepth;
+  let p;
+  if(method==="ford")       p = d<=2.5?0.95 : d<=3.5?0.75 : d<=4.5?0.50 : 0.30;
+  else if(method==="caulk") p = d<=3?0.90   : d<=4.5?0.75 : d<=6?0.55   : 0.40;
+  else if(method==="ferry") p = 0.98;
+  else /* guide */           p = 0.92;
+  const lines=[];
+  if(method==="ford") lines.push("You drive the oxen into the water and ford the "+lm.river+"...");
+  if(method==="caulk") lines.push("You caulk the wagon box with tar and pitch, lash it fast,","and float it across the "+lm.river+" like a boat...");
+  if(method==="ferry") lines.push("You pay the ferryman and ride his flatboat across the "+lm.river+".");
+  if(method==="guide") lines.push("The Shoshone guide studies the water, then leads your","oxen in at a place you would never have chosen...");
+  if(Math.random()<p){
+    lines.push("", "You make it across safely. The far bank, at last.");
+    S.lm++;
+    setScreen({ lines, cont:()=>{ afterAction(()=>travelScreen()); } });
+    return;
+  }
+  /* trouble in the water */
+  lines.push("", "Halfway across, the current catches the wagon —");
+  const losses=[];
+  if(S.food>0){ const a=Math.min(S.food, RI(40,150)); S.food-=a; losses.push(a+" pounds of food"); }
+  if(Math.random()<0.6&&S.clothing>0){ const a=RI(1,Math.max(1,S.clothing)); S.clothing-=a; losses.push(a+" set(s) of clothing"); }
+  if(Math.random()<0.5&&S.bullets>=20){ S.bullets-=20; losses.push("a box of bullets"); }
+  if(Math.random()<0.4){ const part=pick(["wheel","axle","tongue"]);
+    if(S.parts[part]>0){ S.parts[part]--; losses.push("a spare "+PARTNAME[part]); } }
+  if(losses.length) lines.push("the wagon swamps! You lose: "+losses.join(", ")+".");
+  else lines.push("the wagon swamps and ships a deal of water,","but by some mercy nothing is lost.");
+  const drownRisk = method==="ferry" ? 0.02 : d>=4.5 ? 0.30 : d>=3.5 ? 0.15 : 0.05;
+  if(Math.random()<drownRisk && alive().length){
+    const p2=pick(alive()); hurt(p2,999,"drowning");
+    lines.push("", "In the struggle for the bank, "+p2.name+" is swept away.");
   } else {
-    const risk=S.riverDepth>3.5?0.45:S.riverDepth>2.8?0.25:0.10;
-    S.atRiver=null;
-    if(Math.random()<risk){
-      const lostF=Math.min(S.food, ri(30,120)); S.food-=lostF;
-      let extra="";
-      if(Math.random()<0.4 && S.oxen>1){ S.oxen--; extra=" An ox drowned."; }
-      if(Math.random()<0.35){ hurtRandom(28,"the crossing"); extra+=" A traveler nearly drowned."; }
-      log(`The wagon tips in the ${r.name}! You lose ${Math.floor(lostF)} lb of food.${extra}`,"bad");
-    } else log(`You ford the ${r.name} safely.`,"good");
+    lines.push("", "Soaked and shaken, you drag the wagon out on the far bank.");
   }
-  render(); save();
-}
-function acceptTrade(){
-  if(S.trade==null) return;
-  const t=TRADES[S.trade];
-  if(t.can()){ t.apply(); log(`Trade made: ${t.text}.`,"good"); }
-  S.trade=null; render(); save();
-}
-function declineTrade(){
-  if(S.trade==null) return;
-  log("You wave the trader off and roll on.");
-  S.trade=null; render(); save();
+  S.lm++;
+  setScreen({ lines, cont:()=>{ afterAction(()=>travelScreen()); } });
 }
 
-document.querySelectorAll("[data-prof]").forEach(b=>b.onclick=()=>newGame(b.dataset.prof));
-$("#continue").onclick=()=>{ $("#setup").classList.add("hidden"); $("#game").classList.remove("hidden"); render() };
-$("#act-travel").onclick=travel;
-$("#act-rest").onclick=rest;
-$("#act-hunt").onclick=hunt;
-$("#rv-ford").onclick=()=>crossRiver("ford");
-$("#rv-ferry").onclick=()=>crossRiver("ferry");
-$("#rv-wait").onclick=()=>crossRiver("wait");
-$("#tr-accept").onclick=acceptTrade;
-$("#tr-decline").onclick=declineTrade;
-$("#pace").onchange=e=>{ S.pace=e.target.value; save() };
-$("#rations").onchange=e=>{ S.rations=e.target.value; save() };
-$("#new-game").onclick=()=>{ if(confirm("Abandon this journey and start over?")){ localStorage.removeItem(SAVE_KEY); location.reload() } };
-$("#over-again").onclick=()=>{ localStorage.removeItem(SAVE_KEY); location.reload() };
-
-// setup stats + resume a saved journey
-try{ const wins=+localStorage.getItem("oregon.wins")||0, best=+localStorage.getItem("oregon.best")||0;
-  if(wins){ const el=$("#setup-stats"); el.hidden=false; el.textContent=`Journeys completed: ${wins} · Best score: ${best}`; }
-  const s=JSON.parse(localStorage.getItem(SAVE_KEY));
-  if(s && !s.over && s.party && s.party.length){ S=s;
-    $("#continue-row").hidden=false;
-    $("#continue-info").textContent=`${Math.floor(S.miles)} miles in, ${S.party.length} travelers, ${dateStr()}.`;
+/* ============================== The Dalles ============================== */
+function dallesScreen(lm){
+  S.lm++;
+  setScreen({ art:ART.river, lines:[lm.desc,"",
+    "The toll road costs $10. The river costs nothing —",
+    "but the Columbia has swallowed wagons before."],
+    menu:[
+      {label:"Take the Barlow Toll Road ($10)", disabled:S.money<10, fn:()=>{
+          S.money-=10;
+          travelScreen(["You pay the toll and take the Barlow Road around",
+            "Mount Hood. It is rough and steep, but it is a road.",
+            "The Willamette Valley lies just ahead."]);
+        }},
+      {label:"Raft the Columbia River", fn:raftColumbia},
+    ] });
+}
+function raftColumbia(){
+  addDay(); eatDay();
+  const lines=["You lash your wagon onto a rough log raft and push",
+    "out into the Columbia. The river takes you swiftly",
+    "down between walls of black rock..."];
+  const t=Math.random();
+  if(t<0.62){
+    lines.push("", "The raft holds! You sweep down past the rapids and",
+      "into calm water. Below you, green and gold, lies",
+      "the Willamette Valley.");
+  } else if(t<0.88){
+    const a=Math.min(S.food, RI(50,150)); S.food-=a;
+    if(S.bullets>=20) S.bullets-=20;
+    lines.push("", "A rock tears at the raft and the wagon tips half",
+      "into the river. You save the wagon, but lose "+a+" pounds",
+      "of food and a box of bullets to the current.");
+  } else if(alive().length){
+    const p2=pick(alive()); hurt(p2,999,"drowning");
+    lines.push("", "The raft breaks up in the rapids. You drag yourselves",
+      "ashore, half drowned — but "+p2.name+" does not come up.");
   }
-}catch(e){}
+  S.miles=2040;
+  setScreen({ lines, cont:()=>{ afterAction(()=>winGame()); } });
+}
+
+/* ============================== hunting ============================== */
+const HUNT={active:false, animal:null, appearAt:0, shots:0, t1:0, t2:0, meat:0};
+function startHunt(){
+  if(S.bullets<=0){
+    setScreen({ lines:["You have no bullets. There is no use hunting",
+      "without ammunition."], cont:()=>travelScreen() });
+    return;
+  }
+  HUNT.active=true; HUNT.shots=0; HUNT.meat=0; HUNT.animal=null;
+  huntScreen(["You set out from the wagon with your rifle.",
+    "Game is about — if you are quick. When an animal",
+    "appears, SHOOT at once (tap SHOOT, or press SPACE",
+    "or B). Do not shoot at shadows: a wasted bullet",
+    "scares the game away."]);
+  scheduleAnimal();
+}
+function huntScreen(lines){
+  setScreen({ lines:lines.concat(["",
+    "Bullets left: "+S.bullets+"    Shots taken: "+HUNT.shots+"    Meat gained: "+HUNT.meat+" pounds"]),
+    menu:[{label:"Give up hunting and return to the wagon", fn:endHunt}] });
+  $("shoot").classList.add("on");
+}
+function scheduleAnimal(){
+  clearTimeout(HUNT.t1); clearTimeout(HUNT.t2);
+  HUNT.animal=null;
+  HUNT.t1=setTimeout(()=>{
+    HUNT.animal=pick(ANIMALS); HUNT.appearAt=Date.now();
+    $("art").style.display="block";
+    $("art").textContent=ART[HUNT.animal.id]||"";
+    $("text").innerHTML="A "+HUNT.animal.name.toUpperCase()+"!\n\nSHOOT — NOW!";
+    HUNT.t2=setTimeout(()=>{
+      if(HUNT.animal){ const a=HUNT.animal; HUNT.animal=null;
+        huntScreen(["The "+a.name+" is gone before you can fire.",
+          "The brush swallows it up."]);
+        if(HUNT.shots<4&&S.bullets>0) scheduleAnimal(); else endHuntSoon();
+      }
+    }, HUNT.animal.window);
+  }, R(900,2600));
+}
+function endHuntSoon(){ HUNT.t1=setTimeout(endHunt, 1200); }
+function huntShoot(){
+  if(!HUNT.active) return;
+  if(S.bullets<=0){ huntScreen(["Your rifle clicks on an empty chamber. You are out of bullets."]); endHuntSoon(); return; }
+  S.bullets--; HUNT.shots++;
+  clearTimeout(HUNT.t2);
+  if(!HUNT.animal){
+    huntScreen(["BANG! You shot at a shadow — nothing there but",
+      "wind in the brush. The noise will have scared",
+      "off anything close."]);
+    if(HUNT.shots<4&&S.bullets>0) scheduleAnimal(); else endHuntSoon();
+    return;
+  }
+  const a=HUNT.animal; HUNT.animal=null;
+  const reaction=Date.now()-HUNT.appearAt;
+  let p=a.base + (1-clamp(reaction/a.window,0,1))*0.25 - 0.08;
+  p=clamp(p,0.1,0.95);
+  if(Math.random()<p){
+    const carried=Math.min(a.meat,100);
+    HUNT.meat+=carried; S.food+=carried;
+    const extra=a.meat>100 ? "\nYou got "+a.meat+" pounds of meat, but you can only\ncarry 100 pounds of it back to the wagon." : "";
+    huntScreen(["BANG! You killed the "+a.name+".",
+      "You dress out "+carried+" pounds of meat."+extra]);
+  } else {
+    huntScreen(["BANG! You missed the "+a.name+".",
+      "It vanishes into the brush, unharmed."]);
+  }
+  if(HUNT.shots<4&&S.bullets>0) scheduleAnimal(); else endHuntSoon();
+}
+$("shoot").addEventListener("click", huntShoot);
+function endHunt(){
+  if(!HUNT.active) return;
+  HUNT.active=false; clearTimeout(HUNT.t1); clearTimeout(HUNT.t2);
+  addDay(); const fed=eatDay(); pickWeather();
+  const lines=["You return to the wagon with "+HUNT.meat+" pounds of meat.",
+    "The hunt took the rest of the day."];
+  if(!fed) lines.push("There is nothing else to eat tonight.");
+  afterAction(()=>travelScreen(lines));
+}
+
+/* ============================== the end of the trail ============================== */
+function winGame(){
+  S.won=true; S.over=true;
+  const rows=[]; let subtotal=0;
+  const val={good:500, fair:400, poor:300, "very poor":200};
+  alive().forEach(p=>{ const v=val[hpWord(p.hp)]; subtotal+=v;
+    rows.push("  "+p.name+" arrives in "+hpWord(p.hp)+" health".padEnd(0,"")+": "+v); });
+  const add=(label,v)=>{ subtotal+=v; rows.push("  "+label+": "+v); };
+  add("Wagon still rolling", 50);
+  add("Oxen ("+S.oxen+" at 100 each)", S.oxen*100);
+  add("Spare parts ("+(S.parts.wheel+S.parts.axle+S.parts.tongue)+" at 10 each)",
+      (S.parts.wheel+S.parts.axle+S.parts.tongue)*10);
+  add("Clothing ("+S.clothing+" sets at 10 each)", S.clothing*10);
+  add("Food ("+Math.round(S.food)+" pounds)", Math.floor(S.food/25));
+  add("Bullets ("+S.bullets+")", Math.floor(S.bullets/50));
+  add("Cash ("+money(S.money)+")", Math.floor(S.money/5));
+  const total=subtotal*S.mult;
+  const prevBest=bestScore(); const isBest=total>prevBest;
+  if(isBest) setBest(total);
+  clearSave();
+  setScreen({ art:ART.mountains, lines:[
+    "CONGRATULATIONS!",
+    "",
+    "You have finally arrived in the Willamette Valley",
+    "of Oregon, after "+S.days+" days on the trail.",
+    "",
+    "Your party stands on a green hillside, looking down",
+    "at farms, orchards and the wide river. You made it.",
+    "",
+    "SCORE",
+    "",
+  ].concat(rows,[
+    "",
+    "Subtotal: "+subtotal,
+    "Occupation bonus ("+(S.occ||"")+", x"+S.mult+"): ",
+    "TOTAL SCORE: "+total,
+    isBest ? "*** A NEW BEST SCORE! ***" : "Best score so far: "+Math.max(prevBest,total),
+  ]),
+  menu:[{label:"Play again", fn:()=>{ S=newGame(); titleScreen(); }}] });
+}
+
+/* ============================== test hooks + init ============================== */
+window.OT={ get S(){ return S; }, get buttons(){ return BTNS; },
+  press(label){ const b=BTNS.find(x=>x.label.includes(label)); if(!b) throw new Error("no button: "+label); if(!b.disabled) b.fn(); },
+  space(){ if(UI.cont){ const f=UI.cont; UI.cont=null; f(); } },
+  type(v){ $("entry").value=v; entryOk(); },
+  startHunt, huntShoot, continueTrail, crossRiver, travelScreen, titleScreen,
+  LANDMARKS, ITEMS, OCC };
+titleScreen();
 </script>
 </body>
 </html>
