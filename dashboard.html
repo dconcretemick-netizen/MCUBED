@@ -153,6 +153,15 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .units-more{margin:10px 0 0!important;font-size:13px}
 .api-info{margin-bottom:10px}.api-info p{margin:0 0 10px;color:var(--muted);font-size:14px}
 .kv{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0;font-size:14px}.kv>span:first-child{color:var(--muted);width:68px}
+.obd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
+.obd-tile{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.obd-tile b{display:block;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.obd-tile span{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.obd-tile span small{font-size:12px;color:var(--muted);font-weight:500}
+.dtc{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.dtc:last-child{border-bottom:0}
+.dtc code{font-size:16px;font-weight:700;color:var(--warn);white-space:nowrap}
+.dtc p{margin:0;font-size:14px}
 .kv code{flex:1;min-width:0}
 .kv code,.msg code{font-family:var(--mono);font-size:13px;background:var(--surface-2);padding:2px 6px;border-radius:6px;word-break:break-all}
 .kv .hint{color:var(--faint);font-size:12px}.btn.sm{min-height:30px;padding:0 10px;font-size:13px}
@@ -277,6 +286,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   <button role="tab" data-v="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg>Games</button>
   <button role="tab" data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Stats</button>
   <button role="tab" data-v="toolbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>Toolbox</button>
+  <button role="tab" data-v="obd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4.5-4.5"/><path d="M2 14h2M20 14h2M12 6V4"/></svg>OBD</button>
   <button role="tab" data-v="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Update<i class="dot" id="upd-dot" hidden></i></button>
 </nav>
 
@@ -502,6 +512,54 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </div>
   </section>
 
+  <section class="view" id="v-obd">
+    <div class="card"><h2>Car diagnostics <span class="chip" id="obd-chip">not connected</span></h2>
+      <p class="news-note">Plug an ELM327 adapter into the car's OBD-II port (under the dash), turn the ignition on, then connect. Wi-Fi adapters are easiest; Bluetooth adapters work in the Android app. No adapter handy? Try the demo car.</p>
+      <div class="row" style="margin:10px 0">
+        <label class="ctl" style="flex:1;min-width:150px">Adapter
+          <select id="obd-transport" class="ctl">
+            <option value="wifi">Wi-Fi adapter</option>
+            <option value="bluetooth">Bluetooth adapter</option>
+            <option value="demo">Demo car (no adapter)</option>
+          </select></label>
+      </div>
+      <div class="row" id="obd-wifi-fields">
+        <label class="ctl" style="flex:2;min-width:150px">Adapter address
+          <input id="obd-host" class="ctl" type="text" value="192.168.0.10" autocomplete="off" spellcheck="false"></label>
+        <label class="ctl" style="flex:1;min-width:90px">Port
+          <input id="obd-port" class="ctl" type="number" value="35000"></label>
+      </div>
+      <div class="row" id="obd-bt-fields" hidden>
+        <label class="ctl" style="flex:2;min-width:150px">Paired adapter
+          <select id="obd-device" class="ctl"><option value="">Looking for paired devices…</option></select></label>
+        <label class="ctl" style="flex:1;min-width:140px">…or type its address
+          <input id="obd-address" class="ctl" type="text" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="obd-connect" style="flex:1">Connect</button>
+        <button class="btn" id="obd-disconnect" disabled>Disconnect</button>
+      </div>
+      <div class="kv" style="margin-top:10px"><span>Adapter</span><code id="obd-adapter">—</code></div>
+      <div class="kv"><span>Protocol</span><code id="obd-protocol">—</code></div>
+      <div class="kv"><span>VIN</span><code id="obd-vin">—</code></div>
+      <p class="news-note" id="obd-msg" role="status" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)"><h2>Live data <span class="chip" id="obd-mil">light: —</span></h2>
+      <div class="obd-grid" id="obd-live"><div class="skel"></div></div>
+      <p class="news-note" id="obd-live-note" style="margin:10px 0 0">Connect to an adapter to see live gauges. Speed and temperatures are shown in mph and °F.</p>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)"><h2>Trouble codes</h2>
+      <div id="obd-codes"><p class="news-note">Connect, then read the codes stored in the car.</p></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="obd-read" disabled>Read codes</button>
+        <button class="btn" id="obd-clear" disabled>Clear codes</button>
+      </div>
+      <p class="news-note" style="margin:10px 0 0">Clearing turns off the check-engine light and erases freeze-frame data. If the fault is still there, the code comes back — clearing is not a repair.</p>
+    </div>
+  </section>
+
   <section class="view" id="v-update">
     <div class="card"><h2>MCUBED version <span class="chip" id="upd-chip">checking</span></h2>
       <div class="kv"><span>Installed</span><code id="upd-cur">…</code></div>
@@ -657,6 +715,7 @@ function showView(v){
   if(v==="news") loadNews();
   if(v==="update") loadUpdate();
   if(v==="toolbox"){ loadKeys(); loadToolbox(); }
+  if(v==="obd") loadObd(); else stopObdPoll();
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
@@ -1070,6 +1129,93 @@ $("#tb-restart").addEventListener("click",async()=>{
   try{ await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"restart"})}) }catch(e){}
   toast("Restarting\u2026"); await waitForRestart();
 });
+
+
+/* ---------- OBD-II diagnostics ---------- */
+let OBD=null, obdTimer=null;
+const OBD_TILE_ORDER=["0C","0D","05","42","04","11","2F","10","0F","06","07","1F"];
+function obdTile(k,v){
+  let val=v.value, unit=v.unit;
+  if(k==="0D"){ val=Math.round(v.value*0.621371); unit="mph" }
+  else if(["05","0F","46","5C"].includes(k)){ val=Math.round(v.value*9/5+32); unit="°F" }
+  else if(k==="42"){ val=(+v.value).toFixed(1) }
+  else if(typeof val==="number") val=Math.round(val*10)/10;
+  return `<div class="obd-tile"><b>${esc(v.name)}</b><span>${val} <small>${esc(unit)}</small></span></div>`;
+}
+function renderObdStatus(){
+  const d=OBD||{};
+  $("#obd-chip").textContent=d.connected?(d.demo?"demo car":"connected"):"not connected";
+  $("#obd-chip").className="chip "+(d.connected?"kept":"rolled_back");
+  $("#obd-adapter").textContent=d.adapter||"—";
+  $("#obd-protocol").textContent=d.protocol||"—";
+  $("#obd-vin").textContent=d.vin||"—";
+  $("#obd-connect").disabled=!!d.connected;
+  $("#obd-disconnect").disabled=!d.connected;
+  $("#obd-read").disabled=!d.connected;
+  $("#obd-clear").disabled=!d.connected;
+  if(d.last_error) $("#obd-msg").textContent=d.last_error;
+}
+function renderObdLive(d){
+  const vals=d.values||{};
+  const keys=OBD_TILE_ORDER.filter(k=>vals[k]);
+  $("#obd-live").innerHTML=keys.length?keys.map(k=>obdTile(k,vals[k])).join(""):'<p class="news-note">No live data answered yet.</p>';
+  $("#obd-live-note").textContent="Updated "+new Date(d.at*1000).toLocaleTimeString()+" · refreshes while this tab is open.";
+  const mil=$("#obd-mil");
+  mil.textContent=d.mil_on==null?"light: —":d.mil_on?`check-engine light ON · ${d.dtc_count||0} code(s)`:"check-engine light off";
+  mil.className="chip "+(d.mil_on?"rolled_back":"kept");
+}
+async function obdPoll(){
+  try{ renderObdLive(await api("/api/obd/live")) }catch(e){ stopObdPoll(); $("#obd-msg").textContent=e.message }
+}
+function startObdPoll(){ stopObdPoll(); obdPoll(); obdTimer=setInterval(obdPoll,1300) }
+function stopObdPoll(){ if(obdTimer){ clearInterval(obdTimer); obdTimer=null } }
+async function loadObd(){
+  if(STATIC){ $("#obd-chip").textContent="static snapshot"; return }
+  try{ OBD=await api("/api/obd/status"); renderObdStatus(); if(OBD.connected) startObdPoll() }catch(e){ $("#obd-msg").textContent=e.message }
+  try{ const bt=await api("/api/obd/devices");
+    const sel=$("#obd-device");
+    if(bt.devices&&bt.devices.length) sel.innerHTML=bt.devices.map(d=>`<option value="${esc(d.address)}">${esc(d.name||"Adapter")} · ${esc(d.address)}</option>`).join("");
+    else sel.innerHTML=`<option value="">${bt.available?"No paired adapters found — pair it in Bluetooth settings first":"Bluetooth not available here"}</option>`;
+  }catch(e){}
+}
+function syncObdFields(){
+  const t=$("#obd-transport").value;
+  $("#obd-wifi-fields").hidden=t!=="wifi";
+  $("#obd-bt-fields").hidden=t!=="bluetooth";
+}
+$("#obd-transport").addEventListener("change",syncObdFields);
+$("#obd-connect").addEventListener("click",async()=>{
+  const t=$("#obd-transport").value;
+  const body={transport:t, host:$("#obd-host").value.trim(), port:+$("#obd-port").value||35000,
+              address:$("#obd-address").value.trim()||$("#obd-device").value};
+  $("#obd-msg").textContent="Connecting… (the adapter wakes the car up; this can take a few seconds)";
+  try{ OBD=await api("/api/obd/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    renderObdStatus(); $("#obd-msg").textContent="Connected."; toast("OBD connected"); startObdPoll(); readObdCodes();
+  }catch(e){ $("#obd-msg").textContent=e.message; try{ OBD=await api("/api/obd/status"); renderObdStatus() }catch(_){} }
+});
+$("#obd-disconnect").addEventListener("click",async()=>{
+  stopObdPoll();
+  try{ OBD=await api("/api/obd/disconnect",{method:"POST"}); renderObdStatus(); $("#obd-msg").textContent="Disconnected." }catch(e){ toast(e.message) }
+});
+async function readObdCodes(){
+  const box=$("#obd-codes"); box.innerHTML='<div class="skel"></div>';
+  try{ const d=await api("/api/obd/codes");
+    const list=(arr,label)=>arr&&arr.length?`<p class="news-note" style="margin:8px 0 0"><b>${label}</b></p>`+arr.map(c=>`<div class="dtc"><code>${esc(c.code)}</code><p>${esc(c.description)}</p></div>`).join(""):"";
+    let h=list(d.stored,"Stored codes")+list(d.pending,"Pending codes");
+    if(!h) h='<p class="news-note">No trouble codes stored. </p>';
+    if(d.freeze&&d.freeze.dtc){ const f=d.freeze; const rest=Object.entries(f).filter(([k])=>k!=="dtc").map(([k,v])=>`${esc(k)} ${esc(v)}`).join(" · ");
+      h+=`<p class="news-note" style="margin:10px 0 0"><b>Freeze frame</b> — when ${esc(f.dtc.code)} set: ${rest}</p>`; }
+    box.innerHTML=h;
+    const mil=$("#obd-mil"); mil.textContent=d.mil_on?`check-engine light ON · ${d.dtc_count||0} code(s)`:"check-engine light off";
+    mil.className="chip "+(d.mil_on?"rolled_back":"kept");
+  }catch(e){ box.innerHTML=`<p class="news-note">${esc(e.message)}</p>` }
+}
+$("#obd-read").addEventListener("click",readObdCodes);
+$("#obd-clear").addEventListener("click",async()=>{
+  if(!confirm("Clear all trouble codes and freeze-frame data? The light will come back if the fault is still present.")) return;
+  try{ await api("/api/obd/clear",{method:"POST"}); toast("Codes cleared"); readObdCodes() }catch(e){ toast(e.message) }
+});
+syncObdFields();
 
 /* ---- AI units in use ---- */
 let UNITS=null;

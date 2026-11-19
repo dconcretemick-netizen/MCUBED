@@ -78,6 +78,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ObdBridge.init(this);
+        if (Build.VERSION.SDK_INT >= 31
+                && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 7);
+        }
         status = new TextView(this);
         status.setText("Starting MCUBED gateway…");
         status.setTextColor(Color.parseColor("#9aa8a6"));

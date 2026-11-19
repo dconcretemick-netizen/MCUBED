@@ -3299,6 +3299,522 @@ def toolbox_status(gw: "Gateway") -> dict:
     }
 
 
+
+# --------------------------------------------------------------------------- #
+# OBD-II diagnostics: ELM327 adapters over Wi-Fi (TCP), Bluetooth, or demo.
+# Diagnostics only: read/clear trouble codes and live data. No ECU flashing.
+# --------------------------------------------------------------------------- #
+class ObdError(Exception):
+    pass
+
+
+# pid -> (label, unit, decode bytes -> value, byte count)
+OBD_PIDS = {
+    0x04: ("Engine load", "%", lambda d: d[0] * 100 / 255, 1),
+    0x05: ("Coolant temp", "°C", lambda d: d[0] - 40, 1),
+    0x06: ("Short fuel trim B1", "%", lambda d: (d[0] - 128) * 100 / 128, 1),
+    0x07: ("Long fuel trim B1", "%", lambda d: (d[0] - 128) * 100 / 128, 1),
+    0x08: ("Short fuel trim B2", "%", lambda d: (d[0] - 128) * 100 / 128, 1),
+    0x09: ("Long fuel trim B2", "%", lambda d: (d[0] - 128) * 100 / 128, 1),
+    0x0A: ("Fuel pressure", "kPa", lambda d: d[0] * 3, 1),
+    0x0B: ("Intake pressure", "kPa", lambda d: d[0], 1),
+    0x0C: ("RPM", "rpm", lambda d: (d[0] * 256 + d[1]) / 4, 2),
+    0x0D: ("Speed", "km/h", lambda d: d[0], 1),
+    0x0E: ("Timing advance", "°", lambda d: d[0] / 2 - 64, 1),
+    0x0F: ("Intake air temp", "°C", lambda d: d[0] - 40, 1),
+    0x10: ("MAF air flow", "g/s", lambda d: (d[0] * 256 + d[1]) / 100, 2),
+    0x11: ("Throttle", "%", lambda d: d[0] * 100 / 255, 1),
+    0x1F: ("Run time", "s", lambda d: d[0] * 256 + d[1], 2),
+    0x21: ("Distance with light on", "km", lambda d: d[0] * 256 + d[1], 2),
+    0x2F: ("Fuel level", "%", lambda d: d[0] * 100 / 255, 1),
+    0x33: ("Barometric pressure", "kPa", lambda d: d[0], 1),
+    0x42: ("Battery voltage", "V", lambda d: (d[0] * 256 + d[1]) / 1000, 2),
+    0x46: ("Ambient temp", "°C", lambda d: d[0] - 40, 1),
+    0x5C: ("Oil temp", "°C", lambda d: d[0] - 40, 1),
+}
+OBD_LIVE_PIDS = [0x0C, 0x0D, 0x05, 0x42, 0x04, 0x11, 0x2F, 0x10, 0x0F, 0x06, 0x07, 0x1F]
+
+DTC_DESCRIPTIONS = {
+    "P0101": "Mass air flow sensor range/performance problem",
+    "P0102": "Mass air flow sensor low input",
+    "P0113": "Intake air temperature sensor high input",
+    "P0118": "Coolant temperature sensor high input",
+    "P0128": "Coolant thermostat — engine running too cool",
+    "P0131": "Oxygen sensor low voltage (bank 1, sensor 1)",
+    "P0133": "Oxygen sensor slow response (bank 1, sensor 1)",
+    "P0135": "Oxygen sensor heater fault (bank 1, sensor 1)",
+    "P0141": "Oxygen sensor heater fault (bank 1, sensor 2)",
+    "P0171": "System too lean (bank 1) — unmetered air or low fuel delivery",
+    "P0172": "System too rich (bank 1)",
+    "P0174": "System too lean (bank 2)",
+    "P0175": "System too rich (bank 2)",
+    "P0300": "Random/multiple cylinder misfire detected",
+    "P0301": "Cylinder 1 misfire detected",
+    "P0302": "Cylinder 2 misfire detected",
+    "P0303": "Cylinder 3 misfire detected",
+    "P0304": "Cylinder 4 misfire detected",
+    "P0305": "Cylinder 5 misfire detected",
+    "P0306": "Cylinder 6 misfire detected",
+    "P0325": "Knock sensor fault (bank 1)",
+    "P0335": "Crankshaft position sensor fault",
+    "P0340": "Camshaft position sensor fault",
+    "P0401": "EGR flow insufficient",
+    "P0402": "EGR flow excessive",
+    "P0411": "Secondary air injection — incorrect flow",
+    "P0420": "Catalyst system efficiency below threshold (bank 1) — often a tired catalytic converter or O2 sensor",
+    "P0430": "Catalyst system efficiency below threshold (bank 2)",
+    "P0442": "Evaporative emissions — small leak detected",
+    "P0446": "Evaporative emissions vent control fault",
+    "P0455": "Evaporative emissions — large leak detected (check the gas cap first)",
+    "P0456": "Evaporative emissions — very small leak detected",
+    "P0500": "Vehicle speed sensor fault",
+    "P0505": "Idle air control system fault",
+    "P0507": "Idle speed higher than expected",
+    "P0562": "System voltage low — check battery and alternator",
+    "P0563": "System voltage high — check alternator/regulator",
+    "P0601": "ECU memory checksum error",
+    "P0700": "Transmission control system fault (see transmission codes)",
+    "P0715": "Transmission input speed sensor fault",
+    "P0730": "Incorrect gear ratio",
+    "P2181": "Cooling system performance problem",
+    "C0035": "Left front wheel speed sensor fault (ABS)",
+    "C0040": "Right front wheel speed sensor fault (ABS)",
+    "U0100": "Lost communication with the engine computer",
+    "U0121": "Lost communication with the ABS module",
+}
+
+
+def decode_dtc(b1: int, b2: int) -> str:
+    """Two raw bytes -> a DTC string like P0420."""
+    return f"{'PCBU'[(b1 >> 6) & 3]}{(b1 >> 4) & 3}{(b1 & 0xF):X}{b2 >> 4:X}{(b2 & 0xF):X}"
+
+
+def describe_dtc(code: str) -> str:
+    if code in DTC_DESCRIPTIONS:
+        return DTC_DESCRIPTIONS[code]
+    if code.startswith("P03") and code[-1].isdigit() and code != "P0300":
+        return f"Cylinder {code[-1]} misfire detected"
+    family = {"P": "Powertrain", "C": "Chassis/ABS", "B": "Body", "U": "Network/communication"}.get(code[:1], "")
+    return f"{family} trouble code — look up {code} in the service manual for this vehicle".strip()
+
+
+def _hex_frames(raw: str) -> list:
+    """ELM327 text -> list of byte strings, one per clean hex line."""
+    out = []
+    for line in re.split(r"[\r\n]+", raw or ""):
+        t = re.sub(r"[^0-9A-Fa-f]", "", line)
+        if len(t) >= 2 and len(t) % 2 == 0:
+            try:
+                out.append(bytes.fromhex(t))
+            except ValueError:
+                pass
+    return out
+
+
+class _TcpTransport:
+    def __init__(self, host: str, port: int):
+        self.host, self.port, self.sock = host, port, None
+
+    def open(self):
+        import socket
+        self.sock = socket.create_connection((self.host, self.port), timeout=6)
+        self.sock.settimeout(0.4)
+
+    def exchange(self, cmd: str, timeout: float = 5.0) -> str:
+        import socket
+        self.sock.sendall((cmd + "\r").encode())
+        buf, end = b"", time.time() + timeout
+        while time.time() < end and b">" not in buf:
+            try:
+                chunk = self.sock.recv(1024)
+                if chunk:
+                    buf += chunk
+            except socket.timeout:
+                pass
+            except OSError as e:
+                raise ObdError(f"adapter connection lost ({e})") from None
+        return buf.decode("latin-1").replace(">", " ")
+
+    def close(self):
+        try:
+            if self.sock:
+                self.sock.close()
+        except OSError:
+            pass
+        self.sock = None
+
+
+class _RfcommTransport:
+    """Bluetooth SPP on desktop Linux (Python AF_BLUETOOTH)."""
+
+    def __init__(self, address: str):
+        self.address, self.sock = address, None
+
+    def open(self):
+        import socket
+        if not hasattr(socket, "AF_BLUETOOTH"):
+            raise ObdError("Bluetooth sockets are not available on this system — use a Wi-Fi adapter")
+        self.sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
+        self.sock.settimeout(8)
+        self.sock.connect((self.address, 1))
+        self.sock.settimeout(0.4)
+
+    exchange = _TcpTransport.exchange
+    close = _TcpTransport.close
+
+
+class _AndroidBtTransport:
+    """Bluetooth SPP on Android, bridged to Java (ObdBridge) by Chaquopy."""
+
+    def __init__(self, address: str):
+        self.address, self.bridge = address, None
+
+    def open(self):
+        try:
+            from java import jclass
+            self.bridge = jclass("com.mcubed.app.ObdBridge")
+        except Exception:
+            raise ObdError("Bluetooth bridge is not available in this app build") from None
+        if not self.bridge.connect(self.address):
+            raise ObdError("Bluetooth connect failed — is the adapter paired, in range, and Bluetooth on?")
+
+    def exchange(self, cmd: str, timeout: float = 5.0) -> str:
+        return str(self.bridge.exchange(cmd, int(timeout * 1000)))
+
+    def close(self):
+        try:
+            if self.bridge:
+                self.bridge.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+class _DemoTransport:
+    """A simulated car + ELM327, so the OBD tab works with no adapter at all."""
+
+    def __init__(self):
+        self.t0 = time.time()
+        self.dtcs = [0x0420, 0x0171]
+        self.pending = [0x0300]
+
+    def open(self):
+        pass
+
+    def close(self):
+        pass
+
+    def _sim(self) -> dict:
+        t = time.time() - self.t0
+        rpm = 1500 + 850 * math.sin(t / 17) + 260 * math.sin(t / 5.3)
+        return {
+            0x01: bytes([(0x80 if self.dtcs else 0x00) | len(self.dtcs), 0x07, 0x00, 0x00]),
+            0x04: bytes([int(28 + 18 * math.sin(t / 17)) * 255 // 100]),
+            0x05: bytes([int(min(92, 22 + t / 3)) + 40]),
+            0x06: bytes([128 + int(6 * math.sin(t / 9))]),
+            0x07: bytes([128 + int(9 * math.sin(t / 23))]),
+            0x0B: bytes([38]),
+            0x0C: (lambda v: bytes([int(v) >> 8, int(v) & 0xFF]))(max(0, rpm) * 4),
+            0x0D: bytes([int(max(0, (rpm - 1000) / 26))]),
+            0x0E: bytes([int((12 + 4 * math.sin(t / 7)) * 2 + 128)]),
+            0x0F: bytes([24 + 40]),
+            0x10: (lambda v: bytes([int(v) >> 8, int(v) & 0xFF]))((4 + rpm / 700) * 100),
+            0x11: bytes([int(22 + 16 * math.sin(t / 17)) * 255 // 100]),
+            0x1F: (lambda v: bytes([int(v) >> 8, int(v) & 0xFF]))(min(65535, int(t) + 640)),
+            0x2F: bytes([63 * 255 // 100]),
+            0x33: bytes([101]),
+            0x42: (lambda v: bytes([int(v) >> 8, int(v) & 0xFF]))(13800 + int(300 * math.sin(t / 11))),
+            0x46: bytes([24 + 40]),
+        }
+
+    def exchange(self, cmd: str, timeout: float = 5.0) -> str:
+        c = cmd.strip().upper()
+        if c.startswith("AT"):
+            if c == "ATZ":
+                return "ELM327 v1.5"
+            if c == "ATDP":
+                return "ISO 15765-4 (CAN 11/500)"
+            if c == "ATRV":
+                return "13.9V"
+            return "OK"
+        if c == "0100":
+            return "4100BE1FA813"
+        if c == "0120":
+            return "412080022001"
+        if c == "0140":
+            return "414040084000"
+        sim = self._sim()
+        if re.fullmatch(r"01[0-9A-F]{2}", c):
+            pid = int(c[2:4], 16)
+            return "41" + c[2:4] + sim[pid].hex().upper() if pid in sim else "NO DATA"
+        if c == "03":
+            body = "".join(f"{d:04X}" for d in self.dtcs) or "0000"
+            return "43" + body
+        if c == "07":
+            body = "".join(f"{d:04X}" for d in self.pending) or "0000"
+            return "47" + body
+        if c == "020200":
+            return "420200" + (f"{self.dtcs[0]:04X}" if self.dtcs else "0000")
+        if re.fullmatch(r"02[0-9A-F]{2}00", c):
+            pid = int(c[2:4], 16)
+            return "42" + c[2:4] + "00" + sim[pid].hex().upper() if pid in sim else "NO DATA"
+        if c == "0902":
+            vin = "1HGCM82633A123456"
+            lines = []
+            for i in range(0, len(vin), 4):
+                chunk = vin[i:i + 4].encode().hex().upper()
+                lines.append(f"4902{i // 4 + 1:02X}{chunk}")
+            return "\r".join(lines)
+        if c == "04":
+            self.dtcs, self.pending = [], []
+            return "44"
+        return "?"
+
+
+class ObdSession:
+    """One ELM327 connection, serialized. All reads go through the lock."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.transport = None
+        self.kind = ""
+        self.target = ""
+        self.adapter = ""
+        self.protocol = ""
+        self.vin = ""
+        self.supported: set = set()
+        self.last_error = ""
+        self.connected_at = 0.0
+        self._mon_cache: tuple = (0.0, {})
+
+    # -- connection -------------------------------------------------------- #
+    def status(self) -> dict:
+        return {"connected": self.transport is not None, "transport": self.kind,
+                "target": self.target, "adapter": self.adapter, "protocol": self.protocol,
+                "vin": self.vin, "demo": self.kind == "demo",
+                "last_error": self.last_error,
+                "connected_at": self.connected_at or None}
+
+    def _cmd(self, cmd: str, timeout: float = 5.0) -> str:
+        raw = self.transport.exchange(cmd, timeout)
+        if "STOPPED" in raw:  # interrupted by a previous long op: retry once
+            raw = self.transport.exchange(cmd, timeout)
+        return raw
+
+    def connect(self, kind: str, host: str = "", port: int = 35000, address: str = "") -> dict:
+        with self.lock:
+            self.disconnect()
+            try:
+                if kind == "demo":
+                    t = _DemoTransport()
+                    target = "simulated car"
+                elif kind == "wifi":
+                    t = _TcpTransport(host or "192.168.0.10", int(port or 35000))
+                    target = f"{host or '192.168.0.10'}:{int(port or 35000)}"
+                elif kind == "bluetooth":
+                    if not address:
+                        raise ObdError("pick a paired Bluetooth adapter first")
+                    t = _AndroidBtTransport(address) if _is_android() else _RfcommTransport(address)
+                    target = address
+                else:
+                    raise ObdError("transport must be wifi, bluetooth or demo")
+                t.open()
+                banner = ""
+                try:
+                    banner = t.exchange("ATZ", 3)
+                except Exception:  # noqa: BLE001 - some clones answer slowly; setup below still works
+                    pass
+                m = re.search(r"ELM327[^\r\n]*", banner or "")
+                self.adapter = m.group(0).strip() if m else "ELM327 adapter"
+                for cmd in ("ATE0", "ATL0", "ATS0", "ATH0", "ATSP0"):
+                    try:
+                        t.exchange(cmd, 2)
+                    except Exception:  # noqa: BLE001
+                        pass
+                self.transport, self.kind, self.target = t, kind, target
+                probe = self._cmd("0100", 8)
+                if "UNABLE TO CONNECT" in probe:
+                    raise ObdError("The adapter answers, but cannot talk to the car. Is the ignition on?")
+                if "NO DATA" in probe and kind != "demo":
+                    raise ObdError("The car did not answer. Check the adapter is fully plugged in and the ignition is on.")
+                self.supported = self._read_supported()
+                try:
+                    self.protocol = self._cmd("ATDP", 2).strip().split("\r")[0].strip()
+                except Exception:  # noqa: BLE001
+                    self.protocol = ""
+                self.vin = self._read_vin()
+                self.connected_at = time.time()
+                self.last_error = ""
+                return self.status()
+            except Exception as e:  # noqa: BLE001
+                try:
+                    t.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                self.disconnect()
+                self.last_error = str(e) if isinstance(e, ObdError) else f"{type(e).__name__}: {e}"
+                raise ObdError(self.last_error) from None
+
+    def disconnect(self):
+        if self.transport is not None:
+            try:
+                self.transport.close()
+            except Exception:  # noqa: BLE001
+                pass
+        self.transport, self.kind, self.target = None, "", ""
+        self.adapter = self.protocol = self.vin = ""
+        self.supported = set()
+        self.connected_at = 0.0
+
+    # -- protocol helpers --------------------------------------------------- #
+    def _frame_for(self, raw: str, first: int, second: Optional[int] = None) -> Optional[bytes]:
+        for f in _hex_frames(raw):
+            if f and f[0] == first and (second is None or (len(f) >= 2 and f[1] == second)):
+                return f
+        return None
+
+    def _read_supported(self) -> set:
+        supported = set()
+        for base in (0x00, 0x20, 0x40):
+            f = self._frame_for(self._cmd(f"01{base:02X}", 5), 0x41, base)
+            if not f or len(f) < 6:
+                break
+            bits = int.from_bytes(f[2:6], "big")
+            for i in range(32):
+                if bits & (1 << (31 - i)):
+                    supported.add(base + i + 1)
+            if base + 0x20 not in supported:
+                break
+        return supported
+
+    def _read_pid(self, pid: int, mode: int = 1, frame: int = 0) -> Optional[bytes]:
+        cmd = f"{mode:02X}{pid:02X}" + (f"{frame:02X}" if mode == 2 else "")
+        raw = self._cmd(cmd, 5)
+        if "NO DATA" in raw or "ERROR" in raw:
+            return None
+        f = self._frame_for(raw, 0x40 + mode, pid)
+        if f is None:
+            return None
+        return f[3:] if mode == 2 else f[2:]
+
+    def read_value(self, pid: int) -> Optional[dict]:
+        name, unit, fn, _n = OBD_PIDS[pid]
+        data = self._read_pid(pid)
+        if data is None:
+            return None
+        try:
+            v = fn(data)
+        except (IndexError, ZeroDivisionError):
+            return None
+        return {"pid": f"{pid:02X}", "name": name, "value": round(v, 2) if isinstance(v, float) else v, "unit": unit}
+
+    def monitor_status(self) -> dict:
+        if self._mon_cache[0] and time.time() - self._mon_cache[0] < 5:
+            return self._mon_cache[1]
+        out = {"mil_on": None, "dtc_count": None}
+        data = self._read_pid(0x01)
+        if data:
+            out = {"mil_on": bool(data[0] & 0x80), "dtc_count": data[0] & 0x7F}
+        self._mon_cache = (time.time(), out)
+        return out
+
+    def live(self) -> dict:
+        if self.transport is None:
+            raise ObdError("not connected")
+        with self.lock:
+            values = {}
+            for pid in OBD_LIVE_PIDS:
+                if self.supported and pid not in self.supported:
+                    continue
+                got = self.read_value(pid)
+                if got:
+                    values[got["pid"]] = got
+            return {"at": time.time(), "values": values, **self.monitor_status()}
+
+    def _read_codes(self, mode: int, first: int) -> list:
+        raw = self._cmd(f"{mode:02X}", 6)
+        codes = []
+        for f in _hex_frames(raw):
+            if not f or f[0] != first:
+                continue
+            body = f[1:]
+            for i in range(0, len(body) - 1, 2):
+                v = (body[i] << 8) | body[i + 1]
+                if v:
+                    code = decode_dtc(body[i], body[i + 1])
+                    codes.append({"code": code, "description": describe_dtc(code)})
+        return codes
+
+    def codes(self) -> dict:
+        if self.transport is None:
+            raise ObdError("not connected")
+        with self.lock:
+            stored = self._read_codes(3, 0x43)
+            pending = self._read_codes(7, 0x47)
+            freeze = {}
+            fdtc = self._read_pid(0x02, mode=2)
+            if fdtc and len(fdtc) >= 2:
+                code = decode_dtc(fdtc[0], fdtc[1])
+                freeze["dtc"] = {"code": code, "description": describe_dtc(code)}
+                for pid in (0x0C, 0x0D, 0x05):
+                    data = self._read_pid(pid, mode=2)
+                    if data:
+                        name, unit, fn, _n = OBD_PIDS[pid]
+                        try:
+                            freeze[name] = f"{round(fn(data), 1)} {unit}"
+                        except (IndexError, ZeroDivisionError):
+                            pass
+            return {"stored": stored, "pending": pending, "freeze": freeze,
+                    **self.monitor_status()}
+
+    def _read_vin(self) -> str:
+        try:
+            raw = self._cmd("0902", 6)
+        except Exception:  # noqa: BLE001
+            return ""
+        parts = {}
+        for f in _hex_frames(raw):
+            if len(f) >= 3 and f[0] == 0x49 and f[1] == 0x02:
+                parts[f[2]] = f[3:]
+        if not parts:
+            return ""
+        raw_bytes = b"".join(parts[k] for k in sorted(parts))
+        vin = "".join(chr(b) for b in raw_bytes if 32 <= b < 127).strip("\x00 ")
+        return vin if len(vin) >= 11 else ""
+
+    def clear_codes(self) -> dict:
+        if self.transport is None:
+            raise ObdError("not connected")
+        with self.lock:
+            raw = self._cmd("04", 6)
+            if self._frame_for(raw, 0x44) is None and "NO DATA" not in raw:
+                raise ObdError(f"the car did not confirm clearing (answer: {raw.strip()[:80]})")
+            self._mon_cache = (0.0, {})
+            return {"cleared": True, **self.monitor_status()}
+
+
+_OBD_SINGLETON: Optional[ObdSession] = None
+
+
+def obd_session() -> ObdSession:
+    global _OBD_SINGLETON
+    if _OBD_SINGLETON is None:
+        _OBD_SINGLETON = ObdSession()
+    return _OBD_SINGLETON
+
+
+def obd_bluetooth() -> dict:
+    """Bonded Bluetooth devices, for the adapter picker (Android bridge)."""
+    if _is_android():
+        try:
+            from java import jclass
+            bridge = jclass("com.mcubed.app.ObdBridge")
+            devices = json.loads(str(bridge.devices()))
+            return {"available": bool(bridge.available()), "devices": devices}
+        except Exception:  # noqa: BLE001
+            return {"available": False, "devices": []}
+    return {"available": hasattr(__import__("socket"), "AF_BLUETOOTH"), "devices": []}
+
+
 def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None) -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from urllib.parse import parse_qs, urlparse
@@ -3417,6 +3933,20 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                     return self._send(502, {"error": f"news unavailable ({type(e).__name__}: {str(e)[:160]})"})
             if u.path == "/api/wine":
                 return self._send(200, wine_status())
+            if u.path == "/api/obd/status":
+                return self._send(200, obd_session().status())
+            if u.path == "/api/obd/devices":
+                return self._send(200, obd_bluetooth())
+            if u.path == "/api/obd/live":
+                try:
+                    return self._send(200, obd_session().live())
+                except ObdError as e:
+                    return self._send(400, {"error": str(e)})
+            if u.path == "/api/obd/codes":
+                try:
+                    return self._send(200, obd_session().codes())
+                except ObdError as e:
+                    return self._send(400, {"error": str(e)})
             if u.path == "/api/keys":
                 return self._send(200, keys_status())
             if u.path == "/api/toolbox":
@@ -3464,6 +3994,23 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 if res.get("restart") and not _is_android():
                     restart_process()
                 return
+            if u.path == "/api/obd/connect":
+                b = self._body()
+                try:
+                    res = obd_session().connect(str(b.get("transport") or "demo"),
+                                                str(b.get("host") or ""), int(b.get("port") or 35000),
+                                                str(b.get("address") or ""))
+                except (ObdError, ValueError) as e:
+                    return self._send(400, {"error": str(e)})
+                return self._send(200, res)
+            if u.path == "/api/obd/disconnect":
+                obd_session().disconnect()
+                return self._send(200, obd_session().status())
+            if u.path == "/api/obd/clear":
+                try:
+                    return self._send(200, obd_session().clear_codes())
+                except ObdError as e:
+                    return self._send(400, {"error": str(e)})
             if u.path == "/api/keys":
                 try:
                     res = save_keys(self._body().get("keys") or {})
