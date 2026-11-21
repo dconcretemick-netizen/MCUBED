@@ -347,7 +347,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 </head>
 <body>
 <header>
-  <div class="brand">
+  <div class="brand" id="brand-home" role="button" aria-label="Go to Home" title="Home" style="cursor:pointer">
     <svg width="32" height="32" viewBox="0 0 64 64" aria-label="MCUBED"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
     <div>MCUBED Gateway<small id="sub">Loading…</small></div>
   </div>
@@ -447,7 +447,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="tiles" id="home-tiles">
       <button class="tile accent" data-go="playground"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><b>Chat</b><small>Ask MCUBED anything — it picks the best AI for the job</small></button>
       <button class="tile" data-go="news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13v16H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v10a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h3"/></svg><b>News</b><small id="tile-news-sub">Top stories from across the spectrum</small></button>
-      <button class="tile term" data-go="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg><b>Games</b><small>OREGON TRAIL · APPLE IIe EDITION — PRESS TO PLAY</small></button>
+      <button class="tile term" data-go="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg><b>Games</b><small>OREGON TRAIL · APPLE IIe EDITION · 3RD EDITION — PRESS TO PLAY</small></button>
       <button class="tile" data-go="obd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4.5-4.5"/><path d="M2 14h2M20 14h2M12 6V4"/></svg><b>Car diagnostics</b><small id="tile-obd-sub">Not connected</small></button>
       <button class="tile" data-go="toolbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg><b>Toolbox</b><small id="tile-ai-sub">Keys, background jobs and the AI pool</small></button>
       <button class="tile" data-go="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><b>Update</b><small id="tile-upd-sub">Check for the newest MCUBED</small></button>
@@ -521,7 +521,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 
   <section class="view" id="v-games">
     <div class="seg" role="tablist" aria-label="Game">
-      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="tetris" aria-selected="false">Tetris</button><button role="tab" data-g="pip" aria-selected="false">Pip's Leap</button><button role="tab" data-g="doom" aria-selected="false">Doom</button><button role="tab" data-g="oregon" aria-selected="false">Oregon Trail</button>
+      <button role="tab" data-g="solitaire" aria-selected="true">Solitaire</button><button role="tab" data-g="tetris" aria-selected="false">Tetris</button><button role="tab" data-g="pip" aria-selected="false">Pip's Leap</button><button role="tab" data-g="doom" aria-selected="false">Doom</button><button role="tab" data-g="oregon" aria-selected="false">Oregon Trail</button><button role="tab" data-g="blackjack" aria-selected="false">Blackjack</button>
     </div>
     <div class="game-pane" id="g-solitaire">
     <div class="card" style="padding:0;overflow:hidden">
@@ -571,6 +571,16 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">2,000 miles to Oregon City. Mind the rivers, buy supplies at the forts, and do not die of dysentery. Your journey saves as you go.</span>
       <a class="btn" href="oregon.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
+    </div>
+  </div>
+    <div class="game-pane" id="g-blackjack" hidden>
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="bj-frame" title="Blackjack" data-src="blackjack.html"
+        style="display:block;width:100%;height:100%;border:0;background:#0c2622"></iframe>
+    </div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span style="color:var(--muted);font-size:13px">Classic blackjack against the dealer. Blackjack pays 3:2, the dealer stands on 17, and your bankroll is saved between visits.</span>
+      <a class="btn" href="blackjack.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:var(--text)">Full screen</a>
     </div>
   </div>
   </section>
@@ -720,6 +730,13 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="card" style="margin-top:var(--gap)"><h2>Live data <span class="chip" id="obd-mil">light: —</span></h2>
       <div class="obd-grid" id="obd-live"><div class="skel"></div></div>
       <p class="news-note" id="obd-live-note" style="margin:10px 0 0">Connect to an adapter to see live gauges. Speed and temperatures are shown in mph and °F.</p>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)"><h2>Emissions check <span class="chip" id="obd-emis-chip">not run</span></h2>
+      <div id="obd-emis"><p class="news-note">The same readiness check an inspection station runs: check-engine light, stored, pending and permanent codes, and whether every emissions monitor has completed since the codes were last cleared.</p></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="obd-emis-btn" disabled>Run emissions check</button>
+      </div>
     </div>
 
     <div class="card" style="margin-top:var(--gap)"><h2>Trouble codes</h2>
@@ -924,6 +941,7 @@ document.querySelectorAll("#home-tiles [data-go]").forEach(b=>b.addEventListener
   const tab=document.querySelector(`nav.tabs button[data-v="${b.dataset.go}"]`);
   if(tab) tab.click(); else showView(b.dataset.go);
 }));
+$("#brand-home").addEventListener("click",()=>{ document.querySelector('nav.tabs button[data-v="home"]')?.click(); });
 $("#btn-uses")?.addEventListener("click",()=>showView("uses"));
 $("#btn-uses-keys")?.addEventListener("click",()=>document.querySelector('nav.tabs button[data-v="toolbox"]')?.click());
 async function loadHome(){
@@ -980,13 +998,14 @@ loadRepos();
 let game=localStorage.getItem("mcubed.game")||"solitaire";
 function syncGames(visible){
   document.querySelectorAll(".seg [data-g]").forEach(x=>x.setAttribute("aria-selected",String(x.dataset.g===game)));
-  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-tetris").hidden=game!=="tetris"; $("#g-pip").hidden=game!=="pip"; $("#g-doom").hidden=game!=="doom"; $("#g-oregon").hidden=game!=="oregon";
+  $("#g-solitaire").hidden=game!=="solitaire"; $("#g-tetris").hidden=game!=="tetris"; $("#g-pip").hidden=game!=="pip"; $("#g-doom").hidden=game!=="doom"; $("#g-oregon").hidden=game!=="oregon"; $("#g-blackjack").hidden=game!=="blackjack";
   const sf=$("#sol-frame"), tf=$("#tet-frame"), df=$("#doom-frame");
   if(visible&&game==="solitaire"&&!sf.src) sf.src=sf.dataset.src;          // Solitaire stays loaded and keeps its state
   if(visible&&game==="tetris"&&!tf.src) tf.src=tf.dataset.src;             // Tetris pauses itself when hidden
   if((!visible||game!=="tetris")&&tf.src) tf.contentWindow?.postMessage("mcubed:pause","*");
   const pf=$("#pip-frame"); if(visible&&game==="pip"&&!pf.src) pf.src=pf.dataset.src;
   const of=$("#oregon-frame"); if(visible&&game==="oregon"&&!of.src) of.src=of.dataset.src;   // Oregon Trail stays loaded; it saves its own progress
+  const bf=$("#bj-frame"); if(visible&&game==="blackjack"&&!bf.src) bf.src=bf.dataset.src;
   if((!visible||game!=="pip")&&pf.src) pf.contentWindow?.postMessage("mcubed:pause","*");
   if(visible&&game==="doom"){ if(!df.src) df.src=df.dataset.src } else if(df.src) df.removeAttribute("src");  // Doom unloads to save battery
 }
@@ -1408,6 +1427,7 @@ function renderObdStatus(){
   $("#obd-disconnect").disabled=!d.connected;
   $("#obd-read").disabled=!d.connected;
   $("#obd-clear").disabled=!d.connected;
+  $("#obd-emis-btn").disabled=!d.connected;
   if(d.last_error) $("#obd-msg").textContent=d.last_error;
 }
 function renderObdLive(d){
@@ -1485,6 +1505,19 @@ async function readObdCodes(){
     mil.className="chip "+(d.mil_on?"rolled_back":"kept");
   }catch(e){ box.innerHTML=`<p class="news-note">${esc(e.message)}</p>` }
 }
+async function loadEmissions(){
+  const box=$("#obd-emis"); box.innerHTML='<div class="skel"></div>';
+  try{ const d=await api("/api/obd/emissions");
+    const chip=$("#obd-emis-chip");
+    chip.textContent=d.verdict==="pass"?"ready":d.verdict==="fail"?"would fail":"not ready";
+    chip.className="chip "+(d.verdict==="pass"?"kept":d.verdict==="fail"?"rolled_back":"");
+    const mon=d.monitors.map(m=>`<div class="kv"><span>${esc(m.name)}</span><b>${m.ready?"✓ ready":"… not run yet"}</b></div>`).join("");
+    const codes=[["Stored codes",d.stored],["Pending codes",d.pending],["Permanent codes",d.permanent]].map(([l,a])=>
+      a&&a.length?`<p class="news-note" style="margin:8px 0 0"><b>${l}:</b> ${a.map(c=>esc(c.code)).join(", ")}</p>`:"").join("");
+    box.innerHTML=`<p style="margin:0 0 6px"><b>${esc(d.headline)}</b></p><p class="news-note" style="margin:0 0 8px">${esc(d.detail)}</p>${mon}${codes}`;
+  }catch(e){ box.innerHTML=`<p class="news-note">${esc(e.message)}</p>` }
+}
+$("#obd-emis-btn").addEventListener("click",loadEmissions);
 $("#obd-read").addEventListener("click",readObdCodes);
 $("#obd-clear").addEventListener("click",async()=>{
   if(!confirm("Clear all trouble codes and freeze-frame data? The light will come back if the fault is still present.")) return;

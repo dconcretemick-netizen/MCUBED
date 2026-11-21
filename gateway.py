@@ -2000,7 +2000,7 @@ ICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect w
 # network-first service worker: works offline with the last report, never serves stale data when online
 SERVICE_WORKER = """
 const C='mcubed-v5';
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/tetris.html','/platformer.html','/oregon.html','/manifest.webmanifest','/icon.svg'])))});
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/game.html','/solitaire.html','/tetris.html','/platformer.html','/oregon.html','/blackjack.html','/manifest.webmanifest','/icon.svg'])))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
   e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r})
@@ -3498,7 +3498,7 @@ UI_POLISH_HTML = (
     "</style>"
 )
 UI_PAGES = ("dashboard.html", "oregon.html", "game.html", "solitaire.html",
-            "tetris.html", "platformer.html")
+            "tetris.html", "platformer.html", "blackjack.html")
 
 
 def polish_html(body: bytes) -> bytes:
@@ -4078,11 +4078,17 @@ class _DemoTransport:
     def close(self):
         pass
 
+    def _pid01(self) -> bytes:
+        a = (0x80 if self.dtcs else 0x00) | len(self.dtcs)
+        if getattr(self, "just_cleared", False) and not self.dtcs:
+            return bytes([a, 0x07, 0xEF, 0xEF])  # just cleared: no monitor has run yet
+        return bytes([a, 0x07, 0xEF, 0x04])       # normally: only the EVAP monitor still pending
+
     def _sim(self) -> dict:
         t = time.time() - self.t0
         rpm = 1500 + 850 * math.sin(t / 17) + 260 * math.sin(t / 5.3)
         return {
-            0x01: bytes([(0x80 if self.dtcs else 0x00) | len(self.dtcs), 0x07, 0x00, 0x00]),
+            0x01: self._pid01(),
             0x04: bytes([int(28 + 18 * math.sin(t / 17)) * 255 // 100]),
             0x05: bytes([int(min(92, 22 + t / 3)) + 40]),
             0x06: bytes([128 + int(6 * math.sin(t / 9))]),
@@ -4139,8 +4145,11 @@ class _DemoTransport:
                 chunk = vin[i:i + 4].encode().hex().upper()
                 lines.append(f"4902{i // 4 + 1:02X}{chunk}")
             return "\r".join(lines)
+        if c == "0A":
+            return "4A0420"  # P0420 stays permanent until the car itself verifies the repair
         if c == "04":
             self.dtcs, self.pending = [], []
+            self.just_cleared = True
             return "44"
         return "?"
 
@@ -4341,6 +4350,59 @@ class ObdSession:
             return {"stored": stored, "pending": pending, "freeze": freeze,
                     **self.monitor_status()}
 
+    _CONT_MONITORS = ("Misfire", "Fuel system", "Comprehensive components")
+    _NONCONT_MONITORS = ("Catalyst", "Heated catalyst", "Evaporative system", "Secondary air system",
+                         "A/C refrigerant", "Oxygen sensor", "Oxygen sensor heater", "EGR/VVT system")
+
+    def emissions(self) -> dict:
+        """The inspection-station check (I/M readiness): MIL state, stored /
+        pending / permanent codes, and whether every emissions monitor has
+        completed since the codes were last cleared (PID 0x01)."""
+        if self.transport is None:
+            raise ObdError("not connected")
+        with self.lock:
+            data = self._read_pid(0x01)
+            if not data or len(data) < 4:
+                raise ObdError("the car did not answer the readiness check (PID 01)")
+            a, b, c, d = data[0], data[1], data[2], data[3]
+            mil, count = bool(a & 0x80), a & 0x7F
+            monitors = []
+            for i, name in enumerate(self._CONT_MONITORS):
+                if b & (1 << i):
+                    monitors.append({"name": name, "ready": not (b & (1 << (4 + i)))})
+            for i, name in enumerate(self._NONCONT_MONITORS):
+                if c & (1 << i):
+                    monitors.append({"name": name, "ready": not (d & (1 << i))})
+            stored = self._read_codes(3, 0x43)
+            pending = self._read_codes(7, 0x47)
+            permanent = self._read_codes(0x0A, 0x4A)
+            incomplete = [m["name"] for m in monitors if not m["ready"]]
+            if mil or stored or permanent:
+                bad = stored or permanent
+                verdict = "fail"
+                headline = "Would fail an emissions inspection"
+                detail = ("The check-engine light is " + ("on" if mil else "off") +
+                          f" with {len(stored)} stored and {len(permanent)} permanent code(s)"
+                          + (f" — first: {bad[0]['code']}" if bad else "") +
+                          ". Permanent codes cannot be cleared with a scanner; the car removes them "
+                          "itself once it verifies the repair. Fix the fault, then drive until every "
+                          "monitor has run before retesting.")
+            elif incomplete:
+                verdict = "not_ready"
+                headline = "Not ready for inspection yet"
+                detail = ("No codes, but these monitors have not completed since the codes were "
+                          "last cleared: " + ", ".join(incomplete) +
+                          ". Drive normally for a few days — mixed city and highway trips from a "
+                          "cold start — then check again.")
+            else:
+                verdict = "pass"
+                headline = "Ready — should pass the emissions check"
+                detail = ("Check-engine light off, no stored, pending or permanent codes, and "
+                          "every emissions monitor has completed.")
+            return {"mil_on": mil, "dtc_count": count, "monitors": monitors,
+                    "stored": stored, "pending": pending, "permanent": permanent,
+                    "verdict": verdict, "headline": headline, "detail": detail}
+
     def _read_vin(self) -> str:
         try:
             raw = self._cmd("0902", 6)
@@ -4495,7 +4557,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            if u.path in ("/game.html", "/solitaire.html", "/tetris.html", "/platformer.html", "/oregon.html") and (HERE / u.path[1:]).exists():
+            if u.path in ("/game.html", "/solitaire.html", "/tetris.html", "/platformer.html", "/oregon.html", "/blackjack.html") and (HERE / u.path[1:]).exists():
                 return self._send(200, polish_html((HERE / u.path[1:]).read_bytes()), "text/html; charset=utf-8")
             if u.path == "/api/repos":
                 return self._send(200, dict(load_repos(gw.repo_registry),
@@ -4520,6 +4582,11 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             if u.path == "/api/obd/codes":
                 try:
                     return self._send(200, obd_session().codes())
+                except ObdError as e:
+                    return self._send(400, {"error": str(e)})
+            if u.path == "/api/obd/emissions":
+                try:
+                    return self._send(200, obd_session().emissions())
                 except ObdError as e:
                     return self._send(400, {"error": str(e)})
             if u.path == "/api/keys":
