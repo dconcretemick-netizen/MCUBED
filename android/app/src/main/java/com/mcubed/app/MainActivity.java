@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
             try {
                 if (!Python.isStarted()) Python.start(new AndroidPlatform(this));
                 final String url = Python.getInstance().getModule("android_main")
-                        .callAttr("start", getFilesDir().getAbsolutePath() + "/gateway", keys).toString();
+                        .callAttr("start", getFilesDir().getAbsolutePath() + "/gateway", keys, BuildConfig.CHANNEL).toString();
                 runOnUiThread(() -> {
                     setContentView(web);
                     if (web.getUrl() == null) web.loadUrl(url);

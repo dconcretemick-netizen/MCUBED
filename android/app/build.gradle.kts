@@ -25,6 +25,29 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
+    // Two distribution channels (project codename 6D):
+    //  - direct: the GitHub/sideload build; it updates itself from GitHub releases.
+    //  - play:   the Google Play build; Play handles updates, and the manifest overlay
+    //            in src/play removes the permissions Play forbids for that (installing
+    //            packages, battery-optimization exemption). The CHANNEL build config
+    //            field tells the gateway which world it lives in.
+    flavorDimensions += "channel"
+
+    productFlavors {
+        create("direct") {
+            dimension = "channel"
+            buildConfigField("String", "CHANNEL", "\"direct\"")
+        }
+        create("play") {
+            dimension = "channel"
+            buildConfigField("String", "CHANNEL", "\"play\"")
+        }
+    }
+
     // One permanent release key (from CI secrets) so each new APK installs as an update over the last one.
     val ks = System.getenv("MCUBED_KEYSTORE_FILE")
     signingConfigs {
