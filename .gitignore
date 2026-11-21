@@ -4,6 +4,8 @@ __pycache__/
 *.db-wal
 *.db-shm
 .env
+keys.json
+key_health.json
 report.html
 gui.log
 android/.gradle/
