@@ -326,6 +326,8 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   nav.tabs button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 10%,transparent)}
   .fab{bottom:calc(152px + env(safe-area-inset-bottom))}
   .toast{bottom:calc(154px + env(safe-area-inset-bottom))}
+  /* Home: the middle tile-buttons area scrolls up and down; hero and bottom bar stay put */
+  .tiles{flex:1;min-height:0;overflow-y:auto;grid-template-rows:none;grid-auto-rows:124px;align-content:start}
 }
 </style>
 </head>
