@@ -93,7 +93,7 @@ section#v-playground.active{display:flex;flex-direction:column;height:100%}
 #v-playground .msgs{overflow-y:auto;min-height:0}
 #v-playground .composer{position:static;flex:none}
 .menu-wrap{position:relative;flex:none}
-.menu-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:50;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.menu-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:50;min-width:220px;max-height:min(72vh,600px);overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.35)}
 .menu-head{padding:8px 10px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .menu-item{display:flex;width:100%;align-items:center;gap:8px;padding:10px;border:0;background:transparent;border-radius:8px;cursor:pointer;text-align:left;font:inherit;font-weight:600;color:var(--text)}
 .menu-item:hover{background:var(--surface-2)}
@@ -322,16 +322,16 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 .council summary{cursor:pointer;color:var(--muted);font-weight:600}
 .council-a{margin-top:8px;padding:8px 10px;background:var(--surface-2);border-radius:10px}
 .council-a>div{margin-top:4px}
-/* Phone bottom bar: two rows of bigger buttons (Mick's preference) */
+/* Phone: no bottom bar and no floating + button — every destination lives in
+   the header scroll menu, and the freed space goes to the page itself */
 @media (max-width:899px){
-  nav.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
-  nav.tabs button{min-height:64px;font-size:13px;gap:5px;border-radius:16px}
-  nav.tabs button svg{width:27px;height:27px;padding:3px 16px}
-  nav.tabs button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 10%,transparent)}
-  .fab{bottom:calc(152px + env(safe-area-inset-bottom))}
-  .toast{bottom:calc(154px + env(safe-area-inset-bottom))}
-  /* Home: the middle tile-buttons area scrolls up and down; hero and bottom bar stay put */
-  .tiles{flex:1;min-height:0;overflow-y:auto;grid-template-rows:none;grid-auto-rows:124px;align-content:start}
+  html,body{font-size:16.5px}
+  body{padding-bottom:env(safe-area-inset-bottom)}
+  nav.tabs{display:none}
+  .toast{bottom:calc(18px + env(safe-area-inset-bottom))}
+  /* Home: the middle tile-buttons area scrolls up and down; the hero stays put */
+  .tiles{flex:1;min-height:0;overflow-y:auto;grid-template-rows:none;grid-auto-rows:132px;align-content:start}
+  .tile b{font-size:17px}
 }
 </style>
 </head>
@@ -347,8 +347,19 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   <button class="icon-btn" id="refresh" aria-label="Refresh"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
   <button class="icon-btn" id="theme" aria-label="Toggle theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   <div class="menu-wrap">
-    <button class="icon-btn" id="menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Stats menu" title="Stats"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></button>
-    <div class="menu-panel" id="menu-panel" hidden role="menu" aria-label="Stats">
+    <button class="icon-btn" id="menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Menu" title="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="menu-panel" id="menu-panel" hidden role="menu" aria-label="Menu">
+      <div class="menu-head">Go to</div>
+      <button class="menu-item" data-mv="home" role="menuitem">Home</button>
+      <button class="menu-item" data-mv="playground" role="menuitem">Chat</button>
+      <button class="menu-item" data-mv="news" role="menuitem">News</button>
+      <button class="menu-item" data-mv="web" role="menuitem">Web</button>
+      <button class="menu-item" data-mv="games" role="menuitem">Games</button>
+      <button class="menu-item" data-mv="obd" role="menuitem">Car diagnostics</button>
+      <button class="menu-item" data-mv="toolbox" role="menuitem">Toolbox</button>
+      <button class="menu-item" data-mv="update" role="menuitem">Update</button>
+      <button class="menu-item" data-mv="uses" role="menuitem">What it's for</button>
+      <button class="menu-item" id="menu-newchat" role="menuitem">+ New chat</button>
       <div class="menu-head">Stats</div>
       <button class="menu-item" data-s="overview" role="menuitem">Overview</button>
       <button class="menu-item" data-s="models" role="menuitem">Models</button>
@@ -749,7 +760,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </div>
   </section>
 </main>
-<button id="fab-new" class="fab" aria-label="New chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -873,7 +884,6 @@ function showView(v){
   if(v==="toolbox"){ loadKeys(); loadToolbox(); }
   if(v==="obd") loadObd(); else stopObdPoll();
   if(v==="home") loadHome();
-  $("#fab-new").hidden = v!=="home";
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
@@ -881,7 +891,7 @@ document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("clic
 }));
 document.querySelectorAll("#stats-seg [data-s]").forEach(x=>x.addEventListener("click",()=>{
   statsView=x.dataset.s; localStorage.setItem("mcubed.stats",statsView); showView("stats") }));
-/* Stats now lives in the header dropdown, keeping the bottom bar for the main pages. */
+/* All navigation lives in the header dropdown (a scroll menu); phones have no bottom bar. */
 const menuPanel=$("#menu-panel"), menuBtn=$("#menu-btn");
 function closeMenu(){ menuPanel.hidden=true; menuBtn.setAttribute("aria-expanded","false") }
 menuBtn.addEventListener("click",e=>{ e.stopPropagation(); const open=menuPanel.hidden; menuPanel.hidden=!open; menuBtn.setAttribute("aria-expanded",String(open)) });
@@ -892,13 +902,18 @@ document.querySelectorAll("#menu-panel [data-s]").forEach(x=>x.addEventListener(
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected","false"));
   closeMenu(); showView("stats"); document.querySelector("main").scrollTo({top:0});
 }));
+document.querySelectorAll("#menu-panel [data-mv]").forEach(x=>x.addEventListener("click",()=>{
+  const tab=document.querySelector(`nav.tabs button[data-v="${x.dataset.mv}"]`);
+  closeMenu(); if(tab) tab.click(); else { showView(x.dataset.mv); document.querySelector("main").scrollTo({top:0}) }
+}));
+$("#menu-newchat").addEventListener("click",()=>{ closeMenu();
+  document.querySelector('nav.tabs button[data-v="playground"]')?.click(); $("#btn-newchat").click(); });
 
 /* ---------- home: live tiles (Windows) with Android touches ---------- */
 document.querySelectorAll("#home-tiles [data-go]").forEach(b=>b.addEventListener("click",()=>{
   const tab=document.querySelector(`nav.tabs button[data-v="${b.dataset.go}"]`);
   if(tab) tab.click(); else showView(b.dataset.go);
 }));
-$("#fab-new").addEventListener("click",()=>$("#btn-newchat").click());
 $("#btn-uses")?.addEventListener("click",()=>showView("uses"));
 $("#btn-uses-keys")?.addEventListener("click",()=>document.querySelector('nav.tabs button[data-v="toolbox"]')?.click());
 async function loadHome(){
