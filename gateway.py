@@ -2096,6 +2096,11 @@ def _scheduled_improver(gw: "Gateway", lock: threading.Lock, poll_s: float = 300
                 run_gardener(gw)
         except Exception:  # noqa: BLE001
             log.exception("provider gardener failed")
+        try:  # strive toward the no-cost goals: verify keyless providers, hunt for new ones
+            if gw.store.get_policy("bg_strive", True):
+                run_strive(gw)
+        except Exception:  # noqa: BLE001
+            log.exception("goal striving failed")
         try:  # audit the pages for the automated Android UI polish
             if gw.store.get_policy("bg_ui_polish", True):
                 run_ui_polish(gw)
@@ -3091,6 +3096,10 @@ def save_keys(updates: dict) -> dict:
 # providers, plus automatic adoption of free AI nodes.
 # --------------------------------------------------------------------------- #
 GARDENER_EVERY_HOURS = 6
+STRIVE_EVERY_HOURS = 12
+STRIVE_CANDIDATES = [  # anonymous/keyless providers the strive job watches (reported, never auto-enabled)
+    {"id": "llm7", "name": "LLM7", "base": "https://api.llm7.io/v1"},
+]
 GARDENER_MAX_FAILS = 3  # consecutive failed checks before a key/provider is cleaned
 
 
@@ -3277,6 +3286,90 @@ def gardener_status(gw: "Gateway") -> dict:
     }
 
 
+def _tiny_completion(base: str, model: str) -> bool:
+    """One minimal keyless chat completion; True only if the provider answers."""
+    try:
+        out = _http_json(base.rstrip("/") + "/chat/completions", None, 25,
+                         data={"model": model,
+                               "messages": [{"role": "user", "content": "Reply with the word OK"}],
+                               "max_tokens": 4})
+        return bool(isinstance(out, dict) and out.get("choices"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def run_strive(gw: "Gateway", force: bool = False) -> Optional[dict]:
+    """Strive toward the stated no-cost goals, automatically.
+
+    The goals: real AI at no cost, keys for truly anonymous (keyless,
+    no-account) models wherever they exist, and key maintenance that takes
+    no effort. The gardener keeps saved keys healthy; this job covers the
+    anonymous side. It proves each built-in keyless provider still answers
+    a real completion (a model list alone can lie), and it watches
+    candidate keyless providers — any that start answering are reported in
+    the Toolbox, never enabled silently, so a human decides.
+    """
+    every = float(os.getenv("GATEWAY_STRIVE_HOURS")
+                  or gw.defaults.get("strive_every_hours", STRIVE_EVERY_HOURS))
+    last = float(gw.store.get_policy("last_strive_ts", 0) or 0)
+    if not force and every > 0 and time.time() - last < every * 3600:
+        return None
+    now = time.time()
+    health = load_key_health()
+    st = health.setdefault("strive", {})
+    keyless = {}
+    for node in CLOUD_NODES:
+        if node[3]:  # has a key env var: not an anonymous provider
+            continue
+        rec = _list_cloud(node, dict(NODE_DEFAULTS))
+        models = [m["id"] for m in rec.get("models", [])]
+        ok = bool(models) and _tiny_completion(node[2], models[0])
+        keyless[node[0]] = {"name": node[1], "status": "ok" if ok else "down",
+                            "model": models[0] if models else None, "checked_at": now}
+    candidates = {}
+    findings = list(st.get("findings", []))
+    for cand in STRIVE_CANDIDATES:
+        entry = {"name": cand["name"], "status": "unreachable", "checked_at": now}
+        try:
+            out = _http_json(cand["base"].rstrip("/") + "/models", None, 15)
+            ids = [m.get("id", "") for m in (out or {}).get("data", []) if isinstance(m, dict)]
+            ids = [i for i in ids if i and not _NON_CHAT.search(i)]
+            entry["status"] = "listed_only"
+            if ids and _tiny_completion(cand["base"], ids[0]):
+                entry["status"] = "answers"
+                if not any(f.get("id") == cand["id"] for f in findings):
+                    findings.append({"id": cand["id"], "name": cand["name"], "base": cand["base"],
+                                     "model": ids[0], "found_at": now})
+                    log.info("strive: candidate %s now answers keyless completions", cand["id"])
+        except Exception:  # noqa: BLE001
+            pass
+        candidates[cand["id"]] = entry
+    st.update(checked_at=now, keyless=keyless, candidates=candidates, findings=findings[-5:])
+    _save_key_health(health)
+    gw.store.set_policy("last_strive_ts", now)
+    return {"checked_at": now, "keyless": keyless, "candidates": candidates, "findings": st["findings"]}
+
+
+def strive_status(gw: "Gateway") -> dict:
+    """Strive summary for the Toolbox: the no-cost mission at a glance."""
+    health = load_key_health()
+    st = health.get("strive", {})
+    nodes = load_nodes(gw.nodes_path)
+    online = [n for n in nodes.get("nodes", []) if n.get("status") == "online"]
+    return {
+        "on": bool(gw.store.get_policy("bg_strive", True)),
+        "every": float(os.getenv("GATEWAY_STRIVE_HOURS")
+                       or gw.defaults.get("strive_every_hours", STRIVE_EVERY_HOURS)),
+        "unit": "hours",
+        "last_at": float(gw.store.get_policy("last_strive_ts", 0) or 0) or None,
+        "keyless": st.get("keyless", {}),
+        "candidates": st.get("candidates", {}),
+        "findings": st.get("findings", []),
+        "free_nodes_online": sum(1 for n in online if n.get("free")),
+        "free_models": sum(len(n.get("models", [])) for n in online if n.get("free")),
+    }
+
+
 _GUI_STARTED_AT: float = 0.0
 _GUI_SERVER = None  # the running ThreadingHTTPServer, so the Toolbox can shut it down
 
@@ -3435,10 +3528,12 @@ def toolbox_status(gw: "Gateway") -> dict:
                              "last_node_scan_ts"),
             "lan_scan": {"on": bool(nodes_config(gw).get("lan_scan", True))},
             "gardener": gardener_status(gw),
+            "strive": strive_status(gw),
             "ui_polish": ui_status(gw),
             "obd_update": obd_data_status(gw),
         },
         "gardener": gardener_status(gw),
+        "strive": strive_status(gw),
         "obd_data": obd_data_status(gw),
     }
 
@@ -4434,6 +4529,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                     for name, policy in (("auto_improve", "bg_auto_improve"), ("repo_sync", "bg_repo_sync"),
                                          ("node_scan", "bg_node_scan"), ("lan_scan", "bg_lan_scan"),
                                          ("gardener", "bg_gardener"), ("ui_polish", "bg_ui_polish"),
+                                         ("strive", "bg_strive"),
                                          ("obd_update", "bg_obd_update")):
                         if name in bg:
                             gw.store.set_policy(policy, bool(bg[name]))
@@ -4462,12 +4558,14 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                         elif job_name == "gardener":
                             run_gardener(gw, force=True)
                             run_node_scan(gw, lock, force=True)  # adopt free nodes / drop cleaned ones
+                        elif job_name == "strive":
+                            run_strive(gw, force=True)
                         elif job_name == "ui":
                             run_ui_polish(gw, force=True)
                         elif job_name == "obd":
                             run_obd_update(gw, force=True)
                         else:
-                            return self._send(400, {"error": "job must be improve, repos, nodes, gardener, ui or obd"})
+                            return self._send(400, {"error": "job must be improve, repos, nodes, gardener, strive, ui or obd"})
                     except (GatewayError, ValueError, OSError) as e:
                         return self._send(400, {"error": str(e)})
                 with lock:
