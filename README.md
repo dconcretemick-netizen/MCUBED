@@ -4,6 +4,20 @@
 
 A multi-model AI gateway with a phone-friendly web dashboard. One entry point for OpenAI, Anthropic, Google and DeepSeek models, with OpenRouter as a fallback route for every model.
 
+## What MCUBED is for
+
+MCUBED is built to give you real AI at no cost. Instead of one paid subscription, it spreads your questions across many free AI providers — plus models on your own devices — and automatically fails over when one hits its limit. These are the jobs that design is best at:
+
+- **Everyday AI, no subscription.** Chat, questions, summaries, translations, brainstorming. Requests route across free plans from providers like Google Gemini, Groq, Mistral, NVIDIA and OpenRouter's free models, keyless Pollinations, and Meta's Muse Glimmer — so no single provider's paywall or daily cap is a hard wall.
+- **A jury, not an oracle.** Ask the same question and compare how different models answer. For buying decisions, "is this email a scam," health-ish questions and anything you'd rather not take one AI's word for, a second and third opinion beats one confident answer.
+- **Car help that pays for itself.** Plug in an ELM327 adapter and the diagnostics tab reads and clears fault codes, with over 12,000 plain-English code descriptions stored on the device — then ask the AI what a code means, whether the car is safe to drive, and what a shop typically charges.
+- **News with the blindspots showing.** The News tab groups coverage of the same story from outlets across the spectrum and flags blindspots — stories only one side is covering — so you see the event and the framing at the same time.
+- **The household AI.** One phone or home PC serving everyone's homework help, letters, resumes, forms and polite-but-firm emails — instead of a subscription per person.
+- **Private by architecture.** Add a local model (for example Ollama on a home PC) and MCUBED finds it on your network. Sensitive questions can stay inside your house entirely — no account, no cloud, nothing to revoke.
+- **Keys, kept easy.** Free keys are the fuel, so MCUBED keeps them painless: every provider in the AI keys card has a **Get key** button that goes straight to its free signup (no card required for the free plans), keys are saved once on your device only, and a background gardener checks them, quietly removes ones a provider has rejected, and parks providers that stop answering until they recover. Truly anonymous models need no key or account at all — Pollinations is built in, and new keyless providers get added as they appear.
+
+The honest limits: free tiers have quotas and occasionally disappear, and the best free models trail the top paid ones on the hardest reasoning. MCUBED's answer is breadth and failover — many providers, a local model as the floor, and background care that keeps the pool healthy on its own.
+
 ## Features
 
 - Automatic fallback routing with retries, circuit breakers and quarantine

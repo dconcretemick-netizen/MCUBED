@@ -426,6 +426,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <button class="tile" data-go="obd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4.5-4.5"/><path d="M2 14h2M20 14h2M12 6V4"/></svg><b>Car diagnostics</b><small id="tile-obd-sub">Not connected</small></button>
       <button class="tile" data-go="toolbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg><b>Toolbox</b><small id="tile-ai-sub">Keys, background jobs and the AI pool</small></button>
       <button class="tile" data-go="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><b>Update</b><small id="tile-upd-sub">Check for the newest MCUBED</small></button>
+      <button class="tile" data-go="uses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg><b>What it's for</b><small>The best uses for MCUBED — and how it stays free</small></button>
     </div>
   </section>
 
@@ -568,7 +569,42 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div id="news-list"><div class="card"><div class="skel"></div><div class="skel" style="margin-top:8px"></div></div></div>
   </section>
 
+  <section class="view" id="v-uses">
+    <div class="card"><h2>What MCUBED is for</h2>
+      <p style="margin:0">MCUBED is built to give you real AI at no cost. Instead of one paid subscription, it spreads your questions across many free AI providers — plus models on your own devices — and automatically fails over when one hits its limit. These are the jobs that design is best at.</p>
+    </div>
+    <div class="card"><h2>Everyday AI, no subscription</h2>
+      <p style="margin:0">Chat, questions, summaries, translations, brainstorming. Requests route across free plans from providers like Google Gemini, Groq, Mistral, NVIDIA and OpenRouter's free models, keyless Pollinations, and Meta's Muse Glimmer — so no single provider's paywall or daily cap is a hard wall.</p>
+    </div>
+    <div class="card"><h2>A jury, not an oracle</h2>
+      <p style="margin:0">Ask the same question and compare how different models answer. For buying decisions, "is this email a scam," health-ish questions and anything you'd rather not take one AI's word for, a second and third opinion beats one confident answer.</p>
+    </div>
+    <div class="card"><h2>Car help that pays for itself</h2>
+      <p style="margin:0">Plug in an ELM327 adapter and the Car diagnostics tab reads and clears fault codes, with over 12,000 plain-English code descriptions stored on the device — then ask the AI what a code means, whether the car is safe to drive, and what a shop typically charges.</p>
+    </div>
+    <div class="card"><h2>News with the blindspots showing</h2>
+      <p style="margin:0">The News tab groups coverage of the same story from outlets across the spectrum and flags blindspots — stories only one side is covering — so you see the event and the framing at the same time.</p>
+    </div>
+    <div class="card"><h2>The household AI</h2>
+      <p style="margin:0">One phone or home PC serving everyone's homework help, letters, resumes, forms and polite-but-firm emails — instead of a subscription per person.</p>
+    </div>
+    <div class="card"><h2>Private by architecture</h2>
+      <p style="margin:0">Add a local model (for example Ollama on a home PC) and MCUBED finds it on your network. Sensitive questions can stay inside your house entirely — no account, no cloud, nothing to revoke.</p>
+    </div>
+    <div class="card"><h2>Keys, kept easy</h2>
+      <p style="margin:0 0 10px">Free keys are the fuel, so MCUBED keeps them painless. Every provider in AI keys has a <b>Get key</b> button that takes you straight to its free signup — no card required for the free plans. Keys are saved once, on this device only. A background gardener checks them, quietly removes ones a provider has rejected, and parks providers that stop answering until they recover. Truly anonymous models need no key or account at all — Pollinations is built in, and new keyless providers get added as they appear.</p>
+      <button class="btn primary" id="btn-uses-keys">Manage AI keys</button>
+    </div>
+    <div class="card"><h2>The honest limits</h2>
+      <p style="margin:0">Free tiers have quotas and occasionally disappear, and the best free models trail the top paid ones on the hardest reasoning. MCUBED's answer is breadth and failover — many providers, a local model as the floor, and background care that keeps the pool healthy on its own.</p>
+    </div>
+  </section>
+
   <section class="view" id="v-toolbox">
+    <div class="card"><h2>What MCUBED is for</h2>
+      <p style="margin:0 0 10px">The best uses for MCUBED, how the no-cost model works, and how your AI keys stay maintained.</p>
+      <button class="btn" id="btn-uses">Read the use cases</button>
+    </div>
     <div class="card"><h2>Status <span class="chip" id="tb-chip">checking</span></h2>
       <div class="kv"><span>Gateway</span><code id="tb-running">…</code></div>
       <div class="kv"><span>Uptime</span><code id="tb-uptime">…</code></div>
@@ -853,6 +889,8 @@ document.querySelectorAll("#home-tiles [data-go]").forEach(b=>b.addEventListener
   if(tab) tab.click(); else showView(b.dataset.go);
 }));
 $("#fab-new").addEventListener("click",()=>$("#btn-newchat").click());
+$("#btn-uses")?.addEventListener("click",()=>showView("uses"));
+$("#btn-uses-keys")?.addEventListener("click",()=>document.querySelector('nav.tabs button[data-v="toolbox"]')?.click());
 async function loadHome(){
   const h=new Date().getHours();
   $("#home-greet").textContent = h<12?"Good morning":h<18?"Good afternoon":"Good evening";
