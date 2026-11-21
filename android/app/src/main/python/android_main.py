@@ -1,4 +1,4 @@
-"""Android entry point: runs the MCUBED gateway inside the app on 127.0.0.1.
+"""Android entry point: runs the MHexeract gateway inside the app on 127.0.0.1.
 
 Called from MainActivity through Chaquopy. The gateway runs in LITE mode
 (standard library only). OpenRouter reaches every model; OpenAI and DeepSeek
@@ -52,7 +52,7 @@ def _apply_keys(keys_json: str) -> bool:
     return any(os.getenv(n) for n in KEY_NAMES if n != "GITHUB_TOKEN")
 
 
-def start(data_dir: str, keys_json: str = "{}") -> str:
+def start(data_dir: str, keys_json: str = "{}", channel: str = "direct") -> str:
     """Start the gateway once per process and return the dashboard URL."""
     global _data_dir
     _data_dir = data_dir
@@ -61,6 +61,7 @@ def start(data_dir: str, keys_json: str = "{}") -> str:
         return _state["url"]
     os.environ["GATEWAY_LITE"] = "1"
     os.environ["MCUBED_ANDROID"] = "1"  # Update tab installs a new APK instead of replacing files
+    os.environ["MCUBED_CHANNEL"] = "play" if channel == "play" else "direct"  # Play builds update via Google Play
     os.environ["MCUBED_DATA"] = data_dir  # update.apk lands here (files/gateway), where MainActivity reads it
     has_key = _apply_keys(keys_json)
     import gateway  # imported after GATEWAY_LITE is set
@@ -85,7 +86,7 @@ def start(data_dir: str, keys_json: str = "{}") -> str:
         except OSError:
             time.sleep(0.1)
     else:
-        raise RuntimeError("MCUBED gateway did not start")
+        raise RuntimeError("MHexeract gateway did not start")
 
     _state.update(gw=gw, url=f"http://127.0.0.1:{port}/?token={token}")
     return _state["url"]

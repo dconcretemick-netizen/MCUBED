@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MCUBED Multi-Model AI Gateway
+MHexeract Multi-Model AI Gateway
 =============================
 
 One entry point for OpenAI, Anthropic, Google Vertex AI and DeepSeek models,
@@ -133,7 +133,7 @@ if LITE:
             body["max_completion_tokens"] = body.pop("max_tokens")
         headers = {"Authorization": f"Bearer {os.getenv(env_key, '')}", "Content-Type": "application/json"}
         if provider == "openrouter":
-            headers["X-Title"] = "MCUBED Gateway"
+            headers["X-Title"] = "MHexeract Gateway"
         req = urllib.request.Request(f"{base}/chat/completions", data=json.dumps(body).encode(), headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -1087,7 +1087,7 @@ class Gateway:
 
     # -- availability ------------------------------------------------------- #
     def allow_paid(self) -> bool:
-        """MCUBED is free by default: paid AI is used only if the owner turns it on."""
+        """MHexeract is free by default: paid AI is used only if the owner turns it on."""
         env = os.getenv("MCUBED_ALLOW_PAID")
         if env in ("0", "1"):
             return env == "1"
@@ -1207,7 +1207,7 @@ class Gateway:
         if route.model.startswith("node/"):
             _, nid, wire = route.model.split("/", 2)
             n = self._node_info[nid]
-            extra = {"X-Title": "MCUBED Gateway"} if nid == "openrouter" else None
+            extra = {"X-Title": "MHexeract Gateway"} if nid == "openrouter" else None
             return node_completion(n["base_url"], node_key(n.get("env", "")), wire, messages,
                                    float(self.defaults.get("request_timeout_s", 60)) * (3 if n["kind"] != "cloud" else 1),
                                    nid, route.model, extra, **kw)
@@ -1460,7 +1460,7 @@ class Gateway:
                   "deepseek": "DeepSeek", "openrouter": "OpenRouter"}
 
     def ai_units(self) -> dict:
-        """Every AI unit (provider, local server or network node) MCUBED can reach right now, with live state:
+        """Every AI unit (provider, local server or network node) MHexeract can reach right now, with live state:
         working = answered in the last 24 hours, ready = usable but idle, resting = paused after errors."""
         now = time.time()
         quarantine = {k: v for k, v in self.store.get_policy("quarantine", {}).items() if v > now}
@@ -1760,7 +1760,7 @@ def node_key(env: str) -> Optional[str]:
 def _http_json(url: str, key: Optional[str] = None, timeout: float = 8, data: Optional[dict] = None,
                headers: Optional[dict] = None) -> Any:
     import urllib.request
-    h = {"User-Agent": "MCUBED", "Accept": "application/json", **(headers or {})}
+    h = {"User-Agent": "MHexeract", "Accept": "application/json", **(headers or {})}
     if key:
         h["Authorization"] = f"Bearer {key}"
     body = None
@@ -1990,7 +1990,7 @@ def nodes_summary(d: dict) -> dict:
 # --------------------------------------------------------------------------- #
 HERE = Path(__file__).resolve().parent
 MANIFEST = {
-    "name": "MCUBED Gateway", "short_name": "MCUBED", "start_url": "/", "display": "standalone",
+    "name": "MHexeract Gateway", "short_name": "MHexeract", "start_url": "/", "display": "standalone",
     "background_color": "#0f1417", "theme_color": "#0f1417", "orientation": "any",
     "icons": [{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}],
 }
@@ -2064,7 +2064,7 @@ def discover_repos(token: Optional[str] = None) -> list[dict]:
             f"https://api.github.com/user/repos?per_page=100&page={page}"
             "&affiliation=owner,collaborator,organization_member&sort=updated",
             headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
-                     "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "MCUBED"})
+                     "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "MHexeract"})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 batch = json.loads(r.read())
@@ -2212,7 +2212,7 @@ def run_node_scan(gw: "Gateway", lock: threading.Lock, force: bool = False) -> O
 # --------------------------------------------------------------------------- #
 # Web browser (reader mode): fetch a page and return readable text + links
 # --------------------------------------------------------------------------- #
-WEB_UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36 MCUBED"
+WEB_UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36 MHexeract"
 
 
 def _public_host(host: str) -> bool:
@@ -2368,7 +2368,7 @@ def fetch_page(url: str, max_bytes: int = 3_000_000) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Self-update: install the newest MCUBED from GitHub (verified, backed up, reversible)
+# Self-update: install the newest MHexeract from GitHub (verified, backed up, reversible)
 # --------------------------------------------------------------------------- #
 UPDATE_REPO = os.getenv("MCUBED_REPO", "dconcretemick-netizen/MCUBED")
 UPDATE_BRANCH = os.getenv("MCUBED_BRANCH", "main")
@@ -2380,6 +2380,12 @@ _update_cache: dict = {}
 
 def _is_android() -> bool:
     return os.getenv("MCUBED_ANDROID") == "1"
+
+
+def _channel() -> str:
+    """Where this copy came from: "direct" (GitHub/sideload, self-updates)
+    or "play" (Google Play, which handles updates and forbids self-install)."""
+    return "play" if os.getenv("MCUBED_CHANNEL") == "play" else "direct"
 
 
 def _gh_api(path: str, raw: bool = False, timeout: float = 30) -> Any:
@@ -2397,7 +2403,7 @@ def _gh_api(path: str, raw: bool = False, timeout: float = 30) -> Any:
             return out if raw else json.loads(out)
         except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
             pass
-    headers = {"Accept": accept, "User-Agent": "MCUBED", "X-GitHub-Api-Version": "2022-11-28"}
+    headers = {"Accept": accept, "User-Agent": "MHexeract", "X-GitHub-Api-Version": "2022-11-28"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
@@ -2495,7 +2501,7 @@ def _update_backups() -> list[Path]:
     return sorted((p for p in d.iterdir() if p.is_dir()), reverse=True) if d.exists() else []
 
 
-# Only code signed with this certificate is accepted as an MCUBED APK update (SHA-256 of the DER certificate).
+# Only code signed with this certificate is accepted as an MHexeract APK update (SHA-256 of the DER certificate).
 MCUBED_CERT_SHA256 = "53b57eb8251c6528061e05766f424c41ee1e94801a76a9f944f7c1a19dd9cccc"
 
 
@@ -2575,7 +2581,7 @@ def _gh_file(path: str, sha: str) -> bytes:
         return _gh_api(f"repos/{UPDATE_REPO}/contents/{path}?ref={sha}", raw=True, timeout=60)
     url = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{sha}/{path}"
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "MCUBED"}), timeout=60) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "MHexeract"}), timeout=60) as r:
             return r.read()
     except OSError:
         return _gh_api(f"repos/{UPDATE_REPO}/contents/{path}?ref={sha}", raw=True, timeout=60)
@@ -2680,7 +2686,7 @@ def download_apk() -> dict:
     asset = next((a for a in rel.get("assets", []) if a["name"].endswith(".apk")), None)
     if not asset:
         raise GatewayError("the latest release has no APK yet")
-    headers = {"Accept": "application/octet-stream", "User-Agent": "MCUBED"}
+    headers = {"Accept": "application/octet-stream", "User-Agent": "MHexeract"}
     if _github_token():
         headers["Authorization"] = f"Bearer {_github_token()}"
     out = Path(os.getenv("MCUBED_DATA", str(HERE))) / "update.apk"
@@ -2702,7 +2708,7 @@ def download_apk() -> dict:
         raise GatewayError(f"could not read the APK signature: {e}") from None
     if signers != [MCUBED_CERT_SHA256]:
         tmp.unlink(missing_ok=True)
-        raise GatewayError("APK is not signed with the MCUBED key; not installing")
+        raise GatewayError("APK is not signed with the MHexeract key; not installing")
     # The commit the APK was built from is the one the "latest" tag points at. The release's target_commitish
     # can be stale (it is not moved with the tag), so it is only a fallback.
     target = ""
@@ -3015,7 +3021,7 @@ def wine_run(exe: str, args: Optional[list[str]] = None, wait: bool = False) -> 
     return {"cmd": cmd, "pid": proc.pid}
 
 # --------------------------------------------------------------------------- #
-# OpenAI-compatible API: MCUBED itself behaves like an AI model
+# OpenAI-compatible API: MHexeract itself behaves like an AI model
 # --------------------------------------------------------------------------- #
 OPENAI_PASSTHROUGH = ("temperature", "top_p", "max_tokens", "max_completion_tokens", "stop", "seed",
                       "response_format", "presence_penalty", "frequency_penalty")
@@ -3210,7 +3216,7 @@ def _http_status(url: str, key: Optional[str] = None, headers: Optional[dict] = 
     """HTTP status of a GET, or None when the host cannot be reached at all."""
     import urllib.error
     import urllib.request
-    h = {"User-Agent": "MCUBED", "Accept": "application/json", **(headers or {})}
+    h = {"User-Agent": "MHexeract", "Accept": "application/json", **(headers or {})}
     if key:
         h["Authorization"] = f"Bearer {key}"
     try:
@@ -3901,7 +3907,7 @@ def _dtc_map_from_sqlite(raw: bytes) -> dict:
 
 def _download_dtc_db() -> bytes:
     import urllib.request
-    req = urllib.request.Request(DTC_DB_URL, headers={"User-Agent": "MCUBED"})
+    req = urllib.request.Request(DTC_DB_URL, headers={"User-Agent": "MHexeract"})
     with urllib.request.urlopen(req, timeout=30) as r:
         chunks, total = [], 0
         while True:
@@ -4465,7 +4471,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
         load_saved_keys()
 
     class H(BaseHTTPRequestHandler):
-        server_version = "MCUBED/1.0"
+        server_version = "MHexeract/1.0"
 
         def log_message(self, fmt: str, *a: Any) -> None:
             log.debug("gui " + fmt, *a)
@@ -4602,10 +4608,15 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                 return self._send(200, dict(d, summary=nodes_summary(d), config=nodes_config(gw)))
             if u.path == "/api/update":
                 try:
-                    return self._send(200, check_update(force=(q.get("refresh") or ["0"])[0] == "1"))
+                    d = check_update(force=(q.get("refresh") or ["0"])[0] == "1")
+                    d["channel"] = _channel()
+                    if _channel() == "play":
+                        d["available"] = False  # Play delivers updates, not GitHub
+                    return self._send(200, d)
                 except GatewayError as e:
                     return self._send(200, {"error_detail": str(e), "current": current_version(),
                                             "mode": "apk" if _is_android() else "files", "available": False,
+                                            "channel": _channel(),
                                             "backups": [b.name for b in _update_backups()]})
             if u.path == "/api/report":
                 days = int((q.get("days") or ["7"])[0])
@@ -4627,6 +4638,8 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
             if u.path == "/v1/chat/completions":
                 return self._openai()
             if u.path in ("/api/update/apply", "/api/update/rollback", "/api/update/apk"):
+                if _channel() == "play":
+                    return self._send(400, {"error": "This copy of MHexeract updates through Google Play — open the Play Store to update."})
                 try:  # outside the gateway lock: downloads can take a while
                     res = apply_update() if u.path.endswith("apply") else rollback_update() \
                         if u.path.endswith("rollback") else download_apk()
@@ -4786,7 +4799,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
     _GUI_SERVER = srv
     threading.Thread(target=_scheduled_improver, args=(gw, lock), name="mcubed-improver", daemon=True).start()
     shown = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
-    print(f"MCUBED GUI on http://{shown}:{port}/" + (f"?token={token}" if token else ""))
+    print(f"MHexeract GUI on http://{shown}:{port}/" + (f"?token={token}" if token else ""))
     if host == "0.0.0.0":
         print("Listening on all interfaces: open it from your phone with this machine's LAN IP.")
     try:
@@ -4799,7 +4812,7 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
 # CLI
 # --------------------------------------------------------------------------- #
 def main() -> None:
-    ap = argparse.ArgumentParser(description="MCUBED multi-model AI gateway")
+    ap = argparse.ArgumentParser(description="MHexeract multi-model AI gateway")
     ap.add_argument("--config", default=os.getenv("GATEWAY_CONFIG", "models.json"))
     ap.add_argument("--db", default=os.getenv("GATEWAY_DB", "gateway_usage.db"))
     ap.add_argument("--mock", action="store_true", help="use LiteLLM mock responses (no API keys)")
@@ -4855,7 +4868,7 @@ def main() -> None:
     wn.add_argument("args", nargs=argparse.REMAINDER)
     wn.add_argument("--wait", action="store_true")
 
-    up = sub.add_parser("update", help="install the newest MCUBED from GitHub (verified, with backup)")
+    up = sub.add_parser("update", help="install the newest MHexeract from GitHub (verified, with backup)")
     up.add_argument("action", nargs="?", default="check", choices=["check", "apply", "rollback"])
 
     nd = sub.add_parser("nodes", help="find more AI nodes: cloud providers, local model servers, home network")
@@ -4958,7 +4971,7 @@ def _run(args: argparse.Namespace) -> None:
             print("Update available: run `python gateway.py update apply`" if r["available"] else "Up to date.")
         else:
             print(json.dumps(apply_update() if args.action == "apply" else rollback_update(), indent=2))
-            print("Restart MCUBED to use the new version.")
+            print("Restart MHexeract to use the new version.")
     elif args.cmd == "nodes":
         if args.action in ("trust", "untrust"):
             if not args.url:

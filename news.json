@@ -1,5 +1,5 @@
 {
-  "_about": "News sources for the MCUBED News tab. 'lean' uses AllSides Media Bias Ratings (https://www.allsides.com/media-bias/ratings), checked November 2026. Ratings change over time and a Center rating does not mean more accurate; edit this file to add, remove or relabel sources. Set enabled=false to keep a source available but off by default. The default set is balanced: 1 Left, 4 Lean Left, 4 Center, 4 Lean Right, 1 Right, plus 1 unrated international source.",
+  "_about": "News sources for the MHexeract News tab. 'lean' uses AllSides Media Bias Ratings (https://www.allsides.com/media-bias/ratings), checked November 2026. Ratings change over time and a Center rating does not mean more accurate; edit this file to add, remove or relabel sources. Set enabled=false to keep a source available but off by default. The default set is balanced: 1 Left, 4 Lean Left, 4 Center, 4 Lean Right, 1 Right, plus 1 unrated international source.",
   "cache_seconds": 600,
   "max_age_hours": 48,
   "feeds": [

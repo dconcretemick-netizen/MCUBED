@@ -1,22 +1,24 @@
-# MCUBED
+# MHexeract
+
+*Project codename: **6D** — the hexeract is the six-dimensional cube, three steps past cubed.*
 
 **[MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest)**: [Android APK](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED.apk) · [Desktop zip](https://github.com/dconcretemick-netizen/MCUBED/releases/download/latest/MCUBED-desktop.zip) · [How to install](INSTALL.md) · [Security](SECURITY.md). Always the newest build.
 
 A multi-model AI gateway with a phone-friendly web dashboard. One entry point for OpenAI, Anthropic, Google and DeepSeek models, with OpenRouter as a fallback route for every model.
 
-## What MCUBED is for
+## What MHexeract is for
 
-MCUBED is built to give you real AI at no cost. Instead of one paid subscription, it spreads your questions across many free AI providers — plus models on your own devices — and automatically fails over when one hits its limit. These are the jobs that design is best at:
+MHexeract is built to give you real AI at no cost. Instead of one paid subscription, it spreads your questions across many free AI providers — plus models on your own devices — and automatically fails over when one hits its limit. These are the jobs that design is best at:
 
 - **Everyday AI, no subscription.** Chat, questions, summaries, translations, brainstorming. Requests route across free plans from providers like Google Gemini, Groq, Mistral, NVIDIA and OpenRouter's free models, keyless Pollinations, and Meta's Muse Glimmer — so no single provider's paywall or daily cap is a hard wall.
 - **A jury, not an oracle.** Pick **Council** in the chat's model menu and the models confer: several answer your question — with the full chat history, so the discussion stays in context — then the strongest one reads all the answers and writes the final one, keeping what they agree on and correcting the rest. Each model's own answer stays visible under the reply. For buying decisions, "is this email a scam," health-ish questions and anything you'd rather not take one AI's word for, a conferred answer beats one confident guess.
 - **Car help that pays for itself.** Plug in an ELM327 adapter and the diagnostics tab reads and clears fault codes, with over 12,000 plain-English code descriptions stored on the device — then ask the AI what a code means, whether the car is safe to drive, and what a shop typically charges.
 - **News with the blindspots showing.** The News tab groups coverage of the same story from outlets across the spectrum and flags blindspots — stories only one side is covering — so you see the event and the framing at the same time.
 - **The household AI.** One phone or home PC serving everyone's homework help, letters, resumes, forms and polite-but-firm emails — instead of a subscription per person.
-- **Private by architecture.** Add a local model (for example Ollama on a home PC) and MCUBED finds it on your network. Sensitive questions can stay inside your house entirely — no account, no cloud, nothing to revoke.
-- **Keys, kept easy.** Free keys are the fuel, so MCUBED keeps them painless: every provider in the AI keys card has a **Get key** button that goes straight to its free signup (no card required for the free plans), keys are saved once on your device only, and a background gardener checks them, quietly removes ones a provider has rejected, and parks providers that stop answering until they recover. Truly anonymous models need no key or account at all — Pollinations is built in, and new keyless providers get added as they appear.
+- **Private by architecture.** Add a local model (for example Ollama on a home PC) and MHexeract finds it on your network. Sensitive questions can stay inside your house entirely — no account, no cloud, nothing to revoke.
+- **Keys, kept easy.** Free keys are the fuel, so MHexeract keeps them painless: every provider in the AI keys card has a **Get key** button that goes straight to its free signup (no card required for the free plans), keys are saved once on your device only, and a background gardener checks them, quietly removes ones a provider has rejected, and parks providers that stop answering until they recover. Truly anonymous models need no key or account at all — Pollinations is built in, and new keyless providers get added as they appear.
 
-The honest limits: free tiers have quotas and occasionally disappear, and the best free models trail the top paid ones on the hardest reasoning. MCUBED's answer is breadth and failover — many providers, a local model as the floor, and background care that keeps the pool healthy on its own.
+The honest limits: free tiers have quotas and occasionally disappear, and the best free models trail the top paid ones on the hardest reasoning. MHexeract's answer is breadth and failover — many providers, a local model as the floor, and background care that keeps the pool healthy on its own.
 
 ## Features
 
@@ -26,10 +28,10 @@ The honest limits: free tiers have quotas and occasionally disappear, and the be
 - Automated process improvement: the optimizer tunes tiers, route order, token estimates and quarantines every 50 requests and every 6 hours while the dashboard or app runs, with a change log and automatic rollback
 - Conversation compression for long chats and automatic storage compaction
 - Lite mode for Android/Termux: standard library only, no native builds
-- OpenAI-style chat as the main screen: multi-turn conversations, model picker (MCUBED auto, fast, best quality, or any model with a key), ratings that teach the router
+- OpenAI-style chat as the main screen: multi-turn conversations, model picker (MHexeract auto, fast, best quality, or any model with a key), ratings that teach the router
 - Free by default: only free AI (local models and no-card free plans) unless you switch paid AI on
 - AI nodes: finds 21 cloud providers (Gemini, Groq, Mistral, Cerebras, Hugging Face, NVIDIA and more) plus local model servers such as Ollama and LM Studio, and adds every model it can use
-- OpenAI-compatible API: MCUBED acts as a model named `mcubed` at `/v1/chat/completions` and `/v1/models`, including streaming
+- OpenAI-compatible API: MHexeract acts as a model named `mcubed` at `/v1/chat/completions` and `/v1/models`, including streaming
 - Web browser tab: search or open any address in a reader view, follow links, open the full page, or send the page to the chat
 - News tab built for fairness: 15 outlets rated from left to right, stories grouped so you can compare how each outlet covers the same event, blindspot flags, and an AI balanced brief
 - Windows apps through Wine (Box64 on ARM, Winlator on Android)
@@ -38,7 +40,7 @@ The honest limits: free tiers have quotas and occasionally disappear, and the be
 - Solitaire (Klondike): tap or drag, undo, hints, draw 1 or 3, saved progress
 - Tetris: swipe and tap controls, hold, next queue, ghost piece, wall kicks, saved game and best score
 - Pip's Leap: an original side-scrolling platformer in three worlds (Meadow, Caves, Sky) with large multitouch buttons, forgiving jumps, checkpoints and saved progress
-- Update tab: installs the newest MCUBED from GitHub with integrity checks, a backup and one-tap rollback; the Android app downloads and installs the newest APK
+- Update tab: installs the newest MHexeract from GitHub with integrity checks, a backup and one-tap rollback; the Android app downloads and installs the newest APK
 - Native Android APK built automatically by GitHub Actions
 
 ## Quick start (no API keys)
@@ -78,7 +80,7 @@ python gateway.py discover-openai --write  # add to models.json
 
 ## Repositories
 
-With `GITHUB_TOKEN` set (or the GitHub CLI signed in via `gh auth login`), MCUBED finds every repository you own, collaborate on, or reach through an organization, and records it in `repos.json`. New repositories are added automatically every 6 hours while the dashboard or app runs (`repo_sync_every_hours` in `models.json`), and the Storage tab has a "Sync now" button. Run `python gateway.py repos --clone repos` to also clone them and fast-forward existing copies; the token is sent per command and never written into `.git/config`. Archived repositories are skipped unless you pass `--include-archived`. Use a fine-grained token with read-only access.
+With `GITHUB_TOKEN` set (or the GitHub CLI signed in via `gh auth login`), MHexeract finds every repository you own, collaborate on, or reach through an organization, and records it in `repos.json`. New repositories are added automatically every 6 hours while the dashboard or app runs (`repo_sync_every_hours` in `models.json`), and the Storage tab has a "Sync now" button. Run `python gateway.py repos --clone repos` to also clone them and fast-forward existing copies; the token is sent per command and never written into `.git/config`. Archived repositories are skipped unless you pass `--include-archived`. Use a fine-grained token with read-only access.
 
 ## Android app (native APK)
 
@@ -86,7 +88,7 @@ The `android/` project packages the gateway as a real Android app. It embeds Pyt
 
 - Get the APK from the [MCUBED install](https://github.com/dconcretemick-netizen/MCUBED/releases/tag/latest) release (see [INSTALL.md](INSTALL.md)). Pushing a tag like `v0.1.0` also attaches the APK to a versioned GitHub Release.
 - First launch asks for OpenRouter, OpenAI and DeepSeek keys (any or all), stored only on the device. Choose "Demo mode" to try it with simulated replies. Change keys later from the "AI keys" menu. On Android, OpenAI and DeepSeek are called directly; Claude and Gemini go through OpenRouter.
-- Requires Android 8.0+ on a 64-bit device. Release builds are signed with the permanent MCUBED key (certificate SHA-256 `53b57eb8…dccccc`).
+- Requires Android 8.0+ on a 64-bit device. Release builds are signed with the permanent MHexeract key (certificate SHA-256 `53b57eb8…dccccc`).
 - Register the package with Android developer verification, using the free Limited distribution account: see [REGISTER.md](REGISTER.md).
 - Build locally: `cd android && gradle assembleRelease` (JDK 17, Android SDK, Python 3.13 on PATH).
 
@@ -119,7 +121,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 | `gui [--host --port --token]` | Serve the web dashboard and Doom game |
 | `news [--limit 15] [--brief N] [--sources]` | Headlines grouped by story with left/center/right coverage; `--brief N` writes a balanced brief of story N |
 | `wine status` / `wine run FILE.exe [args]` | Check for Wine and run Windows programs |
-| `update [check\|apply\|rollback]` | Install the newest MCUBED from GitHub (verified, backed up) |
+| `update [check\|apply\|rollback]` | Install the newest MHexeract from GitHub (verified, backed up) |
 | `simulate [--n 300]` | Offline demo with synthetic traffic |
 
 ## Security
@@ -130,7 +132,7 @@ Open http://localhost:8765 in Chrome, then use "Add to Home screen" to install i
 
 ## AI nodes
 
-MCUBED looks for more AI every hour while the dashboard or app runs, and on demand with Stats > Models > "Scan now" or `python gateway.py nodes scan`.
+MHexeract looks for more AI every hour while the dashboard or app runs, and on demand with Stats > Models > "Scan now" or `python gateway.py nodes scan`.
 
 - **Cloud providers:** 21 OpenAI-compatible services (only the free ones are used in free-only mode), including Google Gemini, Groq, Cerebras, Mistral, Hugging Face, NVIDIA NIM, SambaNova, xAI, Together, Fireworks, DeepInfra, Moonshot, Qwen, Z.ai and MiniMax. Add a key in AI keys (Android) or `.env` and the next scan adds that provider's chat models. Several have free tiers. With OpenRouter, free models are added too.
 - **This device:** Ollama, LM Studio, vLLM, Jan, KoboldCpp, GPT4All and llama.cpp servers on their usual ports are used automatically.
@@ -138,7 +140,7 @@ MCUBED looks for more AI every hour while the dashboard or app runs, and on dema
 
 Nodes join the same learning router as every other model, so the good ones earn more traffic. Results are kept in `nodes.json` next to the database.
 
-## Use MCUBED as an OpenAI model
+## Use MHexeract as an OpenAI model
 
 Start the dashboard (`python gateway.py gui`, or open the Android app), then point any OpenAI SDK or tool at it:
 
@@ -156,7 +158,7 @@ print(r.choices[0].message.content)
 
 ## Web browser
 
-The Web tab searches the web or opens an address through the gateway (`POST /api/fetch`) and shows a clean reader view with the page's links. "Open page" shows the full site; on Android it opens an in-app browser screen. "Ask MCUBED" attaches the page to the chat. Requests to localhost or private network addresses are blocked, including through redirects.
+The Web tab searches the web or opens an address through the gateway (`POST /api/fetch`) and shows a clean reader view with the page's links. "Open page" shows the full site; on Android it opens an in-app browser screen. "Ask MHexeract" attaches the page to the chat. Requests to localhost or private network addresses are blocked, including through redirects.
 
 ## News
 
@@ -186,7 +188,7 @@ The Update tab (CLI `update`) compares your version with the newest commit on Gi
 
 - **Git checkout:** runs `git pull --ff-only` and restarts.
 - **Plain copy (zip or Termux):** downloads each program file, checks it against GitHub's hash, confirms the new `gateway.py` compiles, backs up the old files to `.mcubed_backup/`, then restarts. If you edited `models.json` or `news.json`, your copy is kept and the new one is saved as `*.new`. Roll back restores the last backup.
-- **Android app:** every push to `main` refreshes the "MCUBED install" release (tag `latest`). The app downloads that APK (no GitHub token needed) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
+- **Android app:** every push to `main` refreshes the "MHexeract install" release (tag `latest`). The app downloads that APK (no GitHub token needed) and opens Android's installer. All builds are signed with one permanent key stored in GitHub Actions secrets, so each APK installs over the last one. APKs built before this change used a temporary key: uninstall that version once before installing the new one.
 
 ## How a request flows
 
@@ -231,12 +233,12 @@ Quality counts fully up to the "good enough" target and only partly above it. Ef
 
 ## Free of cost
 
-MCUBED and everything it depends on is free, and it stays that way by default.
+MHexeract and everything it depends on is free, and it stays that way by default.
 
-- **AI:** free-only mode is on out of the box (`"cost": {"free_only": true}` in `models.json`, or the "Free AI only" switch in the AI units panel). MCUBED then uses only local models (Ollama, LM Studio and others) and providers with no-card free plans: Google Gemini, Groq, Mistral, SambaNova, NVIDIA, Hugging Face, the Cohere trial key and OpenRouter's `:free` models. Paid keys such as OpenAI or DeepSeek are ignored until you switch paid AI on, and the app asks first. Free plans are rate limited. If one runs out, MCUBED moves to the next free option.
+- **AI:** free-only mode is on out of the box (`"cost": {"free_only": true}` in `models.json`, or the "Free AI only" switch in the AI units panel). MHexeract then uses only local models (Ollama, LM Studio and others) and providers with no-card free plans: Google Gemini, Groq, Mistral, SambaNova, NVIDIA, Hugging Face, the Cohere trial key and OpenRouter's `:free` models. Paid keys such as OpenAI or DeepSeek are ignored until you switch paid AI on, and the app asks first. Free plans are rate limited. If one runs out, MHexeract moves to the next free option.
 - **Stay on free plans:** do not link a billing account or card to a provider you use for free (for example Google AI Studio). Then nothing on that key can turn into a charge.
 - **Software:** Python standard library (Lite and Android mode), optional `litellm` (MIT), Chaquopy (MIT), Android Gradle plugin and Android SDK (free), no paid libraries or services.
-- **Building and hosting:** GitHub Actions, Releases and Dependabot are free for public repositories, so every APK build and the MCUBED install page cost nothing. Build files expire after 3 days.
+- **Building and hosting:** GitHub Actions, Releases and Dependabot are free for public repositories, so every APK build and the MHexeract install page cost nothing. Build files expire after 3 days.
 
 ## Limits
 

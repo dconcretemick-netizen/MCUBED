@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MCUBED limits suite: pushes the gateway until something gives, and records where.
+MHexeract limits suite: pushes the gateway until something gives, and records where.
 
     python limits.py            # full suite (mock mode, no API keys needed)
     python limits.py --quick    # smaller sizes, ~30s
@@ -247,7 +247,7 @@ def malformed(quick: bool):
 
 
 def write_report() -> None:
-    lines = ["# MCUBED gateway limits", "",
+    lines = ["# MHexeract gateway limits", "",
              f"Measured {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} on `{sys.platform}`, Python "
              f"{sys.version.split()[0]}, mode: {'lite (stdlib)' if G.LITE else 'litellm'} + mock providers.", "",
              "| Test | Status | Result |", "|---|---|---|"]

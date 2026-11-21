@@ -1,4 +1,4 @@
-# MCUBED gateway limits
+# MHexeract gateway limits
 
 Measured 2026-11-18 02:24 UTC on `linux`, Python 3.14.8, mode: lite (stdlib) + mock providers.
 

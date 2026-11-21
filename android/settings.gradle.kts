@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "MCUBED"
+rootProject.name = "6D"
 include(":app")

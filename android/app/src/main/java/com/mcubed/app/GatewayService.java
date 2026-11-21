@@ -37,7 +37,7 @@ public class GatewayService extends Service {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (nm != null && nm.getNotificationChannel(CHANNEL) == null) {
                 nm.createNotificationChannel(new NotificationChannel(
-                        CHANNEL, "MCUBED gateway", NotificationManager.IMPORTANCE_LOW));
+                        CHANNEL, "MHexeract gateway", NotificationManager.IMPORTANCE_LOW));
             }
         }
     }
@@ -53,7 +53,7 @@ public class GatewayService extends Service {
         Notification.Builder b = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL)
                 : new Notification.Builder(this);
-        Notification n = b.setContentTitle("MCUBED is running")
+        Notification n = b.setContentTitle("MHexeract is running")
                 .setContentText("Your AI gateway is available in the background. Tap to open.")
                 .setSmallIcon(icon)
                 .setContentIntent(PendingIntent.getActivity(this, 0, open, piFlags))

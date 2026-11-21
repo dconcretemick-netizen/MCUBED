@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314b8a6'/%3E%3Cpath d='M14 46V18l9 14 9-14 9 14 9-14v28' fill='none' stroke='%230f1417' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>MCUBED Gateway</title>
+<title>MHexeract Gateway</title>
 <style data-mcubed-ui-polish>
 /* mcubed-ui-polish v2: automated Android UI improvements, injected by the gateway */
 html{-webkit-tap-highlight-color:transparent}
@@ -348,8 +348,8 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 <body>
 <header>
   <div class="brand" id="brand-home" role="button" aria-label="Go to Home" title="Home" style="cursor:pointer">
-    <svg width="32" height="32" viewBox="0 0 64 64" aria-label="MCUBED"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
-    <div>MCUBED Gateway<small id="sub">Loading…</small></div>
+    <svg width="32" height="32" viewBox="0 0 64 64" aria-label="MHexeract"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
+    <div>MHexeract Gateway<small id="sub">Loading…</small></div>
   </div>
   <select id="days" class="ctl" aria-label="Time range">
     <option value="1">24h</option><option value="7" selected>7d</option><option value="30">30d</option><option value="365">1y</option>
@@ -417,7 +417,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="card"><h2>Routes</h2><div class="tbl-wrap"><table id="t-models"></table></div></div>
     <div class="card" style="margin-top:var(--gap)"><h2>Model pool</h2><div class="tbl-wrap"><table id="t-pool"></table></div></div>
     <div class="card" style="margin-top:var(--gap)"><h2>AI nodes <span class="chip" id="nodes-chip">not scanned</span></h2>
-      <p class="news-note" id="nodes-msg">MCUBED looks for AI providers and local model servers (Ollama, LM Studio and others) every hour and adds the ones it can use.</p>
+      <p class="news-note" id="nodes-msg">MHexeract looks for AI providers and local model servers (Ollama, LM Studio and others) every hour and adds the ones it can use.</p>
       <div class="row"><button class="btn" id="nodes-scan">Scan now</button></div>
       <div style="margin-top:10px"><table id="t-nodes" style="width:100%"></table></div>
     </div>
@@ -435,7 +435,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="home-hero">
       <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
       <div style="min-width:0">
-        <h1 id="home-greet">MCUBED</h1>
+        <h1 id="home-greet">MHexeract</h1>
         <p class="home-sub" id="home-date"></p>
         <div class="row" style="margin-top:10px">
           <span class="chip kept">Gateway running</span>
@@ -445,20 +445,20 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       </div>
     </div>
     <div class="tiles" id="home-tiles">
-      <button class="tile accent" data-go="playground"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><b>Chat</b><small>Ask MCUBED anything — it picks the best AI for the job</small></button>
+      <button class="tile accent" data-go="playground"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><b>Chat</b><small>Ask MHexeract anything — it picks the best AI for the job</small></button>
       <button class="tile" data-go="news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13v16H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v10a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h3"/></svg><b>News</b><small id="tile-news-sub">Top stories from across the spectrum</small></button>
       <button class="tile term" data-go="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15 12h.01M18 13h.01"/></svg><b>Games</b><small>OREGON TRAIL · APPLE IIe EDITION · 3RD EDITION — PRESS TO PLAY</small></button>
       <button class="tile" data-go="obd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4.5-4.5"/><path d="M2 14h2M20 14h2M12 6V4"/></svg><b>Car diagnostics</b><small id="tile-obd-sub">Not connected</small></button>
       <button class="tile" data-go="toolbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg><b>Toolbox</b><small id="tile-ai-sub">Keys, background jobs and the AI pool</small></button>
-      <button class="tile" data-go="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><b>Update</b><small id="tile-upd-sub">Check for the newest MCUBED</small></button>
-      <button class="tile" data-go="uses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg><b>What it's for</b><small>The best uses for MCUBED — and how it stays free</small></button>
+      <button class="tile" data-go="update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><b>Update</b><small id="tile-upd-sub">Check for the newest MHexeract</small></button>
+      <button class="tile" data-go="uses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg><b>What it's for</b><small>The best uses for MHexeract — and how it stays free</small></button>
     </div>
   </section>
 
   <section class="view" id="v-playground">
     <div class="chat">
       <div class="chat-top">
-        <select id="model" class="ctl" aria-label="Model"><option value="mcubed">MCUBED (auto)</option><option value="mcubed-efficient">MCUBED fast</option><option value="mcubed-quality">MCUBED best quality</option><option value="mcubed-council">Council — models confer for the best answer</option></select>
+        <select id="model" class="ctl" aria-label="Model"><option value="mcubed">MHexeract (auto)</option><option value="mcubed-efficient">MHexeract fast</option><option value="mcubed-quality">MHexeract best quality</option><option value="mcubed-council">Council — models confer for the best answer</option></select>
         <button class="btn" id="btn-units" aria-expanded="false" aria-controls="units-info" title="AI units in use"><span class="u-dot" id="units-dot"></span><span id="units-count">AI</span></button>
         <button class="btn" id="btn-api" aria-expanded="false" aria-controls="api-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>API</button>
         <button class="btn" id="btn-newchat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
@@ -466,14 +466,14 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <div class="card api-info" id="units-info" hidden>
         <h2>AI units in use <span class="chip" id="units-chip">checking</span></h2>
         <p id="units-latest">Each message goes to the best AI unit that is working.</p>
-        <label class="free-row"><span><b>Free AI only</b><small id="free-note">MCUBED never calls anything that costs money.</small></span>
+        <label class="free-row"><span><b>Free AI only</b><small id="free-note">MHexeract never calls anything that costs money.</small></span>
           <input type="checkbox" id="free-only" role="switch" checked></label>
         <ul class="units" id="units-list"></ul>
         <p class="units-more" id="units-more"></p>
       </div>
       <div class="card api-info" id="api-info" hidden>
-        <h2>Use MCUBED as an OpenAI model</h2>
-        <p>Any app or SDK that talks to OpenAI can use MCUBED. Point it at this base URL and pick model <code>mcubed</code>. The router chooses the best available model for each request.</p>
+        <h2>Use MHexeract as an OpenAI model</h2>
+        <p>Any app or SDK that talks to OpenAI can use MHexeract. Point it at this base URL and pick model <code>mcubed</code>. The router chooses the best available model for each request.</p>
         <div class="kv"><span>Base URL</span><code id="api-base"></code><button class="btn sm" data-copy="api-base">Copy</button></div>
         <div class="kv"><span>Model</span><code>mcubed</code><span class="hint">also mcubed-efficient, mcubed-quality, or any pool alias</span></div>
         <div class="kv"><span>API key</span><code id="api-key">your gateway token (any text if none is set)</code></div>
@@ -483,7 +483,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
         <div class="empty-chat" id="chat-empty">
           <svg class="hero-logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="var(--accent)"/><path d="M14 46V18l9 14 9-14 9 14 9-14v28" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linejoin="round"/></svg>
           <h1>How can I help?</h1>
-          <p id="empty-sub">MCUBED sends each message to the best AI that is working.</p>
+          <p id="empty-sub">MHexeract sends each message to the best AI that is working.</p>
           <div class="sugg">
             <button class="chip-btn" data-q="Explain the CAP theorem in two lines"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Explain<small>The CAP theorem in two lines</small></button>
             <button class="chip-btn" data-q="Write a Python function that dedupes a list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>Code<small>A Python function that dedupes a list</small></button>
@@ -493,7 +493,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
         </div>
       </div>
       <form class="composer" id="composer">
-        <textarea id="prompt" rows="1" placeholder="Message MCUBED" aria-label="Message"></textarea>
+        <textarea id="prompt" rows="1" placeholder="Message MHexeract" aria-label="Message"></textarea>
         <button class="btn primary send" id="send" type="submit" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
       </form>
     </div>
@@ -605,8 +605,8 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   </section>
 
   <section class="view" id="v-uses">
-    <div class="card"><h2>What MCUBED is for</h2>
-      <p style="margin:0">MCUBED is built to give you real AI at no cost. Instead of one paid subscription, it spreads your questions across many free AI providers — plus models on your own devices — and automatically fails over when one hits its limit. These are the jobs that design is best at.</p>
+    <div class="card"><h2>What MHexeract is for</h2>
+      <p style="margin:0">MHexeract is built to give you real AI at no cost. Instead of one paid subscription, it spreads your questions across many free AI providers — plus models on your own devices — and automatically fails over when one hits its limit. These are the jobs that design is best at.</p>
     </div>
     <div class="card"><h2>Everyday AI, no subscription</h2>
       <p style="margin:0">Chat, questions, summaries, translations, brainstorming. Requests route across free plans from providers like Google Gemini, Groq, Mistral, NVIDIA and OpenRouter's free models, keyless Pollinations, and Meta's Muse Glimmer — so no single provider's paywall or daily cap is a hard wall.</p>
@@ -624,20 +624,20 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <p style="margin:0">One phone or home PC serving everyone's homework help, letters, resumes, forms and polite-but-firm emails — instead of a subscription per person.</p>
     </div>
     <div class="card"><h2>Private by architecture</h2>
-      <p style="margin:0">Add a local model (for example Ollama on a home PC) and MCUBED finds it on your network. Sensitive questions can stay inside your house entirely — no account, no cloud, nothing to revoke.</p>
+      <p style="margin:0">Add a local model (for example Ollama on a home PC) and MHexeract finds it on your network. Sensitive questions can stay inside your house entirely — no account, no cloud, nothing to revoke.</p>
     </div>
     <div class="card"><h2>Keys, kept easy</h2>
-      <p style="margin:0 0 10px">Free keys are the fuel, so MCUBED keeps them painless. Every provider in AI keys has a <b>Get key</b> button that takes you straight to its free signup — no card required for the free plans. Keys are saved once, on this device only. A background gardener checks them, quietly removes ones a provider has rejected, and parks providers that stop answering until they recover. Truly anonymous models need no key or account at all — Pollinations is built in, and new keyless providers get added as they appear.</p>
+      <p style="margin:0 0 10px">Free keys are the fuel, so MHexeract keeps them painless. Every provider in AI keys has a <b>Get key</b> button that takes you straight to its free signup — no card required for the free plans. Keys are saved once, on this device only. A background gardener checks them, quietly removes ones a provider has rejected, and parks providers that stop answering until they recover. Truly anonymous models need no key or account at all — Pollinations is built in, and new keyless providers get added as they appear.</p>
       <button class="btn primary" id="btn-uses-keys">Manage AI keys</button>
     </div>
     <div class="card"><h2>The honest limits</h2>
-      <p style="margin:0">Free tiers have quotas and occasionally disappear, and the best free models trail the top paid ones on the hardest reasoning. MCUBED's answer is breadth and failover — many providers, a local model as the floor, and background care that keeps the pool healthy on its own.</p>
+      <p style="margin:0">Free tiers have quotas and occasionally disappear, and the best free models trail the top paid ones on the hardest reasoning. MHexeract's answer is breadth and failover — many providers, a local model as the floor, and background care that keeps the pool healthy on its own.</p>
     </div>
   </section>
 
   <section class="view" id="v-toolbox">
-    <div class="card"><h2>What MCUBED is for</h2>
-      <p style="margin:0 0 10px">The best uses for MCUBED, how the no-cost model works, and how your AI keys stay maintained.</p>
+    <div class="card"><h2>What MHexeract is for</h2>
+      <p style="margin:0 0 10px">The best uses for MHexeract, how the no-cost model works, and how your AI keys stay maintained.</p>
       <button class="btn" id="btn-uses">Read the use cases</button>
     </div>
     <div class="card"><h2>Status <span class="chip" id="tb-chip">checking</span></h2>
@@ -645,7 +645,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <div class="kv"><span>Uptime</span><code id="tb-uptime">…</code></div>
       <div class="kv"><span>Mode</span><code id="tb-mode">…</code></div>
       <div class="kv"><span>AI keys</span><code id="tb-keys">…</code></div>
-      <p class="news-note" id="tb-android-note" hidden style="margin:10px 0 0">On Android, use the app menu → <b>Toolbox</b> for “Keep running in the background” and battery settings, so Android does not stop MCUBED when you switch apps.</p>
+      <p class="news-note" id="tb-android-note" hidden style="margin:10px 0 0">On Android, use the app menu → <b>Toolbox</b> for “Keep running in the background” and battery settings, so Android does not stop MHexeract when you switch apps.</p>
     </div>
 
     <div class="card" style="margin-top:var(--gap)"><h2>AI keys <span class="chip" id="keys-chip">checking</span></h2>
@@ -659,7 +659,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </div>
 
     <div class="card" style="margin-top:var(--gap)"><h2>Background</h2>
-      <p class="news-note">What MCUBED may do on its own while you are not looking. Changes apply to the next background run.</p>
+      <p class="news-note">What MHexeract may do on its own while you are not looking. Changes apply to the next background run.</p>
       <div id="bg-list"><div class="skel"></div></div>
     </div>
 
@@ -669,13 +669,13 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </div>
 
     <div class="card" style="margin-top:var(--gap)"><h2>No-cost mission</h2>
-      <p class="news-note">MCUBED automatically strives toward its goals: real AI at no cost, truly anonymous (keyless, no-account) models wherever they exist, and keys that maintain themselves. This job proves the keyless providers still answer real questions — a model list alone can lie — and watches candidate keyless providers, reporting any that come alive. Candidates are never switched on silently.</p>
+      <p class="news-note">MHexeract automatically strives toward its goals: real AI at no cost, truly anonymous (keyless, no-account) models wherever they exist, and keys that maintain themselves. This job proves the keyless providers still answer real questions — a model list alone can lie — and watches candidate keyless providers, reporting any that come alive. Candidates are never switched on silently.</p>
       <div id="strive-body"><div class="skel"></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" id="tb-run-strive">Strive now</button></div>
     </div>
 
     <div class="card" style="margin-top:var(--gap)"><h2>Android UI</h2>
-      <p class="news-note">MCUBED checks its own pages every day and automatically adds the mobile polish — finger-sized buttons, no zoom when you tap a field, no tap flash, and a layout that fits the screen without scrolling sideways — to any page missing it, and refreshes older polish to the latest version, for example after an update.</p>
+      <p class="news-note">MHexeract checks its own pages every day and automatically adds the mobile polish — finger-sized buttons, no zoom when you tap a field, no tap flash, and a layout that fits the screen without scrolling sideways — to any page missing it, and refreshes older polish to the latest version, for example after an update.</p>
       <div id="ui-body"><div class="skel"></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" id="tb-run-ui">Check UI now</button></div>
     </div>
@@ -754,7 +754,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   </section>
 
   <section class="view" id="v-update">
-    <div class="card"><h2>MCUBED version <span class="chip" id="upd-chip">checking</span></h2>
+    <div class="card"><h2>MHexeract version <span class="chip" id="upd-chip">checking</span></h2>
       <div class="kv"><span>Installed</span><code id="upd-cur">…</code></div>
       <div class="kv"><span>Newest</span><code id="upd-new">…</code></div>
       <p id="upd-msg" style="color:var(--muted);margin:10px 0 12px;font-size:14px">Checking GitHub for the newest version…</p>
@@ -767,7 +767,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </div>
     <div class="card" style="margin-top:var(--gap)"><h2>What's new</h2><ul class="upd-log" id="upd-log"><li class="empty">Nothing to show yet</li></ul></div>
     <div class="card" style="margin-top:var(--gap)"><h2>How updates work</h2>
-      <p class="news-note" id="upd-how">MCUBED downloads the newest files from GitHub, checks each against GitHub's hash, makes sure the new code starts, keeps a backup of the old files, then restarts. Your keys, history and edited settings are kept. Roll back restores the previous version.</p>
+      <p class="news-note" id="upd-how">MHexeract downloads the newest files from GitHub, checks each against GitHub's hash, makes sure the new code starts, keeps a backup of the old files, then restarts. Your keys, history and edited settings are kept. Roll back restores the previous version.</p>
     </div>
   </section>
 
@@ -779,10 +779,10 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     </form>
     <div class="row web-actions" id="web-actions" hidden>
       <a class="btn" id="web-open" target="_blank" rel="noopener">Open page</a>
-      <button class="btn" id="web-ask">Ask MCUBED about this page</button>
+      <button class="btn" id="web-ask">Ask MHexeract about this page</button>
     </div>
     <div class="card reader" id="web-reader">
-      <div class="web-empty"><h2>Web browser</h2><p>Search the web or type an address. Pages open in a fast reader view; use Open page for the full site. Ask MCUBED sends the page into the chat.</p>
+      <div class="web-empty"><h2>Web browser</h2><p>Search the web or type an address. Pages open in a fast reader view; use Open page for the full site. Ask MHexeract sends the page into the chat.</p>
         <div class="sugg" id="web-recent"></div></div>
     </div>
   </section>
@@ -1094,7 +1094,7 @@ async function loadWine(){ if(STATIC) return; try{ const w=await api("/api/wine"
 }catch(e){ $("#wine-chip").textContent="unknown" } }
 loadWine();
 
-/* ---------- update: install the newest MCUBED from GitHub ---------- */
+/* ---------- update: install the newest MHexeract from GitHub ---------- */
 let UPD=null;
 const short=c=>c?c.slice(0,7):"unknown";
 const when=d=>d?new Date(d).toLocaleString([], {dateStyle:"medium",timeStyle:"short"}):"";
@@ -1103,12 +1103,21 @@ async function loadUpdate(force=false){
   $("#upd-chip").textContent="checking"; $("#upd-chip").className="chip";
   try{ UPD=await api("/api/update"+(force?"?refresh=1":"")) }catch(e){ $("#upd-msg").textContent=e.message; return }
   const u=UPD, apk=u.mode==="apk";
+  if(u.channel==="play"){
+    $("#upd-chip").textContent="Google Play"; $("#upd-chip").className="chip kept";
+    $("#upd-dot").hidden=true; $("#upd-apply").hidden=true; $("#upd-rollback").hidden=true;
+    $("#upd-new").textContent="via Google Play";
+    $("#upd-msg").textContent="This copy of MHexeract came from Google Play, and updates arrive there too.";
+    $("#upd-how").textContent="Google Play handles updates for this copy: open the Play Store, find MHexeract, and tap Update when a new version is offered. Your keys and history stay on the device either way.";
+    $("#upd-log").innerHTML='<li class="empty">Release notes live on the Play Store listing.</li>';
+    return;
+  }
   $("#upd-dot").hidden=!u.available;
   $("#upd-cur").textContent=`${short(u.current?.commit)} ${u.current?.date?"· "+when(u.current.date):""}`;
   $("#upd-new").textContent=u.latest?`${short(apk&&u.apk?u.apk.commit:u.latest.commit)} · ${when(u.latest.date)}`:"unavailable";
   $("#upd-rollback").hidden=apk||!(u.backups||[]).length;
   $("#upd-apply").textContent=apk?"Download and install":"Update now";
-  $("#upd-how").textContent=apk?"The app downloads the newest APK built from GitHub and opens Android's installer. It installs over this version and keeps your keys and history. The first time, Android asks you to allow MCUBED to install updates."
+  $("#upd-how").textContent=apk?"The app downloads the newest APK built from GitHub and opens Android's installer. It installs over this version and keeps your keys and history. The first time, Android asks you to allow MHexeract to install updates."
     :u.mode==="git"?"This copy is a git checkout, so Update runs git pull (fast-forward only) and restarts. Your keys, history and local files are kept.":$("#upd-how").textContent;
   if(u.error_detail){ $("#upd-chip").textContent="offline"; $("#upd-msg").textContent=u.error_detail; $("#upd-apply").disabled=true; return }
   $("#upd-chip").textContent=u.available?"update available":"up to date"; $("#upd-chip").className="chip "+(u.available?"active":"kept");
@@ -1121,7 +1130,7 @@ async function loadUpdate(force=false){
 async function waitForRestart(prev){
   const t0=Date.now(); await new Promise(r=>setTimeout(r,1500));
   while(Date.now()-t0<40000){ try{ const r=await fetch("/api/update",{cache:"no-store"}); if(r.ok){ toast("Updated. Reloading"); setTimeout(()=>location.reload(),600); return } }catch(e){} await new Promise(r=>setTimeout(r,1000)) }
-  toast("MCUBED did not come back. Start it again with python gateway.py gui");
+  toast("MHexeract did not come back. Start it again with python gateway.py gui");
 }
 $("#upd-apply").addEventListener("click",async()=>{
   const b=$("#upd-apply"); b.disabled=true; const apk=UPD?.mode==="apk"; b.textContent=apk?"Downloading…":"Updating…";
@@ -1200,7 +1209,7 @@ function renderChat(pending){
   const box=$("#msgs"); box.querySelectorAll(".msg").forEach(e=>e.remove());
   $("#chat-empty").hidden=convo.length>0||!!pending;
   convo.forEach((m,i)=>box.appendChild(msgEl(m,i)));
-  if(pending){ const t=document.createElement("div"); t.className="msg bot typing"; t.setAttribute("aria-label","MCUBED is thinking"); t.innerHTML="<span></span><span></span><span></span>"; box.appendChild(t) }
+  if(pending){ const t=document.createElement("div"); t.className="msg bot typing"; t.setAttribute("aria-label","MHexeract is thinking"); t.innerHTML="<span></span><span></span><span></span>"; box.appendChild(t) }
   const last=box.lastElementChild; if(last&&convo.length) last.scrollIntoView({block:"end",behavior:pending?"smooth":"auto"});
 }
 let sending=false;
@@ -1306,7 +1315,7 @@ $("#btn-save-keys").addEventListener("click",()=>{
 });
 $("#btn-clear-keys").addEventListener("click",()=>{
   if(!KEYS||!KEYS.saved) return toast("No keys saved");
-  if(!confirm("Remove all saved AI keys? MCUBED will go back to demo mode until you add one again.")) return;
+  if(!confirm("Remove all saved AI keys? MHexeract will go back to demo mode until you add one again.")) return;
   saveKeys(Object.fromEntries(KEYS.keys.map(k=>[k.env,""])), "All keys removed.");
 });
 $("#keys-list").addEventListener("click",e=>{
@@ -1389,7 +1398,7 @@ $("#tb-run-gardener").addEventListener("click",()=>toolboxRun("gardener","Checki
 $("#tb-run-strive").addEventListener("click",()=>toolboxRun("strive","Striving toward the no-cost goals"));
 $("#tb-run-ui").addEventListener("click",()=>toolboxRun("ui","Checking UI"));
 $("#tb-close").addEventListener("click",async()=>{
-  if(!confirm("Shut MCUBED down completely? The gateway stops, and on Android the app closes too. Your keys and settings stay saved — just open MCUBED again to restart.")) return;
+  if(!confirm("Shut MHexeract down completely? The gateway stops, and on Android the app closes too. Your keys and settings stay saved — just open MHexeract again to restart.")) return;
   let android=!!(TB&&TB.android);
   try{ const r=await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"shutdown"})}); if(r&&r.android) android=true; }catch(e){}
   $("#off-screen").hidden=false;
@@ -1399,7 +1408,7 @@ $("#tb-compact").addEventListener("click",async()=>{
   try{ await api("/api/compact",{method:"POST"}); toast("Storage compacted"); $("#tb-msg").textContent="Storage compacted." }catch(e){ toast(e.message) }
 });
 $("#tb-restart").addEventListener("click",async()=>{
-  if(!confirm("Restart the MCUBED gateway? It comes back in a few seconds.")) return;
+  if(!confirm("Restart the MHexeract gateway? It comes back in a few seconds.")) return;
   try{ await api("/api/toolbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"restart"})}) }catch(e){}
   toast("Restarting\u2026"); await waitForRestart();
 });
@@ -1537,7 +1546,7 @@ function renderUnits(){
   $("#units-chip").textContent = `${working} working · ${avail} available · ${d.models} models`;
   const name=id=>(d.units.find(u=>u.id===id)||{}).name||id;
   $("#units-latest").textContent = d.mock ? "Demo mode: no AI keys are set, so replies are simulated. Add keys in AI keys to use real AI."
-    : d.latest ? `Last answer came from ${shortModel(d.latest.model)} on ${name(d.latest.unit)}, ${agoShort(d.latest.ts)}.` : "No answers yet. Send a message and MCUBED picks the best AI unit.";
+    : d.latest ? `Last answer came from ${shortModel(d.latest.model)} on ${name(d.latest.unit)}, ${agoShort(d.latest.ts)}.` : "No answers yet. Send a message and MHexeract picks the best AI unit.";
   const label={working:"working",ready:"ready",resting:"resting after errors"};
   $("#units-list").innerHTML = d.units.length ? d.units.map(u=>{
     const bits=[`${u.kind==="cloud"?"cloud":u.kind==="lan"?"your network":"this device"}`, `${u.models.length} model${u.models.length===1?"":"s"}`];
@@ -1546,9 +1555,9 @@ function renderUnits(){
     if(u.resting_models.length && u.state!=="resting") bits.push(`${u.resting_models.length} resting`);
     return `<li><span class="u-dot ${u.state}"></span><div class="u-main"><div class="u-name">${esc(u.name)}<span class="tag ${u.free?"free":""}">${u.free?"free":"paid"}</span></div><div class="u-sub">${bits.join(" · ")}</div></div><span class="u-state">${label[u.state]}</span></li>`}).join("")
     : '<li class="empty">No AI units yet. Add a key in AI keys.</li>';
-  const es=$("#empty-sub"); if(es) es.textContent = d.mock ? "Demo mode: add an AI key to get real answers." : working ? `${working} AI working now, ${avail} ready. MCUBED picks the best one for each message.` : avail ? `${avail} AI ready. MCUBED picks the best one for each message.` : "Add an AI key in AI keys to get started.";
+  const es=$("#empty-sub"); if(es) es.textContent = d.mock ? "Demo mode: add an AI key to get real answers." : working ? `${working} AI working now, ${avail} ready. MHexeract picks the best one for each message.` : avail ? `${avail} AI ready. MHexeract picks the best one for each message.` : "Add an AI key in AI keys to get started.";
   $("#free-only").checked = d.free_only !== false;
-  $("#free-note").textContent = d.free_only!==false ? "MCUBED never calls anything that costs money." : "Paid AI is allowed. Providers may charge your account.";
+  $("#free-note").textContent = d.free_only!==false ? "MHexeract never calls anything that costs money." : "Paid AI is allowed. Providers may charge your account.";
   $("#units-more").textContent = d.more_with_key ? `${d.more_with_key} more providers are ready to add with a key. See Stats > Models > AI nodes.` : "";
 }
 async function loadUnits(){ if(STATIC) return; try{ UNITS=await api("/api/units"); renderUnits() }catch(e){ $("#units-count").textContent="AI" } }
@@ -1562,8 +1571,8 @@ loadHome();
 </script>
 <div id="off-screen" hidden style="position:fixed;inset:0;z-index:99;background:var(--bg);color:var(--text);text-align:center;padding:24px">
   <div style="margin-top:30vh;font-size:44px" aria-hidden="true">⏻</div>
-  <h2>MCUBED is off</h2>
-  <p class="news-note" style="max-width:340px;margin:0 auto">The gateway has stopped. On Android the app closes itself now — if it doesn't, swipe it away. Open MCUBED again whenever you want it back.</p>
+  <h2>MHexeract is off</h2>
+  <p class="news-note" style="max-width:340px;margin:0 auto">The gateway has stopped. On Android the app closes itself now — if it doesn't, swipe it away. Open MHexeract again whenever you want it back.</p>
 </div>
 </body>
 </html>

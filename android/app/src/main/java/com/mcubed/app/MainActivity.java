@@ -39,7 +39,7 @@ import org.json.JSONObject;
 import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
-/** Hosts the MCUBED gateway (embedded Python) and shows its dashboard full screen. */
+/** Hosts the MHexeract gateway (embedded Python) and shows its dashboard full screen. */
 public class MainActivity extends Activity {
     private static final String PREFS = "mcubed";
     private static final String KEY_CONFIGURED = "keys_configured";
@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 7);
         }
         status = new TextView(this);
-        status.setText("Starting MCUBED gateway…");
+        status.setText("Starting MHexeract gateway…");
         status.setTextColor(Color.parseColor("#9aa8a6"));
         status.setGravity(Gravity.CENTER);
         setContentView(status);
@@ -149,7 +149,7 @@ public class MainActivity extends Activity {
                     if (web.getUrl() == null) web.loadUrl(url);
                 });
             } catch (Throwable t) {
-                runOnUiThread(() -> status.setText("MCUBED failed to start:\n" + t.getMessage()));
+                runOnUiThread(() -> status.setText("MHexeract failed to start:\n" + t.getMessage()));
             }
         }, "mcubed-start").start();
     }
@@ -228,8 +228,8 @@ public class MainActivity extends Activity {
         scroll.addView(box);
         final AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("AI provider keys")
-                .setMessage("MCUBED is free: only free AI is used unless you turn on paid AI. Keys are stored only on this device. "
-                        + "With no keys, MCUBED runs in demo mode with simulated replies.")
+                .setMessage("MHexeract is free: only free AI is used unless you turn on paid AI. Keys are stored only on this device. "
+                        + "With no keys, MHexeract runs in demo mode with simulated replies.")
                 .setView(scroll)
                 .setCancelable(false)
                 .setPositiveButton("Save keys", (d, w) -> saveKeysFrom(fields, firstRun))
@@ -312,7 +312,7 @@ public class MainActivity extends Activity {
 
         TextView statusLine = new TextView(this);
         statusLine.setText("Gateway: running in this app\nAI keys saved: " + savedKeyCount()
-                + "\nBattery: " + (batteryUnrestricted() ? "unrestricted (good)" : "restricted \u2014 Android may stop MCUBED"));
+                + "\nBattery: " + (batteryUnrestricted() ? "unrestricted (good)" : "restricted \u2014 Android may stop MHexeract"));
         box.addView(statusLine);
 
         final CheckBox keep = new CheckBox(this);
@@ -321,7 +321,7 @@ public class MainActivity extends Activity {
         keep.setOnCheckedChangeListener((b, on) -> {
             prefs().edit().putBoolean(KEY_KEEP_BG, on).apply();
             applyBackgroundPref();
-            Toast.makeText(this, on ? "MCUBED will keep running in the background"
+            Toast.makeText(this, on ? "MHexeract will keep running in the background"
                     : "Background keep-alive off", Toast.LENGTH_LONG).show();
         });
         box.addView(keep);
@@ -354,7 +354,7 @@ public class MainActivity extends Activity {
         box.addView(reload);
 
         Button close = new Button(this);
-        close.setText("Shut down MCUBED");
+        close.setText("Shut down MHexeract");
         close.setOnClickListener(v -> confirmClose());
         box.addView(close);
 
@@ -368,8 +368,8 @@ public class MainActivity extends Activity {
     /** Ask first, then shut everything down: service, gateway and app. */
     private void confirmClose() {
         new AlertDialog.Builder(this)
-                .setTitle("Shut down MCUBED?")
-                .setMessage("The gateway will stop and the app will close. Your keys and settings stay saved — just open MCUBED again to restart it.")
+                .setTitle("Shut down MHexeract?")
+                .setMessage("The gateway will stop and the app will close. Your keys and settings stay saved — just open MHexeract again to restart it.")
                 .setPositiveButton("Shut down", (d, w) -> closeApp())
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -430,7 +430,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (!getPackageManager().canRequestPackageInstalls()) {
-            Toast.makeText(this, "Allow MCUBED to install updates, then tap Install again", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Allow MHexeract to install updates, then tap Install again", Toast.LENGTH_LONG).show();
             startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
             return;
         }
