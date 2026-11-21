@@ -318,6 +318,15 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   nav.tabs button svg{width:19px;height:19px;padding:0;background:none!important}
   nav.tabs button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--border))}
 }
+/* Phone bottom bar: two rows of bigger buttons (Mick's preference) */
+@media (max-width:899px){
+  nav.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  nav.tabs button{min-height:64px;font-size:13px;gap:5px;border-radius:16px}
+  nav.tabs button svg{width:27px;height:27px;padding:3px 16px}
+  nav.tabs button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .fab{bottom:calc(152px + env(safe-area-inset-bottom))}
+  .toast{bottom:calc(154px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
