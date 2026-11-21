@@ -318,6 +318,10 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   nav.tabs button svg{width:19px;height:19px;padding:0;background:none!important}
   nav.tabs button[aria-selected=true]{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--border))}
 }
+.council{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;font-size:13.5px}
+.council summary{cursor:pointer;color:var(--muted);font-weight:600}
+.council-a{margin-top:8px;padding:8px 10px;background:var(--surface-2);border-radius:10px}
+.council-a>div{margin-top:4px}
 /* Phone bottom bar: two rows of bigger buttons (Mick's preference) */
 @media (max-width:899px){
   nav.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
@@ -433,7 +437,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
   <section class="view" id="v-playground">
     <div class="chat">
       <div class="chat-top">
-        <select id="model" class="ctl" aria-label="Model"><option value="mcubed">MCUBED (auto)</option><option value="mcubed-efficient">MCUBED fast</option><option value="mcubed-quality">MCUBED best quality</option></select>
+        <select id="model" class="ctl" aria-label="Model"><option value="mcubed">MCUBED (auto)</option><option value="mcubed-efficient">MCUBED fast</option><option value="mcubed-quality">MCUBED best quality</option><option value="mcubed-council">Council — models confer for the best answer</option></select>
         <button class="btn" id="btn-units" aria-expanded="false" aria-controls="units-info" title="AI units in use"><span class="u-dot" id="units-dot"></span><span id="units-count">AI</span></button>
         <button class="btn" id="btn-api" aria-expanded="false" aria-controls="api-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>API</button>
         <button class="btn" id="btn-newchat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
@@ -577,7 +581,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
       <p style="margin:0">Chat, questions, summaries, translations, brainstorming. Requests route across free plans from providers like Google Gemini, Groq, Mistral, NVIDIA and OpenRouter's free models, keyless Pollinations, and Meta's Muse Glimmer — so no single provider's paywall or daily cap is a hard wall.</p>
     </div>
     <div class="card"><h2>A jury, not an oracle</h2>
-      <p style="margin:0">Ask the same question and compare how different models answer. For buying decisions, "is this email a scam," health-ish questions and anything you'd rather not take one AI's word for, a second and third opinion beats one confident answer.</p>
+      <p style="margin:0">Pick <b>Council</b> in the chat's model menu and the models confer: several of them answer your question — with the full chat history, so the discussion stays in context — then the strongest one reads all the answers and writes the final one, keeping what they agree on and correcting the rest. Tap "How the council answered" under any council reply to see what each model said. For buying decisions, "is this email a scam," health-ish questions and anything you'd rather not take one AI's word for, a conferred answer beats one confident guess.</p>
     </div>
     <div class="card"><h2>Car help that pays for itself</h2>
       <p style="margin:0">Plug in an ELM327 adapter and the Car diagnostics tab reads and clears fault codes, with over 12,000 plain-English code descriptions stored on the device — then ask the AI what a code means, whether the car is safe to drive, and what a shop typically charges.</p>
@@ -1134,6 +1138,10 @@ function msgEl(m,i){
   if(m.role==="user"){ d.className="msg user"; d.textContent=m.content; return d }
   d.className="msg bot"+(m.error?" err":"");
   d.innerHTML=m.error?esc(m.content):md(m.content);
+  if(m.meta&&m.meta.council&&m.meta.council.members&&m.meta.council.members.length){ const det=document.createElement("details"); det.className="council";
+    det.innerHTML=`<summary>How the council answered — ${m.meta.council.members.length} models conferred${m.meta.council.judge?`, synthesized by ${esc(m.meta.council.judge)}`:""}</summary>`+
+      m.meta.council.members.map(x=>`<div class="council-a"><b>${esc(x.alias)}</b> · ${esc(x.provider)}<div>${md(x.text)}</div></div>`).join("");
+    d.appendChild(det) }
   if(m.meta){ const f=document.createElement("div"); f.className="mfoot num";
     f.innerHTML=`<span>${esc(String(m.meta.model_alias||"").replace(/^(local|lan|custom)-[\w-]+?:/,""))} · ${esc(m.meta.via)} · ${nf(m.meta.latency_ms)} ms${m.meta.cached?" · cached":""}</span>
       <button data-r="1" class="${m.rated===1?"on":""}" aria-label="Good answer">Good</button><button data-r="0" class="${m.rated===0?"on":""}" aria-label="Bad answer">Bad</button>
@@ -1160,7 +1168,7 @@ async function sendChat(text){
   const sel=$("#model").value, strat={mcubed:"balanced","mcubed-efficient":"efficient","mcubed-quality":"quality"}[sel];
   try{
     const r=await api("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({messages:convo.filter(m=>!m.error).map(m=>({role:m.role,content:m.content})),strategy:strat||null,model:strat?null:sel})});
+      body:JSON.stringify({messages:convo.filter(m=>!m.error).map(m=>({role:m.role,content:m.content})),strategy:strat||null,model:strat?null:sel,council:sel==="mcubed-council"})});
     lastReq=r.request_id; convo.push({role:"assistant",content:r.text,meta:r}); setTimeout(loadUnits,300);
   }catch(e){ convo.push({role:"assistant",content:"Could not get an answer: "+e.message+". Add a key in AI keys (or .env), or pick another model.",error:true}) }
   finally{ sending=false; $("#send").disabled=false; saveConvo(); renderChat(); $("#prompt").focus() }

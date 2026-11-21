@@ -245,6 +245,7 @@ class GatewayResponse:
     auto_quality: float = 0.0
     finish_reason: str = ""
     compression: Optional[dict] = None
+    council: Optional[dict] = None
     raw: Any = field(default=None, repr=False)
 
     def summary(self) -> dict:
@@ -1337,6 +1338,79 @@ class Gateway:
                 self._maybe_auto_improve()
                 return out
         raise AllRoutesFailed(attempts)
+
+    def council_chat(self, messages: list[dict] | str, *, size: int = 3,
+                     task_type: Optional[str] = None) -> GatewayResponse:
+        """Let the models confer and produce one best answer.
+
+        Several models answer the same conversation — the full chat history
+        included, so the discussion stays in context — then the strongest
+        respondent reads all the answers and writes the final one: keeping
+        what they agree on, resolving disagreements by the strongest
+        reasoning, and correcting errors. Members are picked for diversity
+        (a different provider first) from the quality-ordered plan, and every
+        call goes through chat(), so usage logging, failover and learning
+        behave exactly as usual. If fewer than two models answer, it
+        degrades gracefully to the best single answer.
+        """
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+        task_type = task_type or classify_task(messages)
+        chain, _, _, _ = self.plan(messages, "quality", task_type, None, None)
+        picked: list[str] = []
+        seen_providers: set[str] = set()
+        for spec, _, _ in chain:  # first pass: one model per provider, best first
+            if spec.alias not in picked and spec.provider not in seen_providers:
+                picked.append(spec.alias)
+                seen_providers.add(spec.provider)
+            if len(picked) >= size:
+                break
+        if len(picked) < size:  # second pass: fill from any remaining models
+            for spec, _, _ in chain:
+                if spec.alias not in picked:
+                    picked.append(spec.alias)
+                if len(picked) >= size:
+                    break
+        got: dict[str, GatewayResponse] = {}
+
+        def ask(alias: str) -> None:
+            try:
+                r = self.chat(messages, strategy="quality", models=[alias],
+                              use_cache=False, task_type=task_type, _allow_compress=False)
+                if r.text.strip():
+                    got[alias] = r
+            except Exception:  # noqa: BLE001 — a member that fails simply does not vote
+                pass
+
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=max(1, len(picked))) as ex:
+            list(ex.map(ask, picked))
+        answers = [(a, got[a]) for a in picked if a in got]
+        if not answers:
+            return self.chat(messages, task_type=task_type)  # nobody answered: normal path, with its error
+        members = [{"alias": a, "provider": self.models[a].provider, "text": r.text} for a, r in answers]
+        if len(answers) == 1:
+            only = answers[0][1]
+            only.council = {"members": members, "judge": None, "note": "only one model was available"}
+            return only
+        joined = "\n\n".join(f"--- Answer from {m['provider']} model {m['alias']} ---\n{m['text']}"
+                             for m in members)
+        synth = list(messages) + [{"role": "user", "content":
+            "Several AI models have answered the conversation above, with its full history. "
+            "Their answers are below. Write the single best final answer for the user: keep what "
+            "they agree on, and where they disagree go with the strongest reasoning and correct "
+            "any errors. Answer directly, as if you are the only one replying — do not mention "
+            "the other models or this process.\n\n" + joined}]
+        judge = answers[0][0]  # the strongest respondent synthesizes
+        try:
+            final = self.chat(synth, strategy="quality", models=[judge],
+                              use_cache=False, task_type=task_type, _allow_compress=False)
+        except Exception:  # noqa: BLE001 — synthesis failed: the best single answer stands
+            final = answers[0][1]
+            final.council = {"members": members, "judge": None, "note": "synthesis failed; best single answer shown"}
+            return final
+        final.council = {"members": members, "judge": judge}
+        return final
 
     # -- learning signals --------------------------------------------------- #
     def feedback(self, request_id: str, score: float, note: str = "", source: str = "user") -> None:
@@ -4600,8 +4674,11 @@ def serve_gui(gw: "Gateway", host: str = "127.0.0.1", port: int = 8765, token: O
                             msgs = str(b.get("prompt", ""))[:200_000]
                         model = b.get("model")
                         pinned = [model] if model and model in gw.models else None
-                        r = gw.chat(msgs, strategy=b.get("strategy"), tier=b.get("tier") if not pinned else None,
-                                    models=pinned)
+                        if b.get("council") and not pinned:  # models confer over the full history
+                            r = gw.council_chat(msgs)
+                        else:
+                            r = gw.chat(msgs, strategy=b.get("strategy"), tier=b.get("tier") if not pinned else None,
+                                        models=pinned)
                         return self._send(200, {**r.summary(), "text": r.text})
                     if u.path == "/api/fetch":
                         b = self._body()
