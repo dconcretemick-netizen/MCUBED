@@ -153,6 +153,16 @@ pre.out{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);b
 .reader .links button{background:none;border:0;padding:4px 0;color:var(--accent);cursor:pointer;text-align:left;font-size:15px}
 .reader .links small{display:block;color:var(--faint);font-size:12px;word-break:break-all}
 #v-games .seg{display:flex;max-width:100%;overflow-x:auto}#v-games .seg button{padding:0 12px;white-space:nowrap}
+/* Games fill the available screen exactly: the pane flexes to main's real height
+   and the iframe takes all of it, so a game's bottom is never cut off (the old
+   fixed vh heights overshot the visible area on phones). */
+#v-games.active{display:flex;flex-direction:column;height:100%}
+#v-games .seg{flex:none}
+#v-games .game-pane{flex:1;min-height:0;display:flex;flex-direction:column}
+#v-games .game-pane[hidden]{display:none}
+#v-games .game-pane .card{flex:1;min-height:0}
+#v-games .game-pane iframe{flex:1;min-height:0;height:100%}
+#v-games .game-pane .row{flex:none}
 .stats-seg[hidden]{display:none}.stats-seg{display:flex;width:fit-content;max-width:100%;overflow-x:auto}.stats-seg button{padding:0 12px;white-space:nowrap}
 .news-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.news-head .row{flex-wrap:nowrap}.news-head .btn{min-height:40px;padding:0 12px}
 .news-head .seg{margin-bottom:0}.news-head .seg button{padding:0 12px}
@@ -516,7 +526,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="game-pane" id="g-solitaire">
     <div class="card" style="padding:0;overflow:hidden">
       <iframe id="sol-frame" title="Solitaire" data-src="solitaire.html"
-        style="display:block;width:100%;height:min(76vh,720px);border:0;background:#0c2622"></iframe>
+        style="display:block;width:100%;height:100%;border:0;background:#0c2622"></iframe>
     </div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">Klondike. Tap a card to auto-move it, or drag. Progress is saved.</span>
@@ -526,7 +536,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="game-pane" id="g-tetris" hidden>
     <div class="card" style="padding:0;overflow:hidden">
       <iframe id="tet-frame" title="Tetris" data-src="tetris.html"
-        style="display:block;width:100%;height:min(78vh,760px);border:0;background:#0d1216"></iframe>
+        style="display:block;width:100%;height:100%;border:0;background:#0d1216"></iframe>
     </div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">Swipe to move, tap to rotate, flick down to drop. Pauses when you leave.</span>
@@ -536,7 +546,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="game-pane" id="g-pip" hidden>
     <div class="card" style="padding:0;overflow:hidden">
       <iframe id="pip-frame" title="Pip's Leap" data-src="platformer.html" allow="fullscreen; autoplay"
-        style="display:block;width:100%;height:min(78vh,760px);border:0;background:#000"></iframe>
+        style="display:block;width:100%;height:100%;border:0;background:#000"></iframe>
     </div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">A platformer in three worlds. Turn your phone sideways for the widest view.</span>
@@ -546,7 +556,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="game-pane" id="g-doom" hidden>
     <div class="card" style="padding:0;overflow:hidden">
       <iframe id="doom-frame" title="Gateway Doom" data-src="game.html" allow="fullscreen; autoplay"
-        style="display:block;width:100%;height:min(72vh,640px);border:0;background:#000"></iframe>
+        style="display:block;width:100%;height:100%;border:0;background:#000"></iframe>
     </div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">Demons are your real error types from the last 30 days.</span>
@@ -556,7 +566,7 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
     <div class="game-pane" id="g-oregon" hidden>
     <div class="card" style="padding:0;overflow:hidden">
       <iframe id="oregon-frame" title="Oregon Trail" data-src="oregon.html"
-        style="display:block;width:100%;height:min(78vh,760px);border:0;background:#0d1216"></iframe>
+        style="display:block;width:100%;height:100%;border:0;background:#0d1216"></iframe>
     </div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
       <span style="color:var(--muted);font-size:13px">2,000 miles to Oregon City. Mind the rivers, buy supplies at the forts, and do not die of dysentery. Your journey saves as you go.</span>
